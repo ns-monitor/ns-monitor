@@ -900,8 +900,17 @@ CREATE MATERIALIZED VIEW public.layer2_daily_band_stats AS
              CROSS JOIN thresholds thr)
           WHERE (r.sg IS NOT NULL)
           GROUP BY (((r.ts AT TIME ZONE config.tz_name))::date)
+        ), all_days AS (
+         SELECT day
+           FROM daily_cgm
+        UNION
+         SELECT day
+           FROM daily_basal
+        UNION
+         SELECT day
+           FROM daily_bolus
         )
- SELECT COALESCE(cgm.day, db.day, bol.day) AS date,
+ SELECT d.day AS date,
     round((((COALESCE(db.total_basal, (0)::numeric) + COALESCE(bol.smb, (0)::numeric)) + COALESCE(bol.meal_bolus, (0)::numeric)) + COALESCE(bol.correction_bolus, (0)::numeric)), 1) AS tdd,
     round(COALESCE(db.total_basal, (0)::numeric), 1) AS total_basal,
     round(COALESCE(db.scheduled_basal, (0)::numeric), 1) AS scheduled_basal,
@@ -937,10 +946,11 @@ CREATE MATERIALIZED VIEW public.layer2_daily_band_stats AS
     round(cgm.hyper_auc_sum, 3) AS hyper_auc_sum,
     round(cgm.lbgi, 2) AS lbgi,
     round(cgm.hbgi, 2) AS hbgi
-   FROM ((daily_cgm cgm
-     FULL JOIN daily_basal db ON ((db.day = cgm.day)))
-     FULL JOIN daily_bolus bol ON ((bol.day = cgm.day)))
-  ORDER BY COALESCE(cgm.day, db.day, bol.day) DESC
+   FROM (((all_days d
+     LEFT JOIN daily_cgm cgm ON ((cgm.day = d.day)))
+     LEFT JOIN daily_basal db ON ((db.day = d.day)))
+     LEFT JOIN daily_bolus bol ON ((bol.day = d.day)))
+  ORDER BY d.day DESC
   WITH NO DATA;
 
 
