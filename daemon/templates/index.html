@@ -1,0 +1,1805 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Settings — ns-monitor</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        /* Top-level Navigation Pills */
+        .management-nav-pills {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        .m-nav-pill {
+            padding: 8px 18px;
+            border-radius: 6px;
+            font-size: 0.92rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            background: var(--surface-inset);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .m-nav-pill:hover {
+            color: var(--text-color);
+            border-color: var(--border-color-strong);
+        }
+
+        .m-nav-pill.active {
+            color: var(--accent-foreground);
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .management-section {
+            display: none;
+        }
+
+        .management-section.active {
+            display: block;
+        }
+
+        .section-header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .section-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-color);
+            margin: 0;
+        }
+
+        .section-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .swatch-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border: 1px solid var(--border-color);
+            background: var(--surface-inset);
+        }
+
+        .swatch-circle {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        /* Modal Backdrop and Box */
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-backdrop.active {
+            display: flex;
+        }
+
+        .modal-box {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color-strong);
+            border-radius: 8px;
+            width: 100%;
+            max-width: 860px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 12px 36px rgba(0,0,0,0.6);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-color);
+            margin: 0;
+        }
+
+        .modal-body {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .modal-footer {
+            padding: 14px 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        #filter-modal-backdrop .modal-body {
+            font-size: 0.82rem;
+        }
+
+        .color-palette-options {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 6px;
+        }
+
+        .color-palette-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+
+        .color-palette-btn:hover {
+            transform: scale(1.15);
+        }
+
+        .color-palette-btn.selected {
+            border-color: #ffffff;
+            box-shadow: 0 0 0 2px var(--accent);
+        }
+
+        .range-settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 12px;
+        }
+
+        .range-card {
+            background: var(--surface-inset);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+        }
+
+        .range-inputs-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .range-inputs-row .form-input {
+            width: 100px;
+        }
+
+        .table-card {
+            padding: 0;
+            overflow-x: auto;
+        }
+
+        .table-empty-cell {
+            text-align: center;
+            color: var(--text-secondary);
+            padding: var(--space-5);
+        }
+
+        /* Settings Grid Styles */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-6);
+            align-items: start;
+        }
+
+        .config-row {
+            margin-bottom: var(--space-4);
+        }
+
+        .config-row label {
+            display: block;
+            margin-bottom: var(--space-1);
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.9em;
+        }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--surface-raised);
+            border: 1px solid var(--border-color);
+            transition: .3s;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+        }
+
+        input:checked + .slider {
+            background-color: var(--success);
+            border-color: var(--success);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        .slider.round {
+            border-radius: 24px;
+        }
+
+        .slider.round:before {
+            border-radius: 50%;
+        }
+    </style>
+</head>
+
+<body>
+    {% include "sidebar.html" %}
+
+    <div class="container">
+        <header class="page-header">
+            <div class="panel-header-left">
+                <h1 class="panel-h1">System Settings</h1>
+            </div>
+            <div class="panel-header-right">
+                <span id="management-status-msg" style="font-size: 0.85rem; color: var(--text-secondary);"></span>
+            </div>
+        </header>
+
+        <main>
+            <!-- Navigation Tabs -->
+            <div class="management-nav-pills">
+                <button type="button" class="m-nav-pill active" id="tab-btn-filters">
+                    <i class="fa-solid fa-layer-group"></i> Calendar Overlays
+                </button>
+                <button type="button" class="m-nav-pill" id="tab-btn-ranges">
+                    <i class="fa-solid fa-sliders"></i> Chart Display Settings
+                </button>
+                <button type="button" class="m-nav-pill" id="tab-btn-system">
+                    <i class="fa-solid fa-gear"></i> System Settings
+                </button>
+            </div>
+
+            <!-- TAB 1: CALENDAR OVERLAYS -->
+            <section id="section-filters" class="management-section active">
+                <div class="section-header-row">
+                    <div>
+                        <h2 class="section-title">Calendar Overlays</h2>
+                        <div class="section-desc">Create and manage custom filters (qualifying day patterns) and values (daily and rolling metric displays) for Calendar cells.</div>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="btn-new-filter">
+                        <i class="fa-solid fa-plus"></i> New Calendar Overlay
+                    </button>
+                </div>
+
+                <div class="card table-card">
+                    <table class="panel-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Matching / Value Definition</th>
+                                <th>Display Style</th>
+                                <th class="num">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="filters-table-body">
+                            <tr><td colspan="5" class="table-empty-cell">Loading calendar overlays...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- TAB 2: CHART DISPLAY SETTINGS -->
+            <section id="section-ranges" class="management-section">
+                <!-- Sub-navigation Pills -->
+                <div class="management-nav-pills" style="margin-bottom: 16px; border-bottom: none; padding-bottom: 0;">
+                    <button type="button" class="m-nav-pill active" id="subtab-btn-corridors" onclick="switchChartSubtab('corridors')">
+                        <i class="fa-solid fa-arrows-left-right-to-line"></i> Reference Corridors
+                    </button>
+                    <button type="button" class="m-nav-pill" id="subtab-btn-patterns" onclick="switchChartSubtab('patterns')">
+                        <i class="fa-solid fa-chart-line"></i> Patterns Styles
+                    </button>
+                    <button type="button" class="m-nav-pill" id="subtab-btn-trends" onclick="switchChartSubtab('trends')">
+                        <i class="fa-solid fa-chart-area"></i> Trends Styles
+                    </button>
+                    <button type="button" class="m-nav-pill" id="subtab-btn-trace" onclick="switchChartSubtab('trace')">
+                        <svg class="nav-icon-svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align: -0.125em;"><path d="M2 12h3l2.5-4.5 2.5 11.5 3.5-16 3 13 2.5-7 1.5 3h1.5"/></svg> Trace Styles
+                    </button>
+                    <button type="button" class="m-nav-pill" id="subtab-btn-hba1c" onclick="switchChartSubtab('hba1c')">
+                        <svg class="nav-icon-svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align: -0.125em;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> HbA1c Styles
+                    </button>
+                </div>
+
+                <!-- SUB-PANE 1: REFERENCE CORRIDORS -->
+                <div id="subtab-pane-corridors" class="subtab-pane" style="display: block;">
+                    <div class="section-header-row">
+                        <div>
+                            <h2 class="section-title">Visual Chart Display Bands</h2>
+                            <div class="section-desc">Customizes shaded reference corridors on Trace, Trends, and Patterns charts. Strictly decoupled from clinical percentage statistics.</div>
+                        </div>
+                        <button type="button" class="btn btn-primary" id="btn-save-ranges">
+                            <i class="fa-solid fa-floppy-disk"></i> Save Display Settings
+                        </button>
+                    </div>
+
+                    <!-- Decoupled Visual Corridors Banner -->
+                    <div style="margin-bottom: 16px; background: var(--surface-inset); border: 1px solid var(--border-color); border-left: 4px solid var(--accent); padding: 12px 16px; border-radius: 4px; font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5;">
+                        <strong style="color: var(--text-color);"><i class="fa-solid fa-circle-info"></i> Visual Reference Corridors — Strictly Decoupled:</strong>
+                        These settings customize horizontal background shading behind continuous glucose charts. They strictly do <em>not</em> modify clinical percentage statistics (TIR, TITR, TAR, TBR), which are computed using international consensus definitions (3.9–10.0 and 3.9–7.8 mmol/L).
+                    </div>
+
+                    <div class="card">
+                        <div class="range-settings-grid">
+                            <div class="range-card">
+                                <div style="font-weight: 700; color: var(--text-color);">Tight Range (TITR)</div>
+                                <div style="font-size: 0.82rem; color: var(--text-secondary);">Target in Tight Range reference shading.</div>
+                                <div class="range-inputs-row">
+                                    <div>
+                                        <label for="range-titr-low" style="font-size: 0.75rem; color: var(--text-secondary);">Low (mmol/L)</label>
+                                        <input type="number" step="0.1" id="range-titr-low" class="form-input" value="3.9">
+                                    </div>
+                                    <span style="margin-top: 16px; color: var(--text-secondary);">to</span>
+                                    <div>
+                                        <label for="range-titr-high" style="font-size: 0.75rem; color: var(--text-secondary);">High (mmol/L)</label>
+                                        <input type="number" step="0.1" id="range-titr-high" class="form-input" value="7.8">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="range-card">
+                                <div style="font-weight: 700; color: var(--text-color);">Standard Range (TIR)</div>
+                                <div style="font-size: 0.82rem; color: var(--text-secondary);">Standard Time in Range reference shading.</div>
+                                <div class="range-inputs-row">
+                                    <div>
+                                        <label for="range-tir-low" style="font-size: 0.75rem; color: var(--text-secondary);">Low (mmol/L)</label>
+                                        <input type="number" step="0.1" id="range-tir-low" class="form-input" value="3.9">
+                                    </div>
+                                    <span style="margin-top: 16px; color: var(--text-secondary);">to</span>
+                                    <div>
+                                        <label for="range-tir-high" style="font-size: 0.75rem; color: var(--text-secondary);">High (mmol/L)</label>
+                                        <input type="number" step="0.1" id="range-tir-high" class="form-input" value="10.0">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUB-PANE 2: PATTERNS STYLES -->
+                <div id="subtab-pane-patterns" class="subtab-pane" style="display: none;">
+                    <div class="section-header-row">
+                        <div>
+                            <h2 class="section-title">Patterns Display Defaults</h2>
+                            <div class="section-desc">System-wide default colors, line styles, stroke weights, opacities, fill, and graph types for Patterns (AGP). Saved views inherit these unless overridden. AGP and TIR Heat are built-in composite graphs and aren't listed here -- see their pages for legend detail.</div>
+                        </div>
+                    </div>
+                    <div class="card" style="display: flex; gap: 0; padding: 0; overflow: hidden; min-height: 420px; max-width: 760px;">
+                        <div style="width: 280px; border-right: 1px solid var(--border-color); background: var(--surface-inset); flex-shrink: 0;">
+                            <div id="patterns-styles-list"></div>
+                        </div>
+                        <div style="flex: 1; padding: 20px 24px; min-width: 0;" id="patterns-styles-panel"></div>
+                    </div>
+                </div>
+
+                <!-- SUB-PANE 3: TRENDS STYLES -->
+                <div id="subtab-pane-trends" class="subtab-pane" style="display: none;">
+                    <div class="section-header-row">
+                        <div>
+                            <h2 class="section-title">Trends Display Defaults</h2>
+                            <div class="section-desc">System-wide default colors, line styles, stroke weights, opacities, fill, and graph types for Trends metrics. Saved views inherit these unless overridden.</div>
+                        </div>
+                    </div>
+                    <div class="card" style="display: flex; gap: 0; padding: 0; overflow: hidden; min-height: 420px; max-width: 760px;">
+                        <div style="width: 280px; border-right: 1px solid var(--border-color); background: var(--surface-inset); flex-shrink: 0;">
+                            <div id="trends-styles-list"></div>
+                        </div>
+                        <div style="flex: 1; padding: 20px 24px; min-width: 0;" id="trends-styles-panel"></div>
+                    </div>
+                </div>
+
+                <!-- SUB-PANE 4: TRACE STYLES -->
+                <div id="subtab-pane-trace" class="subtab-pane" style="display: none;">
+                    <div class="section-header-row">
+                        <div>
+                            <h2 class="section-title">Trace Display Defaults</h2>
+                            <div class="section-desc">System-wide default colors, line styles, stroke weights, opacities, fill, and graph types for 24-hour Trace metrics. Saved views inherit these unless overridden.</div>
+                        </div>
+                    </div>
+                    <div class="card" style="display: flex; gap: 0; padding: 0; overflow: hidden; min-height: 420px; max-width: 760px;">
+                        <div style="width: 280px; border-right: 1px solid var(--border-color); background: var(--surface-inset); flex-shrink: 0;">
+                            <div id="trace-styles-list"></div>
+                        </div>
+                        <div style="flex: 1; padding: 20px 24px; min-width: 0;" id="trace-styles-panel"></div>
+                    </div>
+                </div>
+
+                <!-- SUB-PANE 5: HBA1C STYLES -->
+                <div id="subtab-pane-hba1c" class="subtab-pane" style="display: none;">
+                    <div class="section-header-row">
+                        <div>
+                            <h2 class="section-title">HbA1c Display Defaults</h2>
+                            <div class="section-desc">System-wide default colors, line styles, stroke weights, opacities, fill, and graph types for HbA1c series. Saved views inherit these unless overridden.</div>
+                        </div>
+                    </div>
+                    <div class="card" style="display: flex; gap: 0; padding: 0; overflow: hidden; min-height: 420px; max-width: 760px;">
+                        <div style="width: 280px; border-right: 1px solid var(--border-color); background: var(--surface-inset); flex-shrink: 0;">
+                            <div id="hba1c-styles-list"></div>
+                        </div>
+                        <div style="flex: 1; padding: 20px 24px; min-width: 0;" id="hba1c-styles-panel"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: SYSTEM SETTINGS -->
+            <section id="section-system" class="management-section">
+                <div class="settings-grid">
+                    <!-- COLUMN 1: Connection & General -->
+                    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+                        <!-- General Settings -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="panel-h3" style="margin:0"><i class="fas fa-cog"></i> General Settings</h3>
+                            </div>
+                            <div class="card-body">
+                                <form id="general-settings" onsubmit="saveSettings(event, 'general-settings')">
+                                    <div class="config-row">
+                                        <label for="NIGHTSCOUT_URL">Nightscout URL</label>
+                                        <input type="text" id="NIGHTSCOUT_URL" name="NIGHTSCOUT_URL" class="form-input"
+                                            placeholder="https://your-nightscout.example.com/api/v1">
+                                        <div class="hint">Must end in /api/v1</div>
+                                    </div>
+
+                                    <div class="config-row">
+                                        <label for="API_SECRET">API Secret</label>
+                                        <input type="password" id="API_SECRET" name="API_SECRET" class="form-input">
+                                        <div class="hint">Used for authentication.</div>
+                                    </div>
+
+                                    <hr style="border:0; border-top:1px solid var(--border-color); margin: var(--space-4) 0;">
+
+                                    <div class="config-row">
+                                        <label for="POLLING_ENABLED">Polling Status</label>
+                                        <label class="switch">
+                                            <input type="checkbox" id="POLLING_ENABLED" name="POLLING_ENABLED">
+                                            <span class="slider round"></span>
+                                        </label>
+                                        <div class="hint">Enable or disable background data fetching.</div>
+                                    </div>
+
+                                    <div class="config-row">
+                                        <label for="POLL_PERIOD_SECONDS">Poll Interval (seconds)</label>
+                                        <input type="number" id="POLL_PERIOD_SECONDS" name="POLL_PERIOD_SECONDS" class="form-input">
+                                        <div class="hint">How often to check Nightscout for new data. Default: 300.</div>
+                                    </div>
+
+                                    <div class="config-row">
+                                        <label for="POLL_OFFSET_SECONDS">Poll Offset (seconds)</label>
+                                        <input type="number" id="POLL_OFFSET_SECONDS" name="POLL_OFFSET_SECONDS" class="form-input">
+                                        <div class="hint">Small buffer added to poll timing.</div>
+                                    </div>
+
+                                    <div class="config-row">
+                                        <label for="TIMEZONE">Site Timezone</label>
+                                        <input type="text" id="TIMEZONE" name="TIMEZONE" class="form-input" placeholder="Australia/Perth" autocomplete="off">
+                                        <div class="hint">IANA timezone used for dates and chart times, e.g. Australia/Perth.</div>
+                                    </div>
+                                    <div class="config-row">
+                                        <label for="HEALTHCHECK_URL">Healthcheck URL</label>
+                                        <input type="text" id="HEALTHCHECK_URL" name="HEALTHCHECK_URL" class="form-input">
+                                        <div class="hint">External URL to ping after every successful poll e.g. HomeAssistant Uptime Kuma</div>
+                                    </div>
+
+                                    <div style="display: flex; gap: var(--space-2); margin-top: var(--space-4);">
+                                        <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Apply General Settings</button>
+                                        <button type="button" class="btn btn-secondary" onclick="resetForm('general-settings')">Cancel</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- COLUMN 2: Bulk Fetch Pacing -->
+                    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+                        <!-- Bulk Fetch Pacing -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="panel-h3" style="margin:0"><i class="fas fa-tachometer-alt"></i> Bulk Fetch Pacing</h3>
+                            </div>
+                            <div class="card-body">
+                                <form id="pacing-settings" onsubmit="saveSettings(event, 'pacing-settings')">
+                                    <div class="config-row">
+                                        <label for="cfg-sleep-windows">Delay Between Chunks (seconds)</label>
+                                        <input type="number" id="cfg-sleep-windows" name="BACKFILL_DELAY_SECONDS" class="form-input" step="0.1">
+                                        <div class="hint">Delay between consecutive multi-day backfill batch runs.</div>
+                                    </div>
+                                    <div class="config-row">
+                                        <label for="cfg-page-size">Max Records per Query</label>
+                                        <input type="number" id="cfg-page-size" name="BACKFILL_PAGE_SIZE" class="form-input">
+                                        <div class="hint">The maximum number of records to request in a single query (Page Size).</div>
+                                    </div>
+                                    <div class="config-row">
+                                        <label for="cfg-sleep-pages">Delay Between Pages (seconds)</label>
+                                        <input type="number" id="cfg-sleep-pages" name="BACKFILL_SLEEP_BETWEEN_PAGES_SEC" class="form-input" step="0.1">
+                                        <div class="hint">Delay applied after fetching a full page of records to pace subsequent requests.</div>
+                                    </div>
+
+                                    <hr style="border:0; border-top:1px solid var(--border-color); margin: var(--space-4) 0;">
+                                    <h4 class="panel-heading-sm" style="margin-bottom: var(--space-2); color: var(--accent);">Advanced Chunk Settings</h4>
+
+                                    <div class="config-row">
+                                        <label for="cfg-chunk-entries">Fetch Chunk - Readings (days)</label>
+                                        <input type="number" id="cfg-chunk-entries" name="BACKFILL_CHUNK_DAYS_ENTRIES" class="form-input">
+                                    </div>
+                                    <div class="config-row">
+                                        <label for="cfg-chunk-treat">Fetch Chunk - Treatments (days)</label>
+                                        <input type="number" id="cfg-chunk-treat" name="BACKFILL_CHUNK_DAYS_TREATMENTS" class="form-input">
+                                    </div>
+                                    <div class="config-row">
+                                        <label for="cfg-chunk-dev">Fetch Chunk - DeviceStatus (days)</label>
+                                        <input type="number" id="cfg-chunk-dev" name="BACKFILL_CHUNK_DAYS_DEVICESTATUS" class="form-input">
+                                    </div>
+
+                                    <div style="display: flex; gap: var(--space-2); margin-top: var(--space-4);">
+                                        <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Apply Pacing Settings</button>
+                                        <button type="button" class="btn btn-secondary" onclick="resetForm('pacing-settings')">Cancel</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+
+    <!-- CALENDAR OVERLAY AUTHORING MODAL -->
+    <div id="filter-modal-backdrop" class="modal-backdrop">
+        <div class="modal-box" style="max-width: 1040px; width: 75vw;">
+            <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <h3 class="modal-title" id="filter-modal-title">New Calendar Overlay</h3>
+                </div>
+                <button type="button" class="btn btn-secondary" id="filter-modal-close" style="padding: 4px 8px;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row-split" style="margin-bottom: 18px; align-items: stretch;">
+                    <div class="form-group" style="flex: 0 0 250px; display: flex; flex-direction: column;">
+                        <label for="filter-name-input" class="form-label-minor">Overlay Name</label>
+                        <input type="text" id="filter-name-input" class="form-input form-input-full form-input-sm" placeholder="e.g. Weekend Hypo Risk" maxlength="30" required>
+                        <div class="char-counter" id="filter-name-counter">0 / 30</div>
+                        <div style="margin-top: 10px;">
+                            <label class="form-label-minor" style="margin-bottom: 4px;">Applies to</label>
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <label class="checkbox-label"><input type="checkbox" id="filter-applies-calendar" onchange="updateAppliesVisibility()" checked> Calendar</label>
+                                <div>
+                                    <label class="checkbox-label"><input type="checkbox" id="filter-applies-patterns" onchange="updateAppliesVisibility()"> Patterns</label>
+                                    <div id="patterns-applies-hint" style="display: none; font-size: 0.72rem; color: var(--text-secondary); margin-left: 20px;">Filters 24h AGP composite percentiles via "Only on:"</div>
+                                </div>
+                                <div>
+                                    <label class="checkbox-label"><input type="checkbox" id="filter-applies-trends" onchange="updateAppliesVisibility()"> Trends</label>
+                                    <div id="trends-applies-hint" style="display: none; font-size: 0.72rem; color: var(--text-secondary); margin-left: 20px;">Flags matching dates along trend timeline</div>
+                                </div>
+                                <div>
+                                    <label class="checkbox-label"><input type="checkbox" id="filter-applies-trace" onchange="updateAppliesVisibility()"> Trace</label>
+                                    <div id="trace-applies-hint" style="display: none; font-size: 0.72rem; color: var(--text-secondary); margin-left: 20px;">Pins event marker on 24h timeline canvas</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group" style="flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0;">
+                        <label for="filter-notes-input" class="form-label-minor">Description <span style="font-weight: 400; opacity: 0.75;">(optional)</span></label>
+                        <textarea id="filter-notes-input" class="form-input form-input-full form-input-sm" placeholder="What this overlay is for -- the name just needs to be recognisable, this is where the detail goes" maxlength="200" style="resize: vertical; flex: 1 1 auto; min-height: 100px;"></textarea>
+                        <div class="char-counter" id="filter-notes-counter">0 / 200</div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 6px;">
+                    <div id="filter-builder-container"></div>
+                </div>
+
+                <div id="calendar-display-section" style="margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <label style="font-weight: 600; font-size: 0.85rem; color: var(--text-color); margin-bottom: 0;">
+                            <i class="fa-solid fa-calendar-days"></i> Calendar Cell Appearance
+                        </label>
+                        <span style="font-size: 0.78rem; color: var(--text-secondary);">Configures visual badge, icon, and position for Calendar day cells</span>
+                    </div>
+                    <div style="display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap;">
+                        <!-- 0. Frequency: Show on -->
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <label class="form-label-minor" style="margin-bottom: 0;">Show on</label>
+                            <select id="filter-display-frequency" class="sentence-select" style="min-width: 155px;">
+                                <option value="matching" selected>Only on matching days</option>
+                                <option value="always">Every day</option>
+                            </select>
+                        </div>
+
+                        <!-- 1. Type -->
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <label class="form-label-minor" style="margin-bottom: 0;">Type</label>
+                            <div id="filter-type-select-wrap">
+                                <select id="filter-display-type" class="sentence-select" style="min-width: 140px;">
+                                    <option value="badge" selected>Badge</option>
+                                    <option value="fill">Cell Fill Tint</option>
+                                    <option value="circle">Circle ●</option>
+                                    <option value="square">Square ■</option>
+                                    <option value="triangle">Triangle ▲</option>
+                                    <option value="tick">Tick ✓</option>
+                                    <option value="cross">Cross ✕</option>
+                                    <option value="value">Value (Number)</option>
+                                    <option value="num_badge">Number Badge [3]</option>
+                                    <option value="custom_text">Custom Text</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- 1b. Value Metric selector -->
+                        <div id="filter-val-metric-wrap" style="display: none; flex-direction: column; gap: 4px;">
+                            <label class="form-label-minor" style="margin-bottom: 0;">Value to display</label>
+                            <select id="filter-val-metric-select" class="sentence-select" style="min-width: 130px;">
+                            </select>
+                        </div>
+
+                        <!-- 1c. Custom Text Input -->
+                        <div id="filter-custom-text-wrap" style="display: none; flex-direction: column; gap: 4px;">
+                            <label class="form-label-minor" style="margin-bottom: 0;">Text / Template</label>
+                            <input type="text" id="filter-custom-text-input" class="sentence-input" placeholder="e.g. P, POD, TIR #%" maxlength="20" style="width: 130px;">
+                        </div>
+
+                        <!-- 2. Location -->
+                        <div id="filter-location-wrap" style="display: flex; flex-direction: column; gap: 4px;">
+                            <label class="form-label-minor" style="margin-bottom: 0;">Location</label>
+                            <select id="filter-display-location" class="sentence-select" style="min-width: 140px;">
+                                <option value="top-left">Top-Left</option>
+                                <option value="top-center">Top-Center</option>
+                                <option value="top-right" selected>Top-Right</option>
+                                <option value="mid-left">Mid-Left</option>
+                                <option value="center">Center</option>
+                                <option value="mid-right">Mid-Right</option>
+                                <option value="bottom-left">Bottom-Left</option>
+                                <option value="bottom-center">Bottom-Center</option>
+                                <option value="bottom-right">Bottom-Right</option>
+                            </select>
+                            <div id="location-fill-indicator" style="display: none; font-size: 0.82rem; color: var(--text-secondary); padding: 5px 0;">
+                                (Entire Cell)
+                            </div>
+                        </div>
+
+                        <!-- 3. Color -->
+                        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1 1 200px;">
+                            <label class="form-label-minor" style="margin-bottom: 0;">Colour</label>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="text" id="filter-color-hex" class="sentence-input" value="#e74c3c" style="width: 85px;">
+                                <div class="color-palette-options" id="filter-color-palette" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="filter-modal-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="filter-modal-save">Save Calendar Overlay</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BLOCKING VIEWS / DELETION GUARD MODAL -->
+    <div id="guard-modal-backdrop" class="modal-backdrop">
+        <div class="modal-box" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title" style="color: var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> Cannot Delete</h3>
+                <button type="button" class="btn btn-secondary" id="guard-modal-close" style="padding: 4px 8px;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="guard-modal-msg" style="margin: 0; color: var(--text-color);">
+                    This item cannot be deleted because it is actively referenced by saved views.
+                </p>
+                <div style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">Referenced in Views:</div>
+                <ul id="guard-modal-views-list" style="margin: 0; padding-left: 20px; color: var(--text-color); font-size: 0.9rem;"></ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="guard-modal-ok">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/registries/trends.js"></script>
+    <script src="/static/js/registries/trace.js"></script>
+    <script src="/static/js/registries/agp.js"></script>
+    <script src="/static/js/registries/hba1c.js"></script>
+    <script src="/static/js/ns-chart-customizer.js"></script>
+    <script src="/static/js/ns-filter-builder.js"></script>
+    <script>
+        (function() {
+            'use strict';
+
+            var metricsCatalog = {};
+            var filtersList = [];
+            var editingFilterId = null;
+            var filterBuilderInstance = null;
+
+            var PRESET_COLORS = [
+                '#2ecc71', '#e74c3c', '#f39c12', '#3498db', '#9b59b6', '#1abc9c', '#e67e22', '#34495e'
+            ];
+
+            function setStatus(msg) {
+                var el = document.getElementById('management-status-msg');
+                if (el) el.textContent = msg;
+            }
+
+            function switchSettingsTab(tabKey) {
+                var validTabs = ['filters', 'ranges', 'system'];
+                if (validTabs.indexOf(tabKey) === -1) tabKey = 'filters';
+
+                try {
+                    localStorage.setItem('ns_settings_active_tab', tabKey);
+                } catch (e) {}
+
+                validTabs.forEach(function(k) {
+                    var btn = document.getElementById('tab-btn-' + k);
+                    var sec = document.getElementById('section-' + k);
+                    if (k === tabKey) {
+                        if (btn) btn.classList.add('active');
+                        if (sec) sec.classList.add('active');
+                    } else {
+                        if (btn) btn.classList.remove('active');
+                        if (sec) sec.classList.remove('active');
+                    }
+                });
+            }
+            window.switchSettingsTab = switchSettingsTab;
+
+            function escapeHtml(str) {
+                if (!str) return '';
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            // --- CALENDAR OVERLAYS FORMATTERS & RENDERERS ---
+            function formatRuleSentence(rule) {
+                if (!rule) return '-';
+                var mKey = rule.metric || '';
+                var cfg = metricsCatalog[mKey] || {};
+                var label = cfg.label || mKey.toUpperCase();
+                var isEvent = cfg.kind === 'event';
+
+                var baseParts = [];
+                baseParts.push(label);
+
+                if (!isEvent) {
+                    var c = rule.comparator || '';
+                    var compWord = c === 'gte' ? 'at least' : (c === 'lte' ? 'at most' : (c === 'gt' ? 'greater than' : (c === 'lt' ? 'less than' : (c === 'eq' ? 'equal to' : c))));
+                    baseParts.push(compWord);
+                    baseParts.push(rule.threshold !== undefined ? rule.threshold : '');
+                    if (cfg.unit && cfg.unit !== 'index') baseParts.push(cfg.unit);
+                }
+
+                var modParts = [];
+                if (rule.window) {
+                    modParts.push('over a ' + rule.window.value + ' ' + rule.window.unit + ' moving average');
+                }
+                if (rule.duration) {
+                    var durPrefix = cfg.kind === 'continuous' ? 'sustained for at least' : 'for at least';
+                    var durSuffix = cfg.kind === 'continuous' ? '' : 'consecutively';
+                    modParts.push(durPrefix + ' ' + rule.duration.value + ' ' + rule.duration.unit + (durSuffix ? ' ' + durSuffix : ''));
+                }
+                if (rule.timeScope) {
+                    modParts.push('between ' + rule.timeScope.start + ' and ' + rule.timeScope.end);
+                }
+
+                var line1 = baseParts.join(' ');
+                if (modParts.length > 0) {
+                    line1 += ' ' + modParts[0];
+                }
+
+                var html = '<div class="target-sentence-line">' + escapeHtml(line1) + '</div>';
+                for (var i = 1; i < modParts.length; i++) {
+                    html += '<div class="target-modifier-line">' + escapeHtml(modParts[i]) + '</div>';
+                }
+                return html;
+            }
+
+            function formatValueSentence(valObj) {
+                if (!valObj) return '-';
+                var m = metricsCatalog[valObj.metric] || { label: valObj.metric };
+                var agg = valObj.window_type === 'rolling' ? (valObj.rolling_days + '-day moving average') : "this day's value";
+                var text = 'Show <b>' + m.label + '</b> as <b>' + agg + '</b>';
+                if (valObj.timeScope) {
+                    var s = valObj.timeScope.start || '00:00';
+                    var e = valObj.timeScope.end || '23:59';
+                    if (s === '06:00' && e === '22:00') text += ' (daytime)';
+                    else if (s === '22:00' && e === '06:00') text += ' (overnight)';
+                    else text += ' (' + s + '–' + e + ')';
+                }
+                return text;
+            }
+
+            function formatFilterTreeSentence(tree) {
+                if (!tree) return '-';
+                if (tree.kind === 'value') {
+                    return formatValueSentence(tree);
+                }
+                if (tree.op && tree.clauses) {
+                    var connector = tree.op === 'AND' ? 'ALL of' : 'ANY of';
+                    if (tree.clauses.length === 0) {
+                        return connector + ': (none)';
+                    }
+                    if (tree.clauses.length === 1) {
+                        var singleClause = tree.clauses[0];
+                        if (singleClause.clauses) {
+                            return '<div class="filter-tree-connector">' + connector + ':</div>' + formatFilterTreeSentence(singleClause);
+                        }
+                        return '<div class="filter-tree-connector">' + connector + ':</div>' + formatRuleSentence(singleClause);
+                    }
+                    var html = '<div class="filter-tree-connector">' + connector + ':</div>';
+                    html += '<div class="filter-tree-clauses">';
+                    tree.clauses.forEach(function(cl) {
+                        html += '<div class="filter-clause-item"><span class="filter-clause-bullet">•</span> ';
+                        if (cl.clauses) {
+                            html += '<div style="display:inline-block; vertical-align:top;">' + formatFilterTreeSentence(cl) + '</div>';
+                        } else {
+                            html += '<div style="display:inline-block; vertical-align:top;">' + formatRuleSentence(cl) + '</div>';
+                        }
+                        html += '</div>';
+                    });
+                    html += '</div>';
+                    return html;
+                }
+                return formatRuleSentence(tree);
+            }
+
+            function formatDisplayDefaultsBadge(defaults) {
+                if (!defaults) return '-';
+                var type = defaults.type || defaults.style || 'badge';
+                if (type === 'fill-color') type = 'fill';
+                if (type === 'corner-badge') type = 'badge';
+                if (type === 'status-icon') type = 'tick';
+                if (type === 'number') type = 'value';
+
+                var loc = defaults.location || (type === 'fill' ? 'entire cell' : (type === 'badge' ? 'top-right' : 'center'));
+                var color = defaults.color || '#e74c3c';
+
+                var iconHtml = '<span class="swatch-circle" style="background:' + color + '"></span>';
+                if (type === 'tick') iconHtml = '<i class="fa-solid fa-check" style="color:' + color + '; margin-right:4px;"></i>';
+                else if (type === 'cross') iconHtml = '<i class="fa-solid fa-xmark" style="color:' + color + '; margin-right:4px;"></i>';
+                else if (type === 'circle') iconHtml = '<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:' + color + '; margin-right:4px;"></span>';
+                else if (type === 'square') iconHtml = '<span style="display:inline-block; width:8px; height:8px; background:' + color + '; margin-right:4px;"></span>';
+                else if (type === 'triangle') iconHtml = '<span style="display:inline-block; width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-bottom:8px solid ' + color + '; margin-right:4px;"></span>';
+                else if (type === 'num_badge') iconHtml = '<span style="display:inline-block; padding:1px 5px; border-radius:10px; background:' + color + '; color:#fff; font-size:0.7rem; font-weight:700; margin-right:4px;">#</span>';
+                else if (type === 'custom_text') {
+                    var txt = defaults.custom_text || 'Text';
+                    iconHtml = '<span style="font-weight:700; color:' + color + '; margin-right:4px;">"' + escapeHtml(txt) + '"</span>';
+                }
+
+                var typeLabel = (type === 'fill') ? 'Fill' : (type === 'num_badge' ? 'Num Badge (' + loc + ')' : (type === 'custom_text' ? 'Text (' + loc + ')' : (type.charAt(0).toUpperCase() + type.slice(1) + ' (' + loc + ')')));
+                if (defaults.show_frequency === 'always') {
+                    typeLabel += ' [Every day]';
+                }
+                return '<span class="swatch-badge">' + iconHtml + typeLabel + '</span>';
+            }
+
+            function loadFilters() {
+                fetch('/api/v1/filters')
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        filtersList = Array.isArray(data) ? data : [];
+                        renderFiltersTable();
+                    })
+                    .catch(function(err) {
+                        console.error('Failed to load calendar overlays:', err);
+                    });
+            }
+
+            function renderFiltersTable() {
+                var tbody = document.getElementById('filters-table-body');
+                if (!tbody) return;
+                tbody.innerHTML = '';
+
+                if (filtersList.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="table-empty-cell">No saved calendar overlays found. Click "+ New Calendar Overlay" to create one.</td></tr>';
+                    return;
+                }
+
+                filtersList.forEach(function(f) {
+                    var tr = document.createElement('tr');
+
+                    // 1. Name & notes
+                    var tdName = document.createElement('td');
+                    var nameDiv = document.createElement('div');
+                    nameDiv.className = 'target-name';
+                    nameDiv.textContent = f.name;
+                    tdName.appendChild(nameDiv);
+                    if (f.notes) {
+                        var notesDiv = document.createElement('div');
+                        notesDiv.className = 'target-desc';
+                        notesDiv.textContent = f.notes;
+                        tdName.appendChild(notesDiv);
+                    }
+                    tr.appendChild(tdName);
+
+                    // 2. Rule sentence
+                    var tdRule = document.createElement('td');
+                    tdRule.innerHTML = formatFilterTreeSentence(f.filter_tree);
+                    tr.appendChild(tdRule);
+
+                    // 3. Display Defaults
+                    var tdDisplay = document.createElement('td');
+                    tdDisplay.innerHTML = formatDisplayDefaultsBadge(f.display_defaults);
+                    tr.appendChild(tdDisplay);
+
+                    // 4. Applies to
+                    var tdApplies = document.createElement('td');
+                    var appliesList = f.applies_to || ['calendar'];
+                    var appliesHtml = appliesList.map(function(a) {
+                        var cls = a === 'calendar' ? 'badge-primary' : 'badge-secondary';
+                        return '<span class="badge ' + cls + '">' + a.charAt(0).toUpperCase() + a.slice(1) + '</span>';
+                    }).join(' ');
+                    tdApplies.innerHTML = appliesHtml;
+                    tr.appendChild(tdApplies);
+
+                    // 5. Actions
+                    var tdActions = document.createElement('td');
+                    tdActions.className = 'table-actions-cell';
+                    tdActions.innerHTML = '<div class="table-actions-btn-group">' +
+                        '<button type="button" class="btn btn-secondary btn-sm btn-filter-edit" data-id="' + f.id + '" title="Edit Overlay"><i class="fa-solid fa-pen"></i></button>' +
+                        '<button type="button" class="btn btn-secondary btn-sm btn-filter-duplicate" data-id="' + f.id + '" title="Duplicate Overlay"><i class="fa-solid fa-copy"></i></button>' +
+                        '<button type="button" class="btn btn-danger btn-sm btn-filter-delete" data-id="' + f.id + '" title="Delete Overlay"><i class="fa-solid fa-trash"></i></button>' +
+                        '</div>';
+                    tr.appendChild(tdActions);
+
+                    tbody.appendChild(tr);
+                });
+
+                tbody.querySelectorAll('.btn-filter-edit').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        var id = parseInt(this.getAttribute('data-id'), 10);
+                        openFilterModal(id);
+                    });
+                });
+                tbody.querySelectorAll('.btn-filter-duplicate').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        var id = parseInt(this.getAttribute('data-id'), 10);
+                        duplicateFilter(id);
+                    });
+                });
+                tbody.querySelectorAll('.btn-filter-delete').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        var id = parseInt(this.getAttribute('data-id'), 10);
+                        deleteFilter(id);
+                    });
+                });
+            }
+
+            function updateFilterNameCounter() {
+                var nameInput = document.getElementById('filter-name-input');
+                var counter = document.getElementById('filter-name-counter');
+                if (!nameInput || !counter) return;
+                var len = nameInput.value.length;
+                counter.textContent = len + ' / 30';
+                counter.classList.toggle('char-counter--over', len >= 30);
+            }
+
+            function updateFilterNotesCounter() {
+                var notesInput = document.getElementById('filter-notes-input');
+                var counter = document.getElementById('filter-notes-counter');
+                if (!notesInput || !counter) return;
+                var len = notesInput.value.length;
+                counter.textContent = len + ' / 200';
+                counter.classList.toggle('char-counter--over', len >= 200);
+            }
+
+            function extractClauseMetrics(tree) {
+                var metrics = [];
+                if (!tree) return metrics;
+                if (tree.metric && metrics.indexOf(tree.metric) === -1) {
+                    metrics.push(tree.metric);
+                }
+                if (tree.clauses && Array.isArray(tree.clauses)) {
+                    tree.clauses.forEach(function(cl) {
+                        var sub = extractClauseMetrics(cl);
+                        sub.forEach(function(m) {
+                            if (metrics.indexOf(m) === -1) metrics.push(m);
+                        });
+                    });
+                }
+                return metrics;
+            }
+
+            function updateFilterValMetricOptions(selectedMetric) {
+                var select = document.getElementById('filter-val-metric-select');
+                if (!select) return;
+                select.innerHTML = '';
+                var tree = filterBuilderInstance ? filterBuilderInstance.getFilter() : null;
+                var metrics = extractClauseMetrics(tree);
+                if (!metrics.length) metrics = ['tir'];
+                metrics.forEach(function(mKey) {
+                    var mCfg = metricsCatalog[mKey] || { label: mKey };
+                    var opt = document.createElement('option');
+                    opt.value = mKey;
+                    opt.textContent = mCfg.label || mKey;
+                    if (mKey === selectedMetric) opt.selected = true;
+                    select.appendChild(opt);
+                });
+            }
+
+            function onOverlayDisplayTypeChange() {
+                var typeSelect = document.getElementById('filter-display-type');
+                var locSelect = document.getElementById('filter-display-location');
+                var locFillInd = document.getElementById('location-fill-indicator');
+                var valMetricWrap = document.getElementById('filter-val-metric-wrap');
+                var customTextWrap = document.getElementById('filter-custom-text-wrap');
+                if (!typeSelect) return;
+
+                var t = typeSelect.value;
+                if (t === 'fill') {
+                    if (locSelect) locSelect.style.display = 'none';
+                    if (locFillInd) locFillInd.style.display = 'block';
+                    if (valMetricWrap) valMetricWrap.style.display = 'none';
+                    if (customTextWrap) customTextWrap.style.display = 'none';
+                } else if (t === 'value' || t === 'num_badge') {
+                    if (locSelect) locSelect.style.display = 'block';
+                    if (locFillInd) locFillInd.style.display = 'none';
+                    if (valMetricWrap) {
+                        valMetricWrap.style.display = 'flex';
+                        updateFilterValMetricOptions();
+                    }
+                    if (customTextWrap) customTextWrap.style.display = 'none';
+                } else if (t === 'custom_text') {
+                    if (locSelect) locSelect.style.display = 'block';
+                    if (locFillInd) locFillInd.style.display = 'none';
+                    if (valMetricWrap) {
+                        valMetricWrap.style.display = 'flex';
+                        updateFilterValMetricOptions();
+                    }
+                    if (customTextWrap) customTextWrap.style.display = 'flex';
+                } else {
+                    if (locSelect) locSelect.style.display = 'block';
+                    if (locFillInd) locFillInd.style.display = 'none';
+                    if (valMetricWrap) valMetricWrap.style.display = 'none';
+                    if (customTextWrap) customTextWrap.style.display = 'none';
+                }
+            }
+
+            function setupColorPalette(containerId, inputId, defaultColor) {
+                var container = document.getElementById(containerId);
+                var input = document.getElementById(inputId);
+                if (!container || !input) return;
+                container.innerHTML = '';
+                input.value = defaultColor || PRESET_COLORS[0];
+
+                PRESET_COLORS.forEach(function(color) {
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'color-palette-btn' + (color.toLowerCase() === input.value.toLowerCase() ? ' selected' : '');
+                    btn.style.backgroundColor = color;
+                    btn.title = color;
+                    btn.addEventListener('click', function() {
+                        input.value = color;
+                        var all = container.querySelectorAll('.color-palette-btn');
+                        all.forEach(function(b) { b.classList.remove('selected'); });
+                        btn.classList.add('selected');
+                    });
+                    container.appendChild(btn);
+                });
+
+                input.addEventListener('input', function() {
+                    var val = input.value.trim().toLowerCase();
+                    var all = container.querySelectorAll('.color-palette-btn');
+                    all.forEach(function(b) {
+                        if (b.title.toLowerCase() === val) b.classList.add('selected');
+                        else b.classList.remove('selected');
+                    });
+                });
+            }
+
+            function updateAppliesVisibility() {
+                var patCb = document.getElementById('filter-applies-patterns');
+                var treCb = document.getElementById('filter-applies-trends');
+                var traCb = document.getElementById('filter-applies-trace');
+                var calSec = document.getElementById('calendar-display-section');
+                var patHint = document.getElementById('patterns-applies-hint');
+                var treHint = document.getElementById('trends-applies-hint');
+                var traHint = document.getElementById('trace-applies-hint');
+
+                if (patHint) patHint.style.display = (patCb && patCb.checked) ? 'block' : 'none';
+                if (treHint) treHint.style.display = (treCb && treCb.checked) ? 'block' : 'none';
+                if (traHint) traHint.style.display = (traCb && traCb.checked) ? 'block' : 'none';
+                if (calSec) {
+                    var calCb = document.getElementById('filter-applies-calendar');
+                    calSec.style.display = (calCb && calCb.checked) ? 'block' : 'none';
+                }
+            }
+
+            function openFilterModal(filterId) {
+                editingFilterId = filterId || null;
+                var modal = document.getElementById('filter-modal-backdrop');
+                var title = document.getElementById('filter-modal-title');
+                var nameInput = document.getElementById('filter-name-input');
+                var notesInput = document.getElementById('filter-notes-input');
+                var freqSelect = document.getElementById('filter-display-frequency');
+                var typeSelect = document.getElementById('filter-display-type');
+                var locSelect = document.getElementById('filter-display-location');
+                var ctextInput = document.getElementById('filter-custom-text-input');
+                var colorHex = document.getElementById('filter-color-hex');
+
+                var initialFilter = null;
+                var initialColor = '#e74c3c';
+
+                var appliesCalCheckbox = document.getElementById('filter-applies-calendar');
+                var appliesPatCheckbox = document.getElementById('filter-applies-patterns');
+                var appliesTreCheckbox = document.getElementById('filter-applies-trends');
+                var appliesTraCheckbox = document.getElementById('filter-applies-trace');
+
+                if (editingFilterId) {
+                    title.textContent = 'Edit Calendar Overlay';
+                    var existing = filtersList.find(function(f) { return f.id === editingFilterId; });
+                    if (existing) {
+                        nameInput.value = existing.name;
+                        notesInput.value = existing.notes || '';
+                        initialFilter = existing.filter_tree;
+
+                        var defs = existing.display_defaults || {};
+                        var dtype = defs.type || defs.style || 'badge';
+                        if (dtype === 'fill-color') dtype = 'fill';
+                        if (dtype === 'corner-badge') dtype = 'badge';
+                        if (dtype === 'status-icon') dtype = 'tick';
+                        if (dtype === 'number') dtype = 'value';
+
+                        if (freqSelect) freqSelect.value = defs.show_frequency || 'matching';
+                        if (typeSelect) typeSelect.value = dtype;
+                        if (locSelect) locSelect.value = defs.location || (dtype === 'fill' ? 'center' : (dtype === 'badge' ? 'top-right' : 'center'));
+                        if (ctextInput) ctextInput.value = defs.custom_text || '';
+                        initialColor = defs.color || '#e74c3c';
+
+                        onOverlayDisplayTypeChange();
+
+                        var existingAppliesTo = existing.applies_to || ['calendar'];
+                        if (appliesCalCheckbox) appliesCalCheckbox.checked = existingAppliesTo.indexOf('calendar') !== -1;
+                        if (appliesPatCheckbox) appliesPatCheckbox.checked = existingAppliesTo.indexOf('patterns') !== -1;
+                        if (appliesTreCheckbox) appliesTreCheckbox.checked = existingAppliesTo.indexOf('trends') !== -1;
+                        if (appliesTraCheckbox) appliesTraCheckbox.checked = existingAppliesTo.indexOf('trace') !== -1;
+                    }
+                } else {
+                    title.textContent = 'New Calendar Overlay';
+                    nameInput.value = '';
+                    notesInput.value = '';
+                    if (freqSelect) freqSelect.value = 'matching';
+                    if (typeSelect) typeSelect.value = 'badge';
+                    if (locSelect) locSelect.value = 'top-right';
+                    if (ctextInput) ctextInput.value = '';
+                    initialColor = '#e74c3c';
+                    onOverlayDisplayTypeChange();
+
+                    if (appliesCalCheckbox) appliesCalCheckbox.checked = true;
+                    if (appliesPatCheckbox) appliesPatCheckbox.checked = false;
+                    if (appliesTreCheckbox) appliesTreCheckbox.checked = false;
+                    if (appliesTraCheckbox) appliesTraCheckbox.checked = false;
+                }
+
+                updateFilterNameCounter();
+                updateFilterNotesCounter();
+                updateAppliesVisibility();
+                setupColorPalette('filter-color-palette', 'filter-color-hex', initialColor);
+
+                var builderContainer = document.getElementById('filter-builder-container');
+                if (window.NSFilterBuilder && builderContainer) {
+                    filterBuilderInstance = NSFilterBuilder.createFilterBuilder({
+                        containerId: 'filter-builder-container',
+                        metrics: metricsCatalog,
+                        initialFilter: initialFilter,
+                        onChange: function() {
+                            var dt = document.getElementById('filter-display-type');
+                            if (dt && (dt.value === 'value' || dt.value === 'num_badge' || dt.value === 'custom_text')) {
+                                updateFilterValMetricOptions();
+                            }
+                        }
+                    });
+                }
+
+                if (editingFilterId) {
+                    var existingItem = filtersList.find(function(f) { return f.id === editingFilterId; });
+                    var existingValMetric = (existingItem && existingItem.display_defaults) ? existingItem.display_defaults.value_metric : null;
+                    updateFilterValMetricOptions(existingValMetric);
+                }
+
+                modal.classList.add('active');
+            }
+
+            function closeFilterModal() {
+                var modal = document.getElementById('filter-modal-backdrop');
+                if (modal) modal.classList.remove('active');
+                editingFilterId = null;
+                filterBuilderInstance = null;
+            }
+
+            function saveFilter() {
+                var nameInput = document.getElementById('filter-name-input');
+                var notesInput = document.getElementById('filter-notes-input');
+                var freqSelect = document.getElementById('filter-display-frequency');
+                var typeSelect = document.getElementById('filter-display-type');
+                var locSelect = document.getElementById('filter-display-location');
+                var ctextInput = document.getElementById('filter-custom-text-input');
+                var colorHex = document.getElementById('filter-color-hex');
+                var valMetricSelect = document.getElementById('filter-val-metric-select');
+
+                var name = nameInput.value.trim();
+                if (!name) {
+                    alert('Overlay name is required.');
+                    nameInput.focus();
+                    return;
+                }
+
+                var tree = filterBuilderInstance ? filterBuilderInstance.getFilter() : null;
+                if (!tree) {
+                    alert('Please configure at least one condition or metric for the overlay.');
+                    return;
+                }
+
+                var appliesTo = [];
+                if (document.getElementById('filter-applies-calendar') && document.getElementById('filter-applies-calendar').checked) appliesTo.push('calendar');
+                if (document.getElementById('filter-applies-patterns') && document.getElementById('filter-applies-patterns').checked) appliesTo.push('patterns');
+                if (document.getElementById('filter-applies-trends') && document.getElementById('filter-applies-trends').checked) appliesTo.push('trends');
+                if (document.getElementById('filter-applies-trace') && document.getElementById('filter-applies-trace').checked) appliesTo.push('trace');
+
+                if (appliesTo.length === 0) {
+                    alert('Please select at least one page for "Applies to".');
+                    return;
+                }
+
+                var dtype = typeSelect.value;
+                var displayDefaults = {
+                    show_frequency: freqSelect.value,
+                    type: dtype,
+                    location: (dtype === 'fill' ? 'center' : locSelect.value),
+                    color: colorHex.value.trim() || '#e74c3c'
+                };
+
+                if (dtype === 'value' || dtype === 'num_badge') {
+                    displayDefaults.value_metric = valMetricSelect ? valMetricSelect.value : 'tir';
+                }
+                if (dtype === 'custom_text') {
+                    displayDefaults.custom_text = ctextInput ? ctextInput.value.trim() : '';
+                    if (valMetricSelect) displayDefaults.value_metric = valMetricSelect.value;
+                }
+
+                var payload = {
+                    name: name,
+                    notes: notesInput.value.trim() || null,
+                    filter_tree: tree,
+                    display_defaults: displayDefaults,
+                    applies_to: appliesTo
+                };
+
+                var url = editingFilterId ? ('/api/v1/filters/' + editingFilterId) : '/api/v1/filters';
+                var method = editingFilterId ? 'PUT' : 'POST';
+
+                fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                })
+                .then(function(r) {
+                    if (!r.ok) return r.json().then(function(e) { throw new Error(e.error || 'Failed to save overlay'); });
+                    return r.json();
+                })
+                .then(function() {
+                    closeFilterModal();
+                    loadFilters();
+                    setStatus('Calendar overlay saved successfully.');
+                })
+                .catch(function(err) {
+                    alert(err.message);
+                });
+            }
+
+            function duplicateFilter(filterId) {
+                var source = filtersList.find(function(f) { return f.id === filterId; });
+                if (!source) return;
+
+                var newName = (source.name + ' (Copy)').slice(0, 30);
+                var payload = {
+                    name: newName,
+                    notes: source.notes,
+                    filter_tree: source.filter_tree,
+                    display_defaults: source.display_defaults,
+                    applies_to: source.applies_to || ['calendar']
+                };
+
+                fetch('/api/v1/filters', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                })
+                .then(function(r) {
+                    if (!r.ok) return r.json().then(function(e) { throw new Error(e.error || 'Failed to duplicate overlay'); });
+                    return r.json();
+                })
+                .then(function() {
+                    loadFilters();
+                    setStatus('Calendar overlay duplicated.');
+                })
+                .catch(function(err) {
+                    alert(err.message);
+                });
+            }
+
+            function deleteFilter(filterId) {
+                if (!confirm('Are you sure you want to delete this calendar overlay?')) return;
+
+                fetch('/api/v1/filters/' + filterId, { method: 'DELETE' })
+                    .then(function(r) {
+                        return r.json().then(function(data) {
+                            return { status: r.status, data: data };
+                        });
+                    })
+                    .then(function(res) {
+                        if (res.status === 409) {
+                            showGuardModal('calendar overlay', res.data.blocking_views || []);
+                            return;
+                        }
+                        if (res.status !== 200) {
+                            alert(res.data.error || 'Failed to delete overlay');
+                            return;
+                        }
+                        loadFilters();
+                        setStatus('Calendar overlay deleted.');
+                    })
+                    .catch(function(err) {
+                        alert(err.message);
+                    });
+            }
+
+            // --- CHART DISPLAY SETTINGS CONTROLLER ---
+            function loadRanges() {
+                fetch('/api/v1/chart_bands')
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.titr) {
+                            document.getElementById('range-titr-low').value = data.titr.low;
+                            document.getElementById('range-titr-high').value = data.titr.high;
+                        }
+                        if (data.tir) {
+                            document.getElementById('range-tir-low').value = data.tir.low;
+                            document.getElementById('range-tir-high').value = data.tir.high;
+                        }
+                    })
+                    .catch(function(err) {
+                        console.error('Failed to load chart bands:', err);
+                    });
+            }
+
+            function saveRanges() {
+                var titrLow = parseFloat(document.getElementById('range-titr-low').value);
+                var titrHigh = parseFloat(document.getElementById('range-titr-high').value);
+                var tirLow = parseFloat(document.getElementById('range-tir-low').value);
+                var tirHigh = parseFloat(document.getElementById('range-tir-high').value);
+
+                if (isNaN(titrLow) || isNaN(titrHigh) || titrLow >= titrHigh) {
+                    alert('Tight Range (TITR): Low bound must be less than High bound.');
+                    return;
+                }
+                if (isNaN(tirLow) || isNaN(tirHigh) || tirLow >= tirHigh) {
+                    alert('Standard Range (TIR): Low bound must be less than High bound.');
+                    return;
+                }
+
+                var payload = {
+                    titr: { low: titrLow, high: titrHigh },
+                    tir: { low: tirLow, high: tirHigh }
+                };
+
+                fetch('/api/v1/chart_bands', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                })
+                .then(function(r) {
+                    if (!r.ok) return r.json().then(function(e) { throw new Error(e.error || 'Failed to update bands'); });
+                    return r.json();
+                })
+                .then(function() {
+                    setStatus('Display settings updated successfully.');
+                    alert('Visual chart display settings saved successfully.');
+                })
+                .catch(function(err) {
+                    alert(err.message);
+                });
+            }
+
+            function switchChartSubtab(subKey) {
+                var valid = ['corridors', 'patterns', 'trends', 'trace', 'hba1c'];
+                if (valid.indexOf(subKey) === -1) subKey = 'corridors';
+
+                try {
+                    localStorage.setItem('ns_chart_subtab', subKey);
+                } catch (e) {}
+
+                valid.forEach(function(k) {
+                    var btn = document.getElementById('subtab-btn-' + k);
+                    var pane = document.getElementById('subtab-pane-' + k);
+                    if (k === subKey) {
+                        if (btn) btn.classList.add('active');
+                        if (pane) pane.style.display = 'block';
+                    } else {
+                        if (btn) btn.classList.remove('active');
+                        if (pane) pane.style.display = 'none';
+                    }
+                });
+            }
+            window.switchChartSubtab = switchChartSubtab;
+
+            function getPageMenuLabel(pageKey, fallback) {
+                return window.NSChartCustomizer ? NSChartCustomizer.getPageMenuLabel(pageKey, fallback) : (fallback || pageKey);
+            }
+
+            function loadChartSettings() {
+                if (!window.NSChartCustomizer) { renderAllStylesLists(); return; }
+                Promise.all([
+                    NSChartCustomizer.loadGlobalSettings('patterns'),
+                    NSChartCustomizer.loadGlobalSettings('trends'),
+                    NSChartCustomizer.loadGlobalSettings('trace')
+                ]).then(renderAllStylesLists).catch(function(err) {
+                    console.error('Failed to load chart metric settings:', err);
+                    renderAllStylesLists();
+                });
+            }
+
+            var selectedStyleMetric = { patterns: null, trends: null, trace: null, hba1c: null };
+
+            function renderAllStylesLists() {
+                renderStylesList('patterns', window.AGP_REGISTRY || [], 'patterns-styles-list', 'patterns-styles-panel');
+                renderStylesList('trends', window.TRENDS_REGISTRY || [], 'trends-styles-list', 'trends-styles-panel');
+                renderStylesList('trace', window.TRACE_REGISTRY || [], 'trace-styles-list', 'trace-styles-panel');
+                renderStylesList('hba1c', window.NS_HBA1C_REGISTRY || [], 'hba1c-styles-list', 'hba1c-styles-panel');
+            }
+
+            function renderStylesList(page, registry, listId, panelId) {
+                var listEl = document.getElementById(listId);
+                var panelEl = document.getElementById(panelId);
+                if (!listEl || !panelEl) return;
+
+                var builtinIds = (window.NSChartCustomizer && window.NSChartCustomizer.BUILTIN_METRIC_IDS) || [];
+                var editable = registry.filter(function(m) { return builtinIds.indexOf(m.id) === -1; });
+
+                if (!editable.length) {
+                    listEl.innerHTML = '<div style="padding: 16px; font-size: 0.85rem; color: var(--text-secondary);">No metrics registered for this chart.</div>';
+                    panelEl.innerHTML = '';
+                    return;
+                }
+
+                if (!selectedStyleMetric[page] || !editable.some(function(m) { return m.id === selectedStyleMetric[page]; })) {
+                    selectedStyleMetric[page] = editable[0].id;
+                }
+
+                listEl.innerHTML = editable.map(function(m) {
+                    var resolved = window.NSChartCustomizer ? NSChartCustomizer.getResolvedStyle(page, m.id, m.style, null) : (m.style || {});
+                    if (!resolved.renderType) resolved.renderType = m.renderType || 'line';
+                    var active = m.id === selectedStyleMetric[page];
+                    var preview = window.NSChartCustomizer ? NSChartCustomizer.buildMetricPreviewSvg(resolved) : '';
+                    var typeLabel = (resolved.renderType || m.renderType || 'line');
+                    typeLabel = typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1);
+                    var weight = resolved.defaultWeight !== undefined ? resolved.defaultWeight : (m.style && m.style.defaultWeight !== undefined ? m.style.defaultWeight : 2);
+                    return '<div class="styles-list-row" data-metric-id="' + m.id + '" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--border-color);' + (active ? ' background: var(--surface-hover);' : '') + '">'
+                        + '<div style="flex: 1; min-width: 0;">'
+                        + '<div style="font-size: 0.85rem; font-weight: 600; color: var(--text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + (m.label || m.id) + '</div>'
+                        + '<div style="font-size: 0.72rem; color: var(--text-secondary);">' + typeLabel + ' &middot; ' + weight + 'px</div>'
+                        + '</div>'
+                        + '<div style="flex-shrink: 0;">' + preview + '</div>'
+                        + '</div>';
+                }).join('');
+
+                var rows = listEl.querySelectorAll('.styles-list-row');
+                rows.forEach(function(row) {
+                    row.addEventListener('click', function() {
+                        selectedStyleMetric[page] = this.getAttribute('data-metric-id');
+                        renderStylesList(page, registry, listId, panelId);
+                    });
+                });
+
+                var selectedItem = editable.filter(function(m) { return m.id === selectedStyleMetric[page]; })[0];
+                if (selectedItem && window.NSChartCustomizer) {
+                    NSChartCustomizer.renderStylePanel(panelEl, {
+                        page: page,
+                        metricId: selectedItem.id,
+                        registryItem: selectedItem,
+                        viewOverrides: null,
+                        mode: 'global',
+                        onChange: function() {
+                            renderStylesList(page, registry, listId, panelId);
+                        }
+                    });
+                }
+            }
+
+            // --- DELETION GUARD MODAL ---
+            function showGuardModal(kind, blockingViews) {
+                var modal = document.getElementById('guard-modal-backdrop');
+                var msg = document.getElementById('guard-modal-msg');
+                var list = document.getElementById('guard-modal-views-list');
+                if (!modal || !msg || !list) return;
+
+                msg.textContent = 'This ' + kind + ' cannot be deleted because it is actively referenced by saved views. Remove it from the following views first:';
+                list.innerHTML = '';
+                blockingViews.forEach(function(v) {
+                    var li = document.createElement('li');
+                    li.textContent = (v.page ? v.page.toUpperCase() : 'PAGE') + ': "' + v.name + '"';
+                    list.appendChild(li);
+                });
+
+                modal.classList.add('active');
+            }
+
+            function closeGuardModal() {
+                var modal = document.getElementById('guard-modal-backdrop');
+                if (modal) modal.classList.remove('active');
+            }
+
+            // --- SYSTEM SETTINGS CONTROLLER (DAEMON / DB CONFIG) ---
+            function markFieldSaved(el) {
+                el.style.color = '#999';
+                el.style.borderLeftColor = '';
+                el.dataset.dirty = '0';
+            }
+
+            function markFieldDirty(el) {
+                el.style.color = '#fff';
+                el.style.borderLeft = '3px solid var(--accent)';
+                el.dataset.dirty = '1';
+            }
+
+            function attachDirtyListeners(formId) {
+                var form = document.getElementById(formId);
+                if (!form) return;
+                form.querySelectorAll('input, select, textarea').forEach(function(el) {
+                    el.addEventListener('input', function() { markFieldDirty(el); });
+                    el.addEventListener('change', function() { markFieldDirty(el); });
+                    markFieldSaved(el);
+                });
+            }
+
+            function clearDirtyState(formId) {
+                var form = document.getElementById(formId);
+                if (!form) return;
+                form.querySelectorAll('input, select, textarea').forEach(function(el) { markFieldSaved(el); });
+            }
+
+            function loadSettings() {
+                fetch('/api/stats')
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        var cfg = data.config || {};
+                        Object.entries(cfg).forEach(function(entry) {
+                            var key = entry[0];
+                            var val = entry[1];
+                            var el = document.getElementById(key) || document.querySelector('[name="' + key + '"]');
+                            if (el) {
+                                if (el.type === 'checkbox') {
+                                    el.checked = (String(val).toLowerCase() === 'true');
+                                } else if (key === 'API_SECRET') {
+                                    el.value = '';
+                                    el.placeholder = 'Leave blank to keep current secret';
+                                } else {
+                                    el.value = val != null ? val : '';
+                                }
+                                markFieldSaved(el);
+                            }
+                        });
+                    })
+                    .catch(function(err) {
+                        console.error('Failed to load system settings:', err);
+                    });
+            }
+
+            function saveSettings(event, formId) {
+                event.preventDefault();
+                var form = document.getElementById(formId);
+                var formData = new FormData(form);
+                var data = {};
+
+                form.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+                    data[cb.name] = cb.checked ? 'true' : 'false';
+                });
+
+                formData.forEach(function(value, key) {
+                    if (!data.hasOwnProperty(key)) {
+                        data[key] = value;
+                    }
+                });
+
+                // Treat empty secret as normal preservation; retain ******** as defence-in-depth
+                if (data.hasOwnProperty('API_SECRET') && (!data.API_SECRET || data.API_SECRET === '********')) {
+                    delete data.API_SECRET;
+                }
+
+                fetch('/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(resp) {
+                    if (resp.status === 'ok') {
+                        clearDirtyState(formId);
+                        setStatus('System settings saved successfully.');
+                        alert('System settings saved successfully.');
+                    } else {
+                        alert('Error saving settings: ' + (resp.message || 'Unknown error'));
+                    }
+                })
+                .catch(function(err) {
+                    console.error('Error:', err);
+                    alert('Failed to save settings.');
+                });
+            }
+            window.saveSettings = saveSettings;
+
+            function resetForm(formId) {
+                loadSettings();
+                clearDirtyState(formId);
+            }
+            window.resetForm = resetForm;
+
+            // --- INITIALIZATION ---
+            function initPage() {
+                // Tab switching
+                var tabFilters = document.getElementById('tab-btn-filters');
+                var tabRanges = document.getElementById('tab-btn-ranges');
+                var tabSystem = document.getElementById('tab-btn-system');
+
+                if (tabFilters) tabFilters.addEventListener('click', function() { switchSettingsTab('filters'); });
+                if (tabRanges) tabRanges.addEventListener('click', function() { switchSettingsTab('ranges'); });
+                if (tabSystem) tabSystem.addEventListener('click', function() { switchSettingsTab('system'); });
+
+                // Custom overlays modal events
+                var btnNew = document.getElementById('btn-new-filter');
+                if (btnNew) btnNew.addEventListener('click', function() { openFilterModal(); });
+                var btnClose = document.getElementById('filter-modal-close');
+                if (btnClose) btnClose.addEventListener('click', closeFilterModal);
+                var btnCancel = document.getElementById('filter-modal-cancel');
+                if (btnCancel) btnCancel.addEventListener('click', closeFilterModal);
+                var btnSave = document.getElementById('filter-modal-save');
+                if (btnSave) btnSave.addEventListener('click', saveFilter);
+
+                var nameInp = document.getElementById('filter-name-input');
+                if (nameInp) nameInp.addEventListener('input', updateFilterNameCounter);
+                var notesInp = document.getElementById('filter-notes-input');
+                if (notesInp) notesInp.addEventListener('input', updateFilterNotesCounter);
+                var dtypeInp = document.getElementById('filter-display-type');
+                if (dtypeInp) dtypeInp.addEventListener('change', onOverlayDisplayTypeChange);
+
+                // Chart display settings events
+                var btnSaveRanges = document.getElementById('btn-save-ranges');
+                if (btnSaveRanges) btnSaveRanges.addEventListener('click', saveRanges);
+
+                // Guard modal events
+                var guardClose = document.getElementById('guard-modal-close');
+                if (guardClose) guardClose.addEventListener('click', closeGuardModal);
+                var guardOk = document.getElementById('guard-modal-ok');
+                if (guardOk) guardOk.addEventListener('click', closeGuardModal);
+
+                // Form dirty tracking for system settings
+                attachDirtyListeners('general-settings');
+                attachDirtyListeners('pacing-settings');
+
+                // Restore active tab
+                var urlParams = new URLSearchParams(window.location.search);
+                var paramTab = urlParams.get('tab');
+                if (paramTab === 'targets' || paramTab === 'custom_overlays') paramTab = 'filters';
+                if (paramTab === 'config' || paramTab === 'general') paramTab = 'system';
+                var initialTab = paramTab;
+                if (!initialTab) {
+                    try {
+                        initialTab = localStorage.getItem('ns_settings_active_tab');
+                    } catch (e) {}
+                }
+                switchSettingsTab(initialTab || 'filters');
+
+                // Restore active chart subtab
+                var paramSubtab = urlParams.get('subtab');
+                var savedSubtab = paramSubtab || 'corridors';
+                if (!paramSubtab) {
+                    try {
+                        savedSubtab = localStorage.getItem('ns_chart_subtab') || 'corridors';
+                    } catch (e) {}
+                }
+                switchChartSubtab(savedSubtab);
+
+                // Dynamically sync subtab labels
+                var btnPat = document.getElementById('subtab-btn-patterns');
+                if (btnPat) btnPat.innerHTML = '<i class="fa-solid fa-chart-line"></i> ' + getPageMenuLabel('patterns', 'Patterns') + ' Styles';
+                var btnTre = document.getElementById('subtab-btn-trends');
+                if (btnTre) btnTre.innerHTML = '<i class="fa-solid fa-chart-area"></i> ' + getPageMenuLabel('trends', 'Trends') + ' Styles';
+                var btnTra = document.getElementById('subtab-btn-trace');
+                if (btnTra) btnTra.innerHTML = '<svg class="nav-icon-svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align: -0.125em;"><path d="M2 12h3l2.5-4.5 2.5 11.5 3.5-16 3 13 2.5-7 1.5 3h1.5"/></svg> ' + getPageMenuLabel('trace', 'Trace') + ' Styles';
+                var btnHba = document.getElementById('subtab-btn-hba1c');
+                if (btnHba) btnHba.innerHTML = '<svg class="nav-icon-svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align: -0.125em;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> ' + getPageMenuLabel('hba1c', 'HbA1c') + ' Styles';
+
+                // Fetch metrics catalog & load data
+                fetch('/api/v1/filters/metrics')
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        metricsCatalog = data;
+                        loadFilters();
+                        loadRanges();
+                        loadChartSettings();
+                        loadSettings();
+                    })
+                    .catch(function(err) {
+                        console.error('Failed to load metrics catalog:', err);
+                        loadChartSettings();
+                        loadSettings();
+                    });
+            }
+
+            document.addEventListener('DOMContentLoaded', initPage);
+        })();
+    </script>
+</body>
+</html>

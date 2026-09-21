@@ -1,0 +1,1464 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trends over Time — ns-monitor</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        @page {
+            size: landscape;
+            margin: 8mm 10mm;
+        }
+        @media print {
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'sidebar.html' %}
+
+    <div class="container container-fluid">
+        <header class="page-header">
+            <h1 class="panel-h1">Longitudinal Trends</h1>
+            {% include '_header_date_selector.html' %}
+        </header>
+
+        <div class="card" id="trends-panel">
+            <div class="panel-header">
+                <div class="panel-header-left">
+                    <h2 id="trends-chart-title-text">Trends over Time (Daily)</h2>
+                </div>
+                <div class="panel-header-right">
+                    <span class="text-muted" id="trends-date-range">Loading...</span>
+                    <!-- Views Manager Pill Button -->
+                    <div class="view-pill-container">
+                        <button type="button" class="view-pill-btn" id="view-pill-btn" onclick="toggleViewDropdown(event)" title="Saved Views">
+                            <i class="fa-solid fa-layer-group"></i>
+                            <span id="active-view-label">Select View</span>
+                            <i class="fa-solid fa-chevron-down" style="font-size: 10px; opacity: 0.7;"></i>
+                        </button>
+            <!-- Views Manager Dropdown Popover -->
+            <div class="view-dropdown-popover" id="view-dropdown-popover" onclick="event.stopPropagation()">
+                <div class="view-dropdown-header">Saved Views</div>
+                <div class="view-list" id="all-views-list">
+                    <!-- Populated dynamically by ns-view-manager.js -->
+                </div>
+                <div class="view-save-section">
+                    <div class="view-save-prompt-row" id="view-save-prompt-row" onclick="showSaveViewInput()">
+                        <i class="fa-solid fa-plus"></i> Save current setup as new view...
+                    </div>
+                    <div class="view-save-input-row" id="view-save-input-row" style="display: none;">
+                        <input type="text" class="view-save-input" id="new-view-name" placeholder="View name..." maxlength="25" onkeydown="if(event.key==='Enter') saveCurrentView(); if(event.key==='Escape') cancelSaveView();">
+                        <button type="button" class="view-save-btn" onclick="saveCurrentView()">Save</button>
+                        <button type="button" class="view-save-cancel" onclick="cancelSaveView()">✕</button>
+                    </div>
+                </div>
+            </div>
+                    </div>
+
+                    <!-- Print Button (moved here 30 Aug 2026 -- was after Settings,
+                         inconsistent with the view-pill / print / settings order
+                         every other page's panel-header uses) -->
+                    <button type="button" class="panel-icon-btn" onclick="printTrendsPanel()" title="Print Trends Chart">
+                        <i class="fa-solid fa-print"></i>
+                    </button>
+
+                    <!-- Settings Menu Trigger -->
+                    <div class="settings-menu-container">
+                        <button type="button" class="panel-icon-btn" id="trends-settings-btn" onclick="toggleTrendsSettings(event)" title="Configure Visualizations & Axis Bounds">
+                            <i class="fa-solid fa-gear"></i>
+                        </button>
+                <!-- Settings Popover -->
+                <div class="settings-popover" id="trends-settings-popover" onclick="event.stopPropagation()" style="min-width: 330px;">
+                    <div class="settings-popover-title">
+                        <span id="trends-settings-popover-title">Trends Display Settings</span>
+                        <button type="button" class="btn-reset-axis" onclick="toggleTrendsSettings(event)">✕</button>
+                    </div>
+
+                    <div class="settings-row">
+                        <span>Target Zone</span>
+                        <div class="settings-toggle-group" id="target-band-toggle">
+                            <button type="button" class="settings-toggle-btn" data-mode="dual" onclick="setTargetBandMode('dual')">Dual Tier</button>
+                            <button type="button" class="settings-toggle-btn" data-mode="titr" id="target-band-btn-titr" onclick="setTargetBandMode('titr')">3.9–7.8</button>
+                            <button type="button" class="settings-toggle-btn" data-mode="tir" id="target-band-btn-tir" onclick="setTargetBandMode('tir')">3.9–10</button>
+                            <button type="button" class="settings-toggle-btn" data-mode="off" onclick="setTargetBandMode('off')">Off</button>
+                        </div>
+                    </div>
+
+                    <div class="settings-row" style="margin-top: 8px;">
+                        <input type="text" id="trends-overlay-search" class="form-input form-input-full" placeholder="Search series...">
+                    </div>
+                    <div class="overlay-list-actions">
+                        <label class="overlay-list-toggle-all-label">
+                            <input type="checkbox" id="trends-overlay-toggle-all" class="overlay-list-checkbox overlay-list-toggle-all">
+                            <span>Select all</span>
+                        </label>
+                        <a href="/settings?tab=ranges&subtab=trends" class="btn-link">Trends Settings &rsaquo;</a>
+                    </div>
+                    <div class="overlay-list-container" id="trends-overlay-list"></div>
+
+                    <div class="divider"></div>
+
+                    <div class="settings-popover-title">
+                        <span>Custom Axis Bounds</span>
+                    </div>
+                    <div id="trends-axis-bounds-settings" style="max-height: 180px; overflow-y: auto;">
+                        <!-- Dynamically populated based on active axes -->
+                    </div>
+                    <div class="settings-note">Ticking series updates chart immediately. Click ✎ to customize line style, thickness, color, opacity, or save as global default.</div>
+                </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Tab Context Menu -->
+            <div class="tab-context-menu" id="tab-context-menu" onclick="event.stopPropagation()">
+                <div class="tab-context-header" id="tab-context-header">View Options</div>
+                <div class="tab-context-item" id="ctx-update" onclick="onContextUpdate()">
+                    <i class="fa-solid fa-floppy-disk"></i> Update with current setup
+                </div>
+                <div class="tab-context-item" id="ctx-duplicate" onclick="onContextDuplicate()">
+                    <i class="fa-solid fa-copy"></i> Duplicate as new view...
+                </div>
+                <div class="tab-context-item" id="ctx-rename" onclick="onContextRename()">
+                    <i class="fa-solid fa-pen-to-square"></i> Rename view...
+                </div>
+                <div class="tab-context-item danger" id="ctx-delete" onclick="onContextDelete()">
+                    <i class="fa-solid fa-trash"></i> Delete view
+                </div>
+            </div>
+
+            <!-- ECharts Container -->
+            <div class="agp-container" style="min-height: 520px; background: #fff; padding: 5px; border-radius: 4px; display: block; border: 1px solid #ddd; position: relative;">
+                <div class="loading-overlay" id="trends-loading" style="background: rgba(255,255,255,0.8); color: #333;">Fetching clinical data...</div>
+                <div id="trends-chart-node" style="min-height: 480px; width:100%;"></div>
+                <div id="trends-axis-pillars" style="position: absolute; top: 5px; left: 5px; right: 5px; bottom: 5px; pointer-events: none; z-index: 6;"></div>
+            </div>
+
+            <!-- Time Range Grain Selectors -->
+            <div class="grain-controls">
+                <label class="grain-label">
+                    <input type="checkbox" id="grain-1" checked onchange="toggleGrain('1')"> 1-Day (Daily)
+                </label>
+                <label class="grain-label">
+                    <input type="checkbox" id="grain-7" onchange="toggleGrain('7')"> 7-Day MAvg
+                </label>
+                <label class="grain-label">
+                    <input type="checkbox" id="grain-14" onchange="toggleGrain('14')"> 14-Day MAvg
+                </label>
+                <label class="grain-label">
+                    <input type="checkbox" id="grain-30" onchange="toggleGrain('30')"> 30-Day MAvg
+                </label>
+                <label class="grain-label">
+                    <input type="checkbox" id="grain-60" onchange="toggleGrain('60')"> 60-Day MAvg
+                </label>
+                <label class="grain-label">
+                    <input type="checkbox" id="grain-90" onchange="toggleGrain('90')"> 90-Day MAvg
+                </label>
+                <label class="grain-label highlight">
+                    <input type="checkbox" id="grain-monthly" onchange="toggleGrain('monthly')"> Monthly Avg
+                </label>
+            </div>
+
+            <!-- Curve-smoothing footnote -- only shown when at least one
+                 visible series has ECharts curve smoothing (Smooth/Spline)
+                 switched on via the style popover. MAVG's own smoothing
+                 doesn't trigger this; it's already visible via the grain
+                 buttons and chart title above. -->
+            <div id="trends-smoothing-footnote" style="display:none; font-size:11px; color:var(--text-secondary); margin-top:6px; text-align:right;">* Smoothing has been applied</div>
+        </div>
+
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+
+    <script src="/static/js/ns-date-selector.js"></script>
+    <script src="/static/js/ns-view-manager.js"></script>
+    <script src="/static/js/ns-axis-pillars.js"></script>
+    <script src="/static/js/registries/trends.js"></script>
+    <script src="/static/js/ns-orchestrator.js"></script>
+    <script src="/static/js/ns-chart-customizer.js"></script>
+    <script>
+        // --- 1. Declarative Registry & Visual Constants ---
+        const TRENDS_METRICS = window.TRENDS_REGISTRY || [];
+
+        const lineIcon = 'path://M 0 3.5 L 20 3.5 L 20 6.5 L 0 6.5 Z';
+        const dashedLineIcon = 'path://M 0 3.5 L 5 3.5 L 5 6.5 L 0 6.5 Z M 7.5 3.5 L 12.5 3.5 L 12.5 6.5 L 7.5 6.5 Z M 15 3.5 L 20 3.5 L 20 6.5 L 15 6.5 Z';
+
+        // Point-marker symbols for Line metrics (msp-marker-type in the style
+        // popover). ECharts has no built-in 'cross' shape -- 'square' isn't
+        // literal either, but 'rect' with equal symbolSize renders a square,
+        // so only cross needs a custom SVG path (diagonal X, drawn in a 0-10
+        // unit box that ECharts scales to fit symbolSize).
+        const MARKER_SYMBOL_MAP = {
+            none: 'none',
+            circle: 'circle',
+            triangle: 'triangle',
+            square: 'rect',
+            // Filled plus/cross polygon in a 0-10 unit box, arm thickness 3.2 --
+            // chosen over a diagonal-X stroke because ECharts custom symbol
+            // paths are filled (itemStyle.color), not stroked, by default; an
+            // open two-line-segment X path with no area would render
+            // invisible. Kept visually matching the equivalent shape drawn in
+            // ns-chart-customizer.js's buildMetricPreviewSvg().
+            // Built via string concat, not a literal 'path://...' -- a raw //
+            // inside a single-quoted string on one line trips check_js_references.py's
+            // naive comment-stripper (it truncates at the first // regardless
+            // of string context), which then loses quote-parity tracking for
+            // the rest of the file and produces unrelated false positives
+            // further down (confirmed: GMI/TIR/rgba flagged as undefined
+            // function calls once this string was added as a literal).
+            cross: 'path:' + '/' + '/' + 'M3.2,0 L6.8,0 L6.8,3.2 L10,3.2 L10,6.8 L6.8,6.8 L6.8,10 L3.2,10 L3.2,6.8 L0,6.8 L0,3.2 L3.2,3.2 Z'
+        };
+
+        // Resolves a metric's ECharts smooth/symbol settings from its
+        // resolved style. Shared shape used by both the legend-name-building
+        // pass and the series-building pass below so the two can never drift.
+        // smoothMode: 'off' (default) or a 0.1-1.0 tension number.
+        function resolveTrendsSmoothing(effectiveStyle, isBar) {
+            if (isBar) return { smooth: false, isSmoothed: false };
+            const mode = effectiveStyle.smooth;
+            let smoothVal;
+            if (mode === undefined || mode === 'off') {
+                smoothVal = false;
+            } else {
+                smoothVal = parseFloat(mode);
+                if (isNaN(smoothVal)) smoothVal = false;
+            }
+            return { smooth: smoothVal, isSmoothed: smoothVal !== false && smoothVal > 0 };
+        }
+
+        function updateTrendsSmoothingFootnote(anySmoothed) {
+            const el = document.getElementById('trends-smoothing-footnote');
+            if (el) el.style.display = anySmoothed ? 'block' : 'none';
+        }
+
+        const GRAIN_TITLE_LABELS = {
+            '1': '(Daily)',
+            '7': '(7-Day MAVG)',
+            '14': '(14-Day MAVG)',
+            '30': '(30-Day MAVG)',
+            '60': '(60-Day MAVG)',
+            '90': '(90-Day MAVG)',
+            'monthly': '(Monthly)'
+        };
+
+        function getActiveGrain() {
+            if (document.getElementById('grain-monthly')?.checked) return 'monthly';
+            const found = ['1', '7', '14', '30', '60', '90'].find(g => document.getElementById(`grain-${g}`)?.checked);
+            return found || '1';
+        }
+
+        // --- 2. Live Custom Axis Bounds ---
+        let currentLayout = null;
+        let lastComputedBounds = {}; // stores actual data-driven min/max per axisGroup
+
+        function getCustomAxisBound(group, type) {
+            return NSAxisPillars.getCustomBound(group, type);
+        }
+
+        function setCustomAxisBound(group, type, val) {
+            NSAxisPillars.setCustomBound(group, type, val, true);
+        }
+
+        function resetCustomAxisBounds(group) {
+            NSAxisPillars.resetBound(group);
+        }
+
+        function updateAxisBoundsUi() {
+            const container = document.getElementById('trends-axis-bounds-settings');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const uniqueGroups = {};
+            TRENDS_METRICS.forEach(entry => {
+                if (!uniqueGroups[entry.axis.group]) {
+                    uniqueGroups[entry.axis.group] = entry;
+                }
+            });
+
+            let axisBoundsViewForColor = (window.NSViews && typeof window.NSViews.getActiveView === 'function')
+                ? window.NSViews.getActiveView()
+                : (window.NSViews && typeof window.NSViews.findView === 'function' ? window.NSViews.findView(window.NSViews.getActiveViewId()) : null);
+            if (!axisBoundsViewForColor && window.NSViews && typeof window.NSViews.getAllViews === 'function') {
+                const all = window.NSViews.getAllViews();
+                if (all && all.length > 0) axisBoundsViewForColor = all[0];
+            }
+            const axisBoundsBaseOverrides = (axisBoundsViewForColor && (axisBoundsViewForColor.styles || (axisBoundsViewForColor.payload && axisBoundsViewForColor.payload.styles))) || {};
+            const axisBoundsViewOverrides = _trendsLivePreviewOverrides ? Object.assign({}, axisBoundsBaseOverrides, _trendsLivePreviewOverrides) : axisBoundsBaseOverrides;
+
+            Object.keys(uniqueGroups).forEach(grp => {
+                const entry = uniqueGroups[grp];
+                const isSelected = getSavedVisibility('trends', entry.label, true);
+                if (!isSelected) return;
+
+                const resolvedAxisStyle = window.NSChartCustomizer
+                    ? NSChartCustomizer.getResolvedStyle('trends', entry.id, entry.style, axisBoundsViewOverrides)
+                    : entry.style;
+                const axisSwatchColor = resolvedAxisStyle.color || entry.style.color;
+
+                const curMin = getCustomAxisBound(grp, 'min');
+                const curMax = getCustomAxisBound(grp, 'max');
+
+                const row = document.createElement('div');
+                row.className = 'axis-bounds-row';
+                row.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${axisSwatchColor};"></span>
+                        <span style="font-weight:600; color:#ddd;">${entry.axis.label}</span>
+                    </div>
+                    <div class="axis-bounds-inputs">
+                        <input type="number" step="any" placeholder="Min" class="axis-bound-input" id="bound-min-${grp}" value="${curMin !== null ? curMin : ''}" onchange="setCustomAxisBound('${grp}', 'min', this.value); applyAxisBoundsToChart();">
+                        <span style="color:#666;">-</span>
+                        <input type="number" step="any" placeholder="Max" class="axis-bound-input" id="bound-max-${grp}" value="${curMax !== null ? curMax : ''}" onchange="setCustomAxisBound('${grp}', 'max', this.value); applyAxisBoundsToChart();">
+                        <button type="button" class="btn-reset-axis" onclick="resetCustomAxisBounds('${grp}')" title="Reset to auto">↺</button>
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        // --- 3. Metric Display Types (Single Source of Truth) ---
+        function getTrendsMetricType(metricId, defaultType) {
+            const entry = TRENDS_METRICS.find(e => e.id === metricId);
+            const fallback = defaultType || (entry ? entry.renderType : 'line');
+            const val = localStorage.getItem(`ns_trends_metric_type_${metricId}`);
+            return val || fallback;
+        }
+
+        function setTrendsMetricType(metricId, type) {
+            localStorage.setItem(`ns_trends_metric_type_${metricId}`, type);
+            updateTrendsSettingsUi();
+            markViewDirty();
+            applyAxisBoundsToChart();
+        }
+
+        function renderTrendsOverlayList() {
+            const searchInput = document.getElementById('trends-overlay-search');
+            const searchTerm = searchInput ? searchInput.value : '';
+            const shownByDefault = ['GMI (%)', 'TIR (%)', 'GVI', 'LBGI'];
+            const activeIds = [];
+            TRENDS_METRICS.forEach(entry => {
+                if (getSavedVisibility('trends', entry.label, shownByDefault.includes(entry.label))) {
+                    activeIds.push(entry.id);
+                }
+            });
+
+            const toggleAllEl = document.getElementById('trends-overlay-toggle-all');
+            if (toggleAllEl) {
+                const totalCount = TRENDS_METRICS.length;
+                const activeCount = activeIds.length;
+                if (activeCount === totalCount && totalCount > 0) {
+                    toggleAllEl.checked = true;
+                    toggleAllEl.classList.remove('is-partial');
+                } else if (activeCount > 0) {
+                    toggleAllEl.checked = true;
+                    toggleAllEl.classList.add('is-partial');
+                } else {
+                    toggleAllEl.checked = false;
+                    toggleAllEl.classList.remove('is-partial');
+                }
+            }
+
+            if (window.NSChartCustomizer) {
+                NSChartCustomizer.renderPopoverChecklist('trends-overlay-list', {
+                    page: 'trends',
+                    registry: TRENDS_METRICS,
+                    activeIds: activeIds,
+                    searchTerm: searchTerm,
+                    onToggle: function(metricId, isChecked) {
+                        const m = TRENDS_METRICS.find(item => item.id === metricId);
+                        if (!m) return;
+                        saveVisibility('trends', m.label, isChecked);
+                        markViewDirty();
+                        if (lastTrendsData) renderTrendsFromData(lastTrendsData);
+                    },
+                    onEdit: function(metricId, iconEl) {
+                        const m = TRENDS_METRICS.find(item => item.id === metricId);
+                        if (!m) return;
+                        let activeView = (window.NSViews && typeof window.NSViews.getActiveView === 'function')
+                            ? window.NSViews.getActiveView()
+                            : (window.NSViews && typeof window.NSViews.findView === 'function' ? window.NSViews.findView(window.NSViews.getActiveViewId()) : null);
+                        if (!activeView && window.NSViews && typeof window.NSViews.getAllViews === 'function') {
+                            const all = window.NSViews.getAllViews();
+                            if (all && all.length > 0) activeView = all[0];
+                        }
+                        const viewOverrides = (activeView && (activeView.styles || (activeView.payload && activeView.payload.styles))) || {};
+                        NSChartCustomizer.openStylePopover(iconEl, {
+                            page: 'trends',
+                            metricId: metricId,
+                            registryItem: m,
+                            viewOverrides: viewOverrides,
+                            mode: 'view',
+                            onPreview: function(mid, previewStyle) {
+                                if (previewStyle) {
+                                    if (!_trendsLivePreviewOverrides) _trendsLivePreviewOverrides = {};
+                                    _trendsLivePreviewOverrides[mid] = previewStyle;
+                                } else {
+                                    if (_trendsLivePreviewOverrides) delete _trendsLivePreviewOverrides[mid];
+                                }
+                                if (lastTrendsData) renderTrendsFromData(lastTrendsData);
+                            },
+                            onSaveView: function(mid, updatedStyle) {
+                                _trendsLivePreviewOverrides = null;
+                                let curView = (window.NSViews && typeof window.NSViews.getActiveView === 'function')
+                                    ? window.NSViews.getActiveView()
+                                    : activeView;
+                                if (!curView && window.NSViews && typeof window.NSViews.getAllViews === 'function') {
+                                    const all = window.NSViews.getAllViews();
+                                    if (all && all.length > 0) curView = all[0];
+                                }
+                                if (curView) {
+                                    if (!curView.styles) curView.styles = {};
+                                    curView.styles[mid] = updatedStyle;
+                                    if (!curView.payload) curView.payload = {};
+                                    curView.payload.styles = curView.styles;
+                                    if (window.NSViews && typeof window.NSViews.saveActiveView === 'function') {
+                                        window.NSViews.saveActiveView();
+                                    } else {
+                                        markViewDirty();
+                                    }
+                                }
+                                renderTrendsOverlayList();
+                                if (lastTrendsData) renderTrendsFromData(lastTrendsData);
+                            },
+                            onSaveGlobal: function(mid, updatedStyle, cascadeIds) {
+                                _trendsLivePreviewOverrides = null;
+                                let curView = (window.NSViews && typeof window.NSViews.getActiveView === 'function')
+                                    ? window.NSViews.getActiveView()
+                                    : activeView;
+                                if (curView && cascadeIds && cascadeIds.includes(parseInt(curView.id, 10))) {
+                                    if (curView.styles) delete curView.styles[mid];
+                                    if (curView.payload && curView.payload.styles) delete curView.payload.styles[mid];
+                                }
+                                renderTrendsOverlayList();
+                                if (lastTrendsData) renderTrendsFromData(lastTrendsData);
+                            },
+                            onRestoreView: function(mid) {
+                                _trendsLivePreviewOverrides = null;
+                                let curView = (window.NSViews && typeof window.NSViews.getActiveView === 'function')
+                                    ? window.NSViews.getActiveView()
+                                    : activeView;
+                                if (curView) {
+                                    if (curView.styles) delete curView.styles[mid];
+                                    if (curView.payload && curView.payload.styles) delete curView.payload.styles[mid];
+                                    if (window.NSViews && typeof window.NSViews.saveActiveView === 'function') {
+                                        window.NSViews.saveActiveView();
+                                    } else {
+                                        markViewDirty();
+                                    }
+                                }
+                                renderTrendsOverlayList();
+                                if (lastTrendsData) renderTrendsFromData(lastTrendsData);
+                            },
+                            onAfterRestoreGlobal: function() {
+                                _trendsLivePreviewOverrides = null;
+                                renderTrendsOverlayList();
+                                if (lastTrendsData) renderTrendsFromData(lastTrendsData);
+                            }
+                        });
+                    }
+                });
+                const popoverTitle = document.getElementById('trends-settings-popover-title');
+                if (popoverTitle && window.NSChartCustomizer) popoverTitle.textContent = NSChartCustomizer.getPageMenuLabel('trends', 'Trends') + ' Display Settings';
+            }
+        }
+
+        function updateTrendsSettingsUi() {
+            updateChartBandLabels();
+            const targetMode = getTargetBandMode();
+            const targetContainer = document.getElementById('target-band-toggle');
+            if (targetContainer) {
+                targetContainer.querySelectorAll('.settings-toggle-btn').forEach(btn => {
+                    if (btn.dataset.mode === targetMode) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+            }
+            renderTrendsOverlayList();
+        }
+
+        // --- Target Zone (Visual Chart Display Bands, driven by the Targets page) ---
+        let chartBands = { titr: { low: 3.9, high: 7.8 }, tir: { low: 3.9, high: 10.0 } };
+
+        function loadChartBands() {
+            fetch('/api/v1/chart_bands')
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.titr && data.tir) {
+                        chartBands = data;
+                        updateChartBandLabels();
+                        if (lastTrendsData) {
+                            renderTrendsFromData(lastTrendsData);
+                        }
+                    }
+                })
+                .catch(err => console.warn('[trends] Failed to load chart bands:', err));
+        }
+
+        function updateChartBandLabels() {
+            const titrLow = (chartBands && chartBands.titr && chartBands.titr.low !== undefined) ? chartBands.titr.low : 3.9;
+            const titrHigh = (chartBands && chartBands.titr && chartBands.titr.high !== undefined) ? chartBands.titr.high : 7.8;
+            const tirHigh = (chartBands && chartBands.tir && chartBands.tir.high !== undefined) ? chartBands.tir.high : 10.0;
+            const titrBtn = document.getElementById('target-band-btn-titr');
+            const tirBtn = document.getElementById('target-band-btn-tir');
+            if (titrBtn) titrBtn.textContent = `${titrLow}\u2013${titrHigh}`;
+            if (tirBtn) tirBtn.textContent = `${titrLow}\u2013${tirHigh}`;
+        }
+
+        function getTargetBandMode() {
+            return localStorage.getItem('ns_trends_target_band_mode') || 'dual';
+        }
+
+        function setTargetBandMode(mode) {
+            localStorage.setItem('ns_trends_target_band_mode', mode);
+            updateTrendsSettingsUi();
+            markViewDirty();
+            if (lastTrendsData) {
+                renderTrendsFromData(lastTrendsData);
+            }
+        }
+
+        function buildTargetMarkArea(mode) {
+            if (!mode || mode === 'off') return { silent: true, data: [] };
+            const titrLow = (chartBands && chartBands.titr && chartBands.titr.low !== undefined) ? chartBands.titr.low : 3.9;
+            const titrHigh = (chartBands && chartBands.titr && chartBands.titr.high !== undefined) ? chartBands.titr.high : 7.8;
+            const tirHigh = (chartBands && chartBands.tir && chartBands.tir.high !== undefined) ? chartBands.tir.high : 10.0;
+
+            const areas = [];
+            if (mode === 'dual') {
+                areas.push([
+                    { yAxis: titrLow, itemStyle: { color: 'rgba(46, 204, 113, 0.20)' } },
+                    { yAxis: titrHigh }
+                ]);
+                areas.push([
+                    { yAxis: titrHigh, itemStyle: { color: 'rgba(46, 204, 113, 0.08)' } },
+                    { yAxis: tirHigh }
+                ]);
+            } else if (mode === 'titr') {
+                areas.push([
+                    { yAxis: titrLow, itemStyle: { color: 'rgba(46, 204, 113, 0.22)' } },
+                    { yAxis: titrHigh }
+                ]);
+            } else if (mode === 'tir') {
+                areas.push([
+                    { yAxis: titrLow, itemStyle: { color: 'rgba(46, 204, 113, 0.16)' } },
+                    { yAxis: tirHigh }
+                ]);
+            }
+            return { silent: true, z: 0, data: areas };
+        }
+
+        // --- 4. Views & Presets Architecture ---
+        const DEFAULT_TRENDS_VIEWS = [
+            {
+                id: 'view_default',
+                name: 'Default Trends',
+                isDefault: true,
+                grain: '1',
+                registryIds: ['gmi', 'tir', 'gvi', 'lbgi'],
+                bounds: {}
+            },
+            {
+                id: 'view_glycemic',
+                name: 'Glycemic Focus',
+                isDefault: true,
+                grain: '14',
+                registryIds: ['gmi', 'tir', 'titr', 'avg_bg', 'cv'],
+                bounds: {}
+            },
+            {
+                id: 'view_dosing',
+                name: 'Dosing & Intake',
+                isDefault: true,
+                grain: '7',
+                registryIds: ['tir', 'tdd', 'carbs'],
+                bounds: {}
+            }
+        ];
+
+        function getCurrentTrendsChartState() {
+            const activeIds = [];
+            TRENDS_METRICS.forEach(entry => {
+                if (getSavedVisibility('trends', entry.label, false)) {
+                    activeIds.push(entry.id);
+                }
+            });
+
+            const typeOverrides = {};
+            TRENDS_METRICS.forEach(entry => {
+                const curType = getTrendsMetricType(entry.id, entry.renderType);
+                if (curType !== entry.renderType) {
+                    typeOverrides[entry.id] = curType;
+                }
+            });
+
+            const activeGrain = document.getElementById('grain-monthly')?.checked ? 'monthly' :
+                (['1', '7', '14', '30', '60', '90'].find(g => document.getElementById(`grain-${g}`)?.checked) || '1');
+
+            const boundsState = NSAxisPillars.getAllBounds();
+            const activeView = (window.NSViews && typeof window.NSViews.getActiveView === 'function')
+                ? window.NSViews.getActiveView()
+                : (window.NSViews && typeof window.NSViews.findView === 'function' ? window.NSViews.findView(window.NSViews.getActiveViewId()) : null);
+            const currentStyles = (activeView && (activeView.styles || (activeView.payload && activeView.payload.styles))) || {};
+
+            const state = {
+                grain: activeGrain,
+                registryIds: activeIds,
+                bounds: boundsState,
+                targetBandMode: getTargetBandMode(),
+                styles: currentStyles
+            };
+            if (Object.keys(typeOverrides).length > 0) {
+                state.types = typeOverrides;
+            }
+            return state;
+        }
+
+        function getSavedVisibility(chartId, seriesName, defaultVal = true) {
+            const key = `ns_chart_${chartId}_${seriesName}`;
+            const val = localStorage.getItem(key);
+            return val !== null ? val === 'true' : defaultVal;
+        }
+
+        function saveVisibility(chartId, seriesName, visible) {
+            const key = `ns_chart_${chartId}_${seriesName}`;
+            localStorage.setItem(key, visible);
+        }
+
+        function trendsChartTitle(activeView) {
+            const grainSuffix = GRAIN_TITLE_LABELS[getActiveGrain()] || '(Daily)';
+            return `${activeView ? activeView.name : 'Trends over Time'} ${grainSuffix}`;
+        }
+
+        function applyTrendsView(view) {
+            if (view.styles) {
+                const activeView = (window.NSViews && typeof window.NSViews.getActiveView === 'function')
+                    ? window.NSViews.getActiveView()
+                    : (window.NSViews && typeof window.NSViews.findView === 'function' ? window.NSViews.findView(window.NSViews.getActiveViewId()) : null);
+                if (activeView) activeView.styles = view.styles;
+            }
+
+            const grainBefore = getActiveGrain();
+
+            // 1. Apply Grain
+            if (view.grain) {
+                toggleGrain(view.grain, false);
+            }
+
+            // 2. Apply Registry Visibility
+            if (view.registryIds && Array.isArray(view.registryIds)) {
+                TRENDS_METRICS.forEach(entry => {
+                    const isVisible = view.registryIds.includes(entry.id);
+                    saveVisibility('trends', entry.label, isVisible);
+                });
+            } else if (view.legend) {
+                // Backward-compatibility fallback for legacy views
+                TRENDS_METRICS.forEach(entry => {
+                    const isVisible = view.legend[entry.label] !== undefined
+                        ? !!view.legend[entry.label]
+                        : (view.legend[entry.id] !== undefined ? !!view.legend[entry.id] : false);
+                    saveVisibility('trends', entry.label, isVisible);
+                });
+                Object.keys(view.legend).forEach(name => {
+                    saveVisibility('trends', name, !!view.legend[name]);
+                });
+            }
+
+            // 3. Apply Metric Types (line vs bar)
+            TRENDS_METRICS.forEach(entry => {
+                const targetType = (view.types && view.types[entry.id]) || entry.renderType;
+                localStorage.setItem(`ns_trends_metric_type_${entry.id}`, targetType);
+            });
+            if (view.targetBandMode) localStorage.setItem('ns_trends_target_band_mode', view.targetBandMode);
+            updateTrendsSettingsUi();
+
+            // 4. Apply Custom Axis Bounds
+            NSAxisPillars.setAllBounds(view.bounds || {});
+
+            updateTrendsSettingsUi();
+            updateAxisBoundsUi();
+
+            if (getActiveGrain() !== grainBefore) {
+                refreshTrends(false);
+            } else if (lastTrendsData) {
+                renderTrendsFromData(lastTrendsData);
+            }
+        }
+
+        function printTrendsPanel() {
+            const settingsPopover = document.getElementById('trends-settings-popover');
+            if (settingsPopover) settingsPopover.classList.remove('active');
+            const viewDropdown = document.getElementById('view-dropdown-popover');
+            if (viewDropdown) viewDropdown.classList.remove('active');
+            window.print();
+        }
+
+        // --- 5. Settings Popover & Display Controls ---
+        function toggleTrendsSettings(event) {
+            if (event) event.stopPropagation();
+            const popover = document.getElementById('trends-settings-popover');
+            if (popover) {
+                const opening = !popover.classList.contains('active');
+                if (opening) {
+                    const viewDropdown = document.getElementById('view-dropdown-popover');
+                    if (viewDropdown) viewDropdown.classList.remove('active');
+                } else {
+                    if (window.NSChartCustomizer && typeof window.NSChartCustomizer.closeStylePopover === 'function') {
+                        NSChartCustomizer.closeStylePopover();
+                    }
+                }
+                updateTrendsSettingsUi();
+                updateAxisBoundsUi();
+                popover.classList.toggle('active');
+            }
+        }
+
+        function toggleGrain(selectedGrain, triggerFetch = true) {
+            const isMonthly = selectedGrain === 'monthly';
+            const grains = ['1', '7', '14', '30', '60', '90'];
+
+            if (isMonthly) {
+                grains.forEach(g => {
+                    const el = document.getElementById(`grain-${g}`);
+                    if (el) el.checked = false;
+                });
+                const mEl = document.getElementById('grain-monthly');
+                if (mEl) mEl.checked = true;
+            } else {
+                const mEl = document.getElementById('grain-monthly');
+                if (mEl) mEl.checked = false;
+
+                grains.forEach(g => {
+                    const el = document.getElementById(`grain-${g}`);
+                    if (el) el.checked = (g === selectedGrain);
+                });
+            }
+
+            saveGrainState();
+
+            // Refresh view-controls (title, pill active-state, popover
+            // checkmark) unconditionally -- this must happen whether or
+            // not the view is being marked dirty, since applyTrendsView()
+            // calls this with triggerFetch=false while APPLYING a saved
+            // view's own grain, and the title/pill need to reflect that
+            // view correctly in that exact case.
+            if (typeof NSViews !== 'undefined' && NSViews.renderViewControls) {
+                NSViews.renderViewControls();
+            }
+
+            // markViewDirty() must stay gated behind triggerFetch, matching
+            // the pre-Phase-3 behavior (git 4524220~1) -- it was made
+            // unconditional during the rewrite, which broke every
+            // view-application path: applyTrendsView() -> toggleGrain(view.grain,
+            // false) -> markViewDirty() was firing even while a view was
+            // legitimately being applied, immediately clearing the just-set
+            // active view (markViewDirty() nulls it whenever one is active).
+            // That's why selecting a saved view never showed its name in the
+            // title, never turned the pill blue, and never showed a checkmark
+            // in the popover list -- by the time anything rendered, there was
+            // no active view left to render. Only a genuine standalone grain
+            // change (the user clicking a checkbox directly) should mark the
+            // view dirty.
+            if (triggerFetch) {
+                markViewDirty();
+                refreshTrends(false);
+            }
+        }
+
+        function saveGrainState() {
+            const monthlyEl = document.getElementById('grain-monthly');
+            if (monthlyEl && monthlyEl.checked) {
+                localStorage.setItem('ns_trends_grain_mode', 'monthly');
+                localStorage.setItem('ns_trends_active_grains', JSON.stringify(['monthly']));
+                return;
+            }
+            localStorage.setItem('ns_trends_grain_mode', 'daily');
+            const activeGrains = [];
+            ['1', '7', '14', '30', '60', '90'].forEach(g => {
+                const el = document.getElementById(`grain-${g}`);
+                if (el && el.checked) activeGrains.push(g);
+            });
+            localStorage.setItem('ns_trends_active_grains', JSON.stringify(activeGrains));
+        }
+
+        function loadGrainState() {
+            const mode = localStorage.getItem('ns_trends_grain_mode');
+            if (mode === 'monthly') {
+                toggleGrain('monthly', false);
+                return;
+            }
+            try {
+                const saved = JSON.parse(localStorage.getItem('ns_trends_active_grains') || '["1"]');
+                if (saved.length) {
+                    toggleGrain(saved[0], false);
+                } else {
+                    toggleGrain('1', false);
+                }
+            } catch (e) {
+                toggleGrain('1', false);
+            }
+        }
+
+        function formatDdMmm(dateStr) {
+            if (!dateStr) return '';
+            const p = String(dateStr).trim().split('T')[0].split('-');
+            if (p.length !== 3) return dateStr;
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const day = String(parseInt(p[2], 10)).padStart(2, '0');
+            const mIdx = parseInt(p[1], 10) - 1;
+            return `${day} ${months[mIdx] || p[1]}`;
+        }
+
+        function formatDM(dateStr) {
+            return formatDdMmm(dateStr);
+        }
+
+        function formatMmmYy(dateStr) {
+            if (!dateStr) return '';
+            const p = dateStr.split('-');
+            if (p.length < 2) return dateStr;
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const mIdx = parseInt(p[1], 10) - 1;
+            const yy = p[0].substring(2);
+            return `${months[mIdx] || p[1]} '${yy}`;
+        }
+
+        function formatTooltipDate(raw) {
+            if (!raw) return '';
+            // Trends is daily-grain (one point per calendar day) -- there's no
+            // time-of-day component to show, unlike Trace's per-5-min data.
+            // This used to call formatTooltipDateTime(), a copy of Trace's
+            // timestamp tooltip formatter carried over unmodified, which
+            // always prefixed the title with "00:00 " since there's no real
+            // time here -- confusing on a chart that's never showing a time.
+            // Formats a plain date instead (e.g. "28 Aug 2026"), matching the
+            // "dd Mon yyyy" convention already used on Profiles
+            // (profile_history.py's fmt_local()).
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            let d;
+            if (typeof raw === 'number' || /^\d{11,}$/.test(String(raw))) {
+                d = new Date(Number(raw));
+            } else {
+                const str = String(raw).trim();
+                d = str.includes('T') ? new Date(str) : new Date(str + 'T00:00:00');
+            }
+            if (isNaN(d.getTime())) return String(raw);
+            return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+        }
+
+        function chooseNiceStep(span, ladder) {
+            let bestStep = ladder[0];
+            let bestDiff = Infinity;
+            for (let i = 0; i < ladder.length; i++) {
+                const s = ladder[i];
+                const regions = Math.floor(span / s);
+                if (regions < 1) continue;
+                let penalty = 0;
+                if (regions < 7) penalty = (7 - regions) * 10;
+                else if (regions > 14) penalty = (regions - 14) * 10;
+                // Small tie-break bonus if span divides evenly into step s (exact right boundary hit)
+                const remainderPenalty = (span % s === 0) ? 0 : 0.2;
+                const score = Math.abs(regions - 10) + penalty + remainderPenalty;
+                if (score < bestDiff) {
+                    bestDiff = score;
+                    bestStep = s;
+                }
+            }
+            return bestStep;
+        }
+
+        function computeTrendsShownIndices(count, isMonthly) {
+            const shownIndices = new Set();
+            if (!count || count <= 0) return shownIndices;
+            if (count === 1) {
+                shownIndices.add(0);
+                return shownIndices;
+            }
+
+            let step = 1;
+            if (isMonthly) {
+                if (count > 12) {
+                    step = chooseNiceStep(count - 1, [1, 2, 3, 4, 6, 12]);
+                }
+            } else if (count > 14) {
+                step = chooseNiceStep(count - 1, [1, 2, 3, 5, 7, 10, 14, 15, 18, 20, 21, 30, 45, 60, 90, 180]);
+            }
+
+            for (let i = 0; i < count; i += step) {
+                shownIndices.add(i);
+            }
+            return shownIndices;
+        }
+
+        let trendsChartInstance = null;
+        let lastTrendsData = null;
+        let _trendsLivePreviewOverrides = null;
+
+        // --- 6. Multi-Axis Layout Builder ---
+        function buildTrendsAxesAndGrid(legendSelected, viewOverrides) {
+            if (!viewOverrides) {
+                let activeView = (window.NSViews && typeof window.NSViews.getActiveView === 'function')
+                    ? window.NSViews.getActiveView()
+                    : (window.NSViews && typeof window.NSViews.findView === 'function' ? window.NSViews.findView(window.NSViews.getActiveViewId()) : null);
+                if (!activeView && window.NSViews && typeof window.NSViews.getAllViews === 'function') {
+                    const all = window.NSViews.getAllViews();
+                    if (all && all.length > 0) activeView = all[0];
+                }
+                const baseOverrides = (activeView && (activeView.styles || (activeView.payload && activeView.payload.styles))) || {};
+                viewOverrides = _trendsLivePreviewOverrides ? Object.assign({}, baseOverrides, _trendsLivePreviewOverrides) : baseOverrides;
+            }
+            const activeGroups = new Set();
+            TRENDS_METRICS.forEach(entry => {
+                if (legendSelected[entry.label]) {
+                    activeGroups.add(entry.axis.group);
+                }
+            });
+
+            let leftOffsetCount = 0;
+            let rightOffsetCount = 0;
+            const yAxes = [];
+            const groupAxisIndexMap = {};
+            const activeLeftAxes = [];
+            const activeRightAxes = [];
+
+            TRENDS_METRICS.forEach(entry => {
+                if (groupAxisIndexMap[entry.axis.group] === undefined) {
+                    const isGroupActive = activeGroups.has(entry.axis.group) && legendSelected[entry.label];
+                    let offset = 0;
+                    if (isGroupActive) {
+                        if (entry.axis.side === 'left') {
+                            offset = leftOffsetCount * 54;
+                            leftOffsetCount++;
+                        } else {
+                            offset = rightOffsetCount * 54;
+                            rightOffsetCount++;
+                        }
+                    }
+
+                    const grp = entry.axis.group;
+                    let isInverse = false;
+                    TRENDS_METRICS.forEach(m => {
+                        if (m.axis && m.axis.group === grp && legendSelected[m.label]) {
+                            const mStyle = window.NSChartCustomizer
+                                ? NSChartCustomizer.getResolvedStyle('trends', m.id, m.style, viewOverrides)
+                                : m.style;
+                            if (mStyle && mStyle.invertAxis) {
+                                isInverse = true;
+                            }
+                        }
+                    });
+
+                    // Axis name/line/label/pillar colour must track the metric's
+                    // RESOLVED style (global default + saved-view override), same
+                    // as the series/legend already do -- not the raw registry
+                    // baseline. Using entry.style.color here was the bug: series
+                    // and legend updated instantly when a colour was changed via
+                    // the style editor, but the axis silently kept showing the
+                    // old/default colour. (4 Sep 2026)
+                    const entryResolvedStyle = window.NSChartCustomizer
+                        ? NSChartCustomizer.getResolvedStyle('trends', entry.id, entry.style, viewOverrides)
+                        : entry.style;
+                    const axisColor = entryResolvedStyle.color || entry.style.color;
+
+                    const isFirstLeft = entry.axis.side === 'left' && offset === 0;
+                    const customMin = getCustomAxisBound(entry.axis.group, 'min');
+                    const customMax = getCustomAxisBound(entry.axis.group, 'max');
+
+                    const autoBounds = lastComputedBounds[entry.axis.group] || {};
+                    const axisMin = (customMin !== null && !isNaN(customMin)) ? customMin : (entry.axis.defaultBounds?.min !== null && entry.axis.defaultBounds?.min !== undefined ? entry.axis.defaultBounds.min : (autoBounds.min !== undefined ? autoBounds.min : 0));
+                    const axisMax = (customMax !== null && !isNaN(customMax)) ? customMax : (entry.axis.defaultBounds?.max !== null && entry.axis.defaultBounds?.max !== undefined ? entry.axis.defaultBounds.max : (autoBounds.max !== undefined ? autoBounds.max : 100));
+
+                    const axisObj = {
+                        type: 'value',
+                        name: entry.axis.label || entry.label,
+                        nameLocation: 'middle',
+                        nameRotate: entry.axis.side === 'left' ? 90 : -90,
+                        nameGap: entry.axis.side === 'left' ? 34 : 26,
+                        position: entry.axis.side,
+                        offset: offset,
+                        min: axisMin,
+                        max: axisMax,
+                        inverse: isInverse,
+                        show: isGroupActive,
+                        nameTextStyle: { color: axisColor, fontWeight: 600, fontSize: 11 },
+                        axisLine: { show: isGroupActive, lineStyle: { color: axisColor } },
+                        axisLabel: {
+                            color: axisColor,
+                            fontSize: 11,
+                            formatter: function(val) {
+                                if (entry.axis.decimals === 0) return Math.round(val);
+                                return Number(val).toFixed(entry.axis.decimals || 1);
+                            }
+                        },
+                        splitLine: {
+                            show: isFirstLeft,
+                            lineStyle: { color: '#e8e8e8', type: 'dashed' }
+                        }
+                    };
+
+                    const axisIndex = yAxes.length;
+                    yAxes.push(axisObj);
+                    groupAxisIndexMap[entry.axis.group] = axisIndex;
+
+                    if (isGroupActive) {
+                        const info = {
+                            group: entry.axis.group,
+                            name: entry.axis.label || entry.label,
+                            color: axisColor,
+                            decimals: entry.axis.decimals !== undefined ? entry.axis.decimals : 1,
+                            side: entry.axis.side,
+                            defaultMin: entry.axis.defaultBounds?.min,
+                            defaultMax: entry.axis.defaultBounds?.max,
+                            calculatedMin: autoBounds.min,
+                            calculatedMax: autoBounds.max
+                        };
+                        if (entry.axis.side === 'left') activeLeftAxes.push(info);
+                        else activeRightAxes.push(info);
+                    }
+                }
+            });
+
+            const gridLeft = Math.max(55, leftOffsetCount * 54 + 10);
+            const gridRight = Math.max(55, rightOffsetCount * 54 + 10);
+
+            currentLayout = {
+                yAxes: yAxes,
+                groupAxisIndexMap: groupAxisIndexMap,
+                activeLeftAxes: activeLeftAxes,
+                activeRightAxes: activeRightAxes,
+                grid: { top: 40, bottom: 60, left: gridLeft, right: gridRight, containLabel: false }
+            };
+
+            return currentLayout;
+        }
+
+        // --- 7. Instant In-Memory Chart Renderer ---
+        function renderTrendsFromData(data) {
+            const chartNode = document.getElementById('trends-chart-node');
+            if (!chartNode || !data || data.length === 0) return;
+
+            const monthlyMode = document.getElementById('grain-monthly') && document.getElementById('grain-monthly').checked;
+            const horizontalDates = data.map(d => monthlyMode ? formatMmmYy(d.Date) : formatDdMmm(d.Date));
+            const shownIndices = computeTrendsShownIndices(horizontalDates.length, monthlyMode);
+            const xIntervalFn = function(index) {
+                return shownIndices.has(index);
+            };
+            const grains = [];
+            if (monthlyMode) {
+                grains.push({ id: 'monthly', suffix: ' (Monthly)', dash: 0, weight: 3 });
+            } else {
+                grains.push({ id: '1', suffix: '', dash: 0, weight: 2 });
+                grains.push({ id: '7', suffix: ' (7d MAvg)', dash: 0, weight: 3 });
+                grains.push({ id: '14', suffix: ' (14d MAvg)', dash: 0, weight: 3 });
+                grains.push({ id: '30', suffix: ' (30d MAvg)', dash: 0, weight: 3 });
+                grains.push({ id: '60', suffix: ' (60d MAvg)', dash: 0, weight: 3 });
+                grains.push({ id: '90', suffix: ' (90d MAvg)', dash: 0, weight: 3 });
+            }
+
+            const activeGrains = grains.filter(g => {
+                const el = document.getElementById(`grain-${g.id}`);
+                return el && el.checked;
+            });
+            if (!activeGrains.length) activeGrains.push(grains[0]);
+
+            // 1. Compute min/max for auto bounds fallback using active grain's projected data
+            const activeGrainObj = activeGrains[0] || { id: '1' };
+            lastComputedBounds = {};
+            TRENDS_METRICS.forEach(entry => {
+                const seriesValues = NSOrchestrator.projectTrends(data, entry, activeGrainObj.id);
+                const vals = seriesValues.filter(v => v !== null && !isNaN(v));
+                if (vals.length) {
+                    const minVal = Math.min(...vals);
+                    const maxVal = Math.max(...vals);
+                    const span = (maxVal - minVal) || 1;
+                    if (!lastComputedBounds[entry.axis.group]) {
+                        lastComputedBounds[entry.axis.group] = {
+                            min: (entry.axis.defaultBounds?.min !== null && entry.axis.defaultBounds?.min !== undefined) ? entry.axis.defaultBounds.min : Math.max(0, Math.floor(minVal - 0.1 * span)),
+                            max: (entry.axis.defaultBounds?.max !== null && entry.axis.defaultBounds?.max !== undefined) ? entry.axis.defaultBounds.max : Math.ceil(maxVal + 0.1 * span)
+                        };
+                    }
+                }
+            });
+
+            let activeView = (window.NSViews && typeof window.NSViews.getActiveView === 'function')
+                ? window.NSViews.getActiveView()
+                : (window.NSViews && typeof window.NSViews.findView === 'function' ? window.NSViews.findView(window.NSViews.getActiveViewId()) : null);
+            if (!activeView && window.NSViews && typeof window.NSViews.getAllViews === 'function') {
+                const all = window.NSViews.getAllViews();
+                if (all && all.length > 0) activeView = all[0];
+            }
+            const baseOverrides = (activeView && (activeView.styles || (activeView.payload && activeView.payload.styles))) || {};
+            const viewOverrides = _trendsLivePreviewOverrides ? Object.assign({}, baseOverrides, _trendsLivePreviewOverrides) : baseOverrides;
+            const shownByDefault = ['GMI (%)', 'TIR (%)', 'GVI', 'LBGI'];
+            const legendSelected = {};
+            const legendItems = [];
+            const smoothedSeriesNames = new Set();
+            let anySeriesSmoothed = false;
+
+            TRENDS_METRICS.forEach(entry => {
+                const isVisible = getSavedVisibility('trends', entry.label, shownByDefault.includes(entry.label));
+                legendSelected[entry.label] = isVisible;
+                if (!isVisible) return; // Only active series appear in legend!
+
+                const effectiveStyle = window.NSChartCustomizer
+                    ? NSChartCustomizer.getResolvedStyle('trends', entry.id, entry.style, viewOverrides)
+                    : entry.style;
+                const strokeColor = effectiveStyle.color || entry.style.color;
+                const strokeWidth = effectiveStyle.defaultWeight !== undefined ? effectiveStyle.defaultWeight : 2;
+                // Declared per-loop: the series forEach below has its own
+                // `metricType`, and that one is NOT in scope here. Removing this
+                // line throws a ReferenceError that aborts the whole render and
+                // blanks the chart, with no syntax error to catch it.
+                const metricType = effectiveStyle.renderType || getTrendsMetricType(entry.id, entry.renderType);
+                const fullStyle = Object.assign({}, effectiveStyle, {
+                    renderType: metricType,
+                    color: strokeColor,
+                    defaultWeight: strokeWidth
+                });
+                const icon = window.NSChartCustomizer
+                    ? NSChartCustomizer.getLegendIcon(fullStyle)
+                    : (metricType === 'bar' ? 'roundRect' : lineIcon);
+
+                // Asterisk flags ECharts curve smoothing specifically (not
+                // MAVG) -- MAVG's own effect is already visible in the grain
+                // buttons and chart title, so re-flagging it here would be
+                // redundant. Formatted via legend.formatter so series and
+                // legend.data names stay canonical and matching.
+                const smoothing = resolveTrendsSmoothing(effectiveStyle, metricType === 'bar');
+                if (smoothing.isSmoothed) {
+                    anySeriesSmoothed = true;
+                    smoothedSeriesNames.add(entry.label);
+                }
+
+                legendItems.push({
+                    name: entry.label,
+                    icon: icon,
+                    itemStyle: { color: strokeColor }
+                });
+            });
+
+            updateTrendsSmoothingFootnote(anySeriesSmoothed);
+
+            const layout = buildTrendsAxesAndGrid(legendSelected, viewOverrides);
+            const series = [];
+
+            TRENDS_METRICS.forEach(entry => {
+                const isVisible = legendSelected[entry.label];
+                if (!isVisible) return; // Don't push inactive series
+
+                const axisIdx = layout.groupAxisIndexMap[entry.axis.group] !== undefined ? layout.groupAxisIndexMap[entry.axis.group] : 0;
+                const effectiveStyle = window.NSChartCustomizer
+                    ? NSChartCustomizer.getResolvedStyle('trends', entry.id, entry.style, viewOverrides)
+                    : entry.style;
+                const metricType = effectiveStyle.renderType || getTrendsMetricType(entry.id, entry.renderType);
+                const isBar = (metricType === 'bar');
+                const isDashed = effectiveStyle.lineType === 'dashed';
+                const strokeColor = effectiveStyle.color || entry.style.color;
+                const lineOpacity = effectiveStyle.opacity !== undefined ? effectiveStyle.opacity : 1.0;
+                const strokeWidth = effectiveStyle.defaultWeight !== undefined ? effectiveStyle.defaultWeight : 2;
+                const fillColor = effectiveStyle.fillColor || strokeColor;
+                const fillOpacity = effectiveStyle.fillOpacity !== undefined ? effectiveStyle.fillOpacity : (isBar ? 0.75 : 0.25);
+                const barFill = (window.NSChartCustomizer && typeof window.NSChartCustomizer.colorWithOpacity === 'function')
+                    ? NSChartCustomizer.colorWithOpacity(fillColor, fillOpacity)
+                    : fillColor;
+                const barStroke = (window.NSChartCustomizer && typeof window.NSChartCustomizer.colorWithOpacity === 'function')
+                    ? NSChartCustomizer.colorWithOpacity(strokeColor, lineOpacity)
+                    : strokeColor;
+                const strokeBorderWidth = (effectiveStyle.lineType === 'none' || lineOpacity <= 0) ? 0 : strokeWidth;
+
+                const smoothing = resolveTrendsSmoothing(effectiveStyle, isBar);
+                const markerType = (!isBar && effectiveStyle.markerType) ? effectiveStyle.markerType : 'none';
+                const markerColor = effectiveStyle.markerColor || strokeColor;
+                const symbol = MARKER_SYMBOL_MAP[markerType] || 'none';
+                const symbolSize = strokeWidth * 3; // fixed: no user-facing size control
+
+                activeGrains.forEach(grain => {
+                    const seriesValues = NSOrchestrator.projectTrends(data, entry, grain.id);
+
+                    const isBg = (entry.id === 'avg_bg');
+                    const sObj = {
+                        name: entry.label,
+                        type: isBar ? 'bar' : 'line',
+                        yAxisIndex: axisIdx,
+                        data: seriesValues,
+                        smooth: smoothing.smooth,
+                        smoothMonotone: (!isBar && effectiveStyle.smoothMonotone) ? 'x' : null,
+                        symbol: symbol,
+                        symbolSize: symbolSize,
+                        lineStyle: {
+                            color: strokeColor,
+                            width: strokeWidth,
+                            type: effectiveStyle.lineType || (isDashed ? 'dashed' : 'solid'),
+                            opacity: lineOpacity
+                        },
+                        itemStyle: isBar ? {
+                            color: barFill,
+                            borderColor: barStroke,
+                            borderWidth: strokeBorderWidth,
+                            borderType: effectiveStyle.lineType || 'solid'
+                        } : {
+                            color: markerType === 'none' ? strokeColor : markerColor,
+                            opacity: lineOpacity
+                        },
+                        z: isBg ? 10 : (isBar ? 3 : 5)
+                    };
+
+                    if (metricType === 'area') {
+                        sObj.areaStyle = {
+                            color: fillColor,
+                            opacity: fillOpacity
+                        };
+                    }
+
+                    series.push(sObj);
+                });
+            });
+
+            const hasActiveBarSeries = series.some(s => s.type === 'bar' && legendSelected[s.name] !== false);
+
+            const targetBandMode = getTargetBandMode();
+            const targetZoneAxisIdx = layout.groupAxisIndexMap['avg_bg'];
+            if (targetZoneAxisIdx !== undefined) {
+                series.push({
+                    name: '_target_zones',
+                    type: 'line',
+                    yAxisIndex: targetZoneAxisIdx,
+                    data: [],
+                    silent: true,
+                    symbol: 'none',
+                    z: 0,
+                    markArea: buildTargetMarkArea(targetBandMode)
+                });
+            }
+
+            const option = {
+                animation: false,
+                backgroundColor: '#ffffff',
+                grid: layout.grid,
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(34, 39, 46, 0.95)',
+                    borderColor: '#444c56',
+                    borderWidth: 1,
+                    textStyle: { color: '#adbac7', fontSize: 11 },
+                    formatter: function(params) {
+                        if (!params || !params.length) return '';
+                        const idx = params[0].dataIndex;
+                        const item = data && data[idx];
+                        const raw = item ? (item.Date || item.date) : params[0].axisValue;
+                        const dateTitle = formatTooltipDate(raw);
+                        let html = `<div style="font-weight:700; margin-bottom:4px; border-bottom:1px solid #444c56; padding-bottom:2px;">${dateTitle}</div>`;
+                        params.forEach(p => {
+                            if (p.value !== null && p.value !== undefined) {
+                                const valStr = typeof p.value === 'number' ? (Number.isInteger(p.value) ? p.value : p.value.toFixed(2)) : p.value;
+                                html += `<div style="margin:2px 0;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px;"></span>${p.seriesName}: <b>${valStr}</b></div>`;
+                            }
+                        });
+                        return html;
+                    }
+                },
+                legend: {
+                    type: 'scroll',
+                    bottom: 5,
+                    data: legendItems,
+                    selectedMode: false,
+                    selected: legendSelected,
+                    itemGap: 14,
+                    itemWidth: 16,
+                    itemHeight: 10,
+                    inactiveColor: '#768390',
+                    inactiveBorderColor: '#768390',
+                    formatter: function(name) {
+                        return smoothedSeriesNames.has(name) ? (name + ' *') : name;
+                    },
+                    textStyle: { color: '#333333', fontSize: 11 }
+                },
+                xAxis: {
+                    type: 'category',
+                    data: horizontalDates,
+                    boundaryGap: hasActiveBarSeries,
+                    axisLine: {
+                        onZero: false,
+                        lineStyle: { color: '#888888' }
+                    },
+                    axisTick: {
+                        show: true,
+                        interval: xIntervalFn,
+                        lineStyle: { color: '#888888' }
+                    },
+                    axisLabel: {
+                        rotate: 0,
+                        color: '#555555',
+                        fontSize: 11,
+                        interval: xIntervalFn,
+                        formatter: function(val) { return val; }
+                    },
+                    splitLine: {
+                        show: true,
+                        interval: xIntervalFn,
+                        lineStyle: {
+                            color: '#e8e8e8',
+                            type: 'dashed',
+                            width: 1
+                        }
+                    }
+                },
+                yAxis: layout.yAxes,
+                series: series
+            };
+
+            if (!trendsChartInstance) {
+                trendsChartInstance = echarts.init(chartNode, null, { renderer: 'canvas' });
+                window.addEventListener('resize', () => {
+                    if (trendsChartInstance) {
+                        trendsChartInstance.resize();
+                        updateAxisPillars();
+                    }
+                });
+                trendsChartInstance.on('legendselectchanged', function(params) {
+                    saveVisibility('trends', params.name, params.selected[params.name]);
+                    markViewDirty();
+                    renderTrendsFromData(lastTrendsData);
+                    updateAxisBoundsUi();
+                });
+            }
+            trendsChartInstance.setOption(option, true);
+            updateAxisBoundsUi();
+            updateAxisPillars();
+        }
+
+        async function refreshTrends(updateUrl = true) {
+            const chartNode = document.getElementById('trends-chart-node');
+            if (!chartNode) return;
+            const loading = document.getElementById('trends-loading');
+            loading.style.display = 'flex';
+            loading.innerHTML = 'Fetching trends data...';
+
+            const activeGrain = getActiveGrain();
+            const provider = {
+                endpoint: '/api/v1/trends_data',
+                params: { grain: activeGrain === 'monthly' ? 'monthly' : 'daily' }
+            };
+            const range = {
+                start_date: document.getElementById('start_date')?.value,
+                end_date: document.getElementById('end_date')?.value
+            };
+
+            try {
+                const data = await NSOrchestrator.fetch(provider, range);
+                lastTrendsData = data;
+                loading.style.display = 'none';
+
+                if (!data || data.length === 0) {
+                    loading.innerHTML = '<span style="color:var(--text-secondary)">No data available for this range.</span>';
+                    loading.style.display = 'flex';
+                    return;
+                }
+
+                renderTrendsFromData(lastTrendsData);
+
+                const rangeEl = document.getElementById('trends-date-range');
+                if (rangeEl && range.start_date && range.end_date) {
+                    rangeEl.textContent = `${formatDMY(range.start_date)} to ${formatDMY(range.end_date)}`;
+                }
+            } catch (err) {
+                console.error(err);
+                loading.innerHTML = '<span style="color:var(--danger)">Connection error.</span>';
+            }
+
+            if (updateUrl) {
+                const params = getChartParams();
+                const newUrl = window.location.pathname + '?' + params;
+                window.history.pushState({ path: newUrl }, '', newUrl);
+            }
+        }
+
+        function applyAxisBoundsToChart() {
+            if (lastTrendsData) {
+                renderTrendsFromData(lastTrendsData);
+            }
+        }
+
+        // --- 8. Axis Pillars ---
+        function updateAxisPillars() {
+            if (!currentLayout) return;
+            NSAxisPillars.renderPillars('trends-axis-pillars', 'trends-chart-node', {
+                top: currentLayout.grid.top,
+                bottom: currentLayout.grid.bottom,
+                left: currentLayout.grid.left,
+                right: currentLayout.grid.right,
+                activeLeftAxes: currentLayout.activeLeftAxes,
+                activeRightAxes: currentLayout.activeRightAxes
+            });
+        }
+
+        window.syncAndSubmit = () => refreshTrends(true);
+        window.onDateOrPresetChange = () => refreshTrends(true);
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadGrainState();
+            updateTrendsSettingsUi();
+            loadChartBands();
+
+            if (window.NSChartCustomizer) {
+                NSChartCustomizer.loadGlobalSettings('trends', () => {
+                    if (lastTrendsData) renderTrendsFromData(lastTrendsData);
+                });
+            }
+
+            const searchInput = document.getElementById('trends-overlay-search');
+            if (searchInput) searchInput.addEventListener('input', renderTrendsOverlayList);
+
+            const toggleAllBtn = document.getElementById('trends-overlay-toggle-all');
+            if (toggleAllBtn) {
+                toggleAllBtn.addEventListener('change', () => {
+                    const shownByDefault = ['GMI (%)', 'TIR (%)', 'GVI', 'LBGI'];
+                    const activeCount = TRENDS_METRICS.filter(m => getSavedVisibility('trends', m.label, shownByDefault.includes(m.label))).length;
+                    const shouldEnable = activeCount < TRENDS_METRICS.length;
+                    TRENDS_METRICS.forEach(m => saveVisibility('trends', m.label, shouldEnable));
+                    markViewDirty();
+                    renderTrendsOverlayList();
+                    if (lastTrendsData) renderTrendsFromData(lastTrendsData);
+                });
+            }
+
+            // Dynamic Axis-Group Clamp Table derived directly from TRENDS_METRICS
+            const axisClamps = {};
+            TRENDS_METRICS.forEach(entry => {
+                if (entry.axis && entry.axis.clamp) {
+                    axisClamps[entry.axis.group] = entry.axis.clamp;
+                }
+            });
+
+            NSAxisPillars.init({
+                clamp: axisClamps,
+                storageKey: 'ns_trends_yaxis_bounds',
+                onLiveUpdate: () => { if (lastTrendsData) renderTrendsFromData(lastTrendsData); },
+                onCommit: () => { markViewDirty(); updateAxisBoundsUi(); }
+            });
+
+            NSViews.init({
+                page: 'trends',
+                activeViewKey: 'ns_trends_active_view',
+                defaultViews: DEFAULT_TRENDS_VIEWS,
+                titleElId: 'trends-chart-title-text',
+                titleFor: trendsChartTitle,
+                settingsPopoverId: 'trends-settings-popover',
+                settingsBtnId: 'trends-settings-btn',
+                captureState: getCurrentTrendsChartState,
+                applyState: applyTrendsView
+            });
+
+            refreshTrends(false);
+        });
+    </script>
+</body>
+
+</html>

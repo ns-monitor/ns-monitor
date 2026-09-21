@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Continuous Glucose Monitoring - ns-monitor</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+</head>
+
+<body>
+    {% include "sidebar.html" %}
+
+    <div class="container">
+        <header class="page-header">
+            <h1 class="panel-h1">Continuous Glucose Monitoring</h1>
+            {% include "_header_date_selector.html" %}
+        </header>
+
+        <div class="loading-overlay hidden" id="cgm-health-loading">Loading CGM health data...</div>
+
+        <!-- CGM Health: data-quality/coverage intelligence, prototype (1 Sep 2026).
+             Deliberately excludes sensor lifespan/warm-up tracking -- see
+             cgm_health.py's module docstring for why. -->
+        <div class="card">
+            <div class="panel-header">
+                <div class="panel-header-left"><h2>CGM Data Quality</h2></div>
+            </div>
+            <div class="score-row" id="cgm-health-kpis"></div>
+        </div>
+
+        <div class="card">
+            <div class="panel-header">
+                <div class="panel-header-left"><h2>Was the loop working with fresh CGM data?</h2></div>
+            </div>
+            <p class="panel-text-minor">Each bar is one day. Height = % of that day's loop decisions where the
+                CGM reading available was 15 minutes old or less. A full green bar at 100% means the loop always
+                had fresh data that day; a shorter, redder bar means part of the day it was making decisions on
+                stale or missing CGM data. Markers below the axis show the gaps from the table below, colour-coded
+                by likely cause, so a dip and a gap can be matched up directly.</p>
+            <div id="staleness-chart-node" class="chart-node-sm"></div>
+        </div>
+
+        <div class="card">
+            <div class="panel-header">
+                <div class="panel-header-left"><h2>CGM gaps</h2></div>
+                <div class="panel-header-right">
+                    <span class="text-muted" id="gap-threshold-note"></span>
+                </div>
+            </div>
+            <div class="score-row" id="gap-totals"></div>
+            <table class="panel-table" id="gap-table">
+                <thead>
+                    <tr><th>Start</th><th>End</th><th>Duration</th><th>Likely cause</th></tr>
+                </thead>
+                <tbody id="gap-table-body"></tbody>
+            </table>
+        </div>
+
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+
+    <script src="/static/js/ns-date-selector.js"></script>
+    <script>
+        let stalenessChart = null;
+
+        const CAUSE_LABELS = {
+            battery: 'Phone battery',
+            absence: 'Away from rig (backfilled)',
+            other: 'Unexplained',
+        };
+
+        function escapeHtml(s) {
+            const div = document.createElement('div');
+            div.textContent = (s === null || s === undefined) ? '' : String(s);
+            return div.innerHTML;
+        }
+
+        function renderKpi(value, label) {
+            return `<div class="score-block">
+                <span class="score-value">${escapeHtml(value)}</span>
+                <span class="score-label">${escapeHtml(label)}</span>
+            </div>`;
+        }
+
+        function renderCoverageAndStalenessKpis(data) {
+            const cov = data.coverage;
+            const stale = data.staleness;
+            const kpiEl = document.getElementById('cgm-health-kpis');
+            kpiEl.innerHTML = [
+                renderKpi(cov.coverage_pct !== null ? `${cov.coverage_pct}%` : '--', 'CGM coverage'),
+                renderKpi(cov.backfilled_pct !== null ? `${cov.backfilled_pct}%` : '--', 'Readings backfilled (not real-time)'),
+                renderKpi(stale.median_staleness_min !== null ? `${stale.median_staleness_min}m` : '--', 'Median BG age at loop decision'),
+                renderKpi(stale.pct_within_reference !== null ? `${stale.pct_within_reference}%` : '--', `Loop cycles with BG <= ${stale.reference_minutes}m old`),
+            ].join('');
+        }
+
+        const CAUSE_COLORS = { battery: '#e67e22', absence: '#2980b9', other: '#7f8c8d' };
+
+        // Green at a perfect day, sliding to red as fresh-data coverage
+        // drops -- lets a bad day register at a glance without reading the
+        // axis, which is the point Harry's "I don't understand the graph"
+        // feedback was making: a plain minutes-based line didn't say
+        // "good day" or "bad day" without close reading.
+        function pctFreshColor(pct) {
+            if (pct === null || pct === undefined) return '#cccccc';
+            if (pct >= 99.9) return '#27ae60';
+            if (pct >= 95) return '#f39c12';
+            return '#e74c3c';
+        }
+
+        function renderStalenessChart(staleness, gapsData, startDate, endDate) {
+            const barData = staleness.daily.map(d => ({
+                value: [d.day, d.pct_fresh],
+                itemStyle: { color: pctFreshColor(d.pct_fresh) },
+                maxMin: d.max_min,
+                nCycles: d.n_cycles,
+            }));
+
+            // One marker per gap, placed just under the axis, coloured to
+            // match the "likely cause" column in the CGM gaps table below --
+            // so a low/red bar up here can be matched directly to the row
+            // that explains it down there.
+            // scatter series.data items need a real [x, y] pair in `value` --
+            // xAxis/yAxis keys (used above) are markLine/markPoint coordinate
+            // syntax, not valid here. Without a real x-value each point
+            // defaulted to ~0, which a time axis reads as 1 Jan 1970 -- that
+            // dragged the whole shared axis back to the 1970s and crushed
+            // the real bar data into a sliver at the right edge (Harry's
+            // "not respecting date boundaries" report, 1 Sep 2026).
+            const gapMarkers = (gapsData ? gapsData.gaps : []).map(g => ({
+                name: g.cause,
+                value: [g.start.slice(0, 10), 0],
+                durationMin: g.duration_min,
+                itemStyle: { color: CAUSE_COLORS[g.cause] || '#7f8c8d' },
+            }));
+
+            if (!stalenessChart) {
+                stalenessChart = echarts.init(document.getElementById('staleness-chart-node'), null, { renderer: 'canvas' });
+            }
+            stalenessChart.setOption({
+                animation: false,
+                backgroundColor: '#ffffff',
+                grid: { left: 55, right: 20, top: 20, bottom: 40 },
+                xAxis: {
+                    type: 'time',
+                    min: startDate,
+                    max: endDate,
+                    axisLine: { lineStyle: { color: '#888888' } },
+                    axisLabel: { color: '#555555' }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '% fresh',
+                    min: 0,
+                    max: 100,
+                    axisLine: { show: true, lineStyle: { color: '#888888' } },
+                    axisLabel: { color: '#555555' },
+                    splitLine: { show: true, lineStyle: { color: '#e8e8e8' } }
+                },
+                tooltip: {
+                    trigger: 'item',
+                    formatter: (p) => {
+                        if (p.componentSubType === 'scatter') {
+                            return `Gap (${p.data.name}): ${p.data.durationMin} min`;
+                        }
+                        const d = p.data;
+                        return `${d.value[0]}<br>${d.value[1]}% of ${d.nCycles} loop cycles had BG &le;${staleness.reference_minutes}m old` +
+                            (d.maxMin !== null ? `<br>Worst moment: ${d.maxMin}m old` : '');
+                    }
+                },
+                series: [
+                    {
+                        type: 'bar',
+                        name: '% loop cycles with fresh BG',
+                        data: barData,
+                        barWidth: '70%'
+                    },
+                    {
+                        type: 'scatter',
+                        name: 'CGM gap',
+                        data: gapMarkers,
+                        symbolSize: 8,
+                        z: 5
+                    }
+                ]
+            }, true);
+        }
+
+        function renderGapTotals(gapsData) {
+            const totalsEl = document.getElementById('gap-totals');
+            totalsEl.innerHTML = ['battery', 'absence', 'other'].map(cause => {
+                const t = gapsData.totals[cause];
+                return renderKpi(`${t.count} (${t.minutes}m)`, CAUSE_LABELS[cause]);
+            }).join('');
+
+            document.getElementById('gap-threshold-note').textContent =
+                `Gaps over ${gapsData.threshold_minutes} minutes, this range`;
+        }
+
+        function renderGapTable(gapsData) {
+            const tbody = document.getElementById('gap-table-body');
+            if (gapsData.gaps.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4">No gaps over ${escapeHtml(gapsData.threshold_minutes)} minutes in this range.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = gapsData.gaps.map(g => `
+                <tr>
+                    <td>${escapeHtml(g.start)}</td>
+                    <td>${escapeHtml(g.end)}</td>
+                    <td>${escapeHtml(g.duration_min)}m</td>
+                    <td>${escapeHtml(CAUSE_LABELS[g.cause] || g.cause)}</td>
+                </tr>
+            `).join('');
+        }
+
+        // Same stale-request guard as the Profiles page -- these queries
+        // aren't instant (the staleness join and gap classification both
+        // touch devicestatus/cgm_readings across the whole range), so
+        // changing the date range before a previous fetch resolves is a
+        // completely normal thing to do and needs to not corrupt the render.
+        let cgmHealthRequestSeq = 0;
+
+        async function loadCgmHealth() {
+            const mySeq = ++cgmHealthRequestSeq;
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+            const loadingEl = document.getElementById('cgm-health-loading');
+
+            loadingEl.classList.remove('hidden');
+
+            try {
+                const resp = await fetch(`/api/v1/cgm_health?start_date=${startDate}&end_date=${endDate}`);
+                const data = await resp.json();
+
+                if (mySeq !== cgmHealthRequestSeq) return;
+                loadingEl.classList.add('hidden');
+
+                if (data.error) {
+                    document.getElementById('cgm-health-kpis').innerHTML =
+                        `<div class="empty-state"><div class="empty-state-title">Error loading CGM health data</div><div class="empty-state-subtitle">${escapeHtml(data.error)}</div></div>`;
+                    return;
+                }
+
+                renderCoverageAndStalenessKpis(data);
+                renderStalenessChart(data.staleness, data.gaps, startDate, endDate);
+                renderGapTotals(data.gaps);
+                renderGapTable(data.gaps);
+            } catch (err) {
+                if (mySeq !== cgmHealthRequestSeq) return;
+                loadingEl.classList.add('hidden');
+                document.getElementById('cgm-health-kpis').innerHTML =
+                    `<div class="empty-state"><div class="empty-state-title">Error loading CGM health data</div><div class="empty-state-subtitle">${escapeHtml(String(err))}</div></div>`;
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            if (stalenessChart) stalenessChart.resize();
+        });
+
+        window.syncAndSubmit = () => loadCgmHealth();
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadCgmHealth();
+        });
+    </script>
+</body>
+
+</html>

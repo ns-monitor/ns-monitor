@@ -1,0 +1,31 @@
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Database backups & data
+*.dump
+*.pgdump
+*.sql.gz
+*.sql.bak
+postgres_data/
+postgres_data.bak*
+grafana_data/
+grafana/
+data/
+
+# Logs & runtime
+daemon/logs/
+*.log
+__pycache__/
+*.py[cod]
+*.class
+.pytest_cache/
+.venv/
+venv/
+
+# OS / Editor artifacts
+.DS_Store
+._*
+.idea/
+.vscode/

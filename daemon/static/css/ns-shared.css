@@ -1,0 +1,2350 @@
+/* =============================================================================
+   nightscout-monitor -- shared site stylesheet (v2)
+   v1: 23 Aug 2026, from a partial audit (25 of 94 candidate classes covered).
+   v2: 23 Aug 2026, same day -- v1 was reactive, not exhaustive (it only
+   covered class names I already recognised, like .panel-table, and missed
+   things I hadn't gone looking for -- .container on all 16 pages, a full
+   typography scale, forms, status badges, grid/column layout). v2 is built
+   from an exhaustive diff: every class appearing on 2+ of the 17 original
+   pages was pulled up and its actual CSS body compared, not just its name.
+   94 such classes were found; this file now covers the ones worth sharing.
+
+   THE RULE (also in STATUS.md "Site-wide style framework"): before writing
+   new CSS anywhere on this site, check here first. If what you need exists
+   below, use it. If something genuinely new and reusable is needed, add it
+   HERE, not inline in a page's own <style> block. If nothing here fits and
+   you're about to invent a new pattern, SAY SO before creating it -- don't
+   silently build a one-off that should have been a shared component, and
+   don't silently extend this file without flagging that you're doing it.
+
+   STATUS AS OF 23 Aug 2026: this file is comprehensive for what it covers,
+   but NO EXISTING PAGE is linked to it yet. That retrofit (Phase 5) is
+   deliberately separate, deferred, done one page at a time -- see
+   STATUS.md Outstanding, including several specific reconciliation
+   decisions this v2 pass surfaced (flagged inline below with REAL DIFF).
+/* Canonical Top-Level Print Setup: Force landscape default on all pages */
+@page {
+    size: landscape;
+    margin: 8mm 10mm;
+}
+
+/* -----------------------------------------------------------------------
+   1. TOKENS
+   Colour values: MAJORITY palette (13 of 17 pages already looked this
+   way) -- not a redesign, just picking what's already mostly true.
+   Confirmed with Harry 23 Aug: the "Advanced Analytics" family
+   (Clinical/Novel/Advanced Analytics/Omnipod, visibly darker at
+   #121212/#1e1e1e) will shift tone on retrofit -- expected, accepted.
+
+   Token STRUCTURE (secondary/tertiary text, borders, links, surfaces,
+   spacing scale): kept from the Advanced Analytics family regardless of
+   the colour decision -- richness and palette are separate questions.
+
+   RETHEMED 30 Aug 2026 -- near-monochrome oklch palette (shadcn-derived,
+   dark-mode values only, no light mode). Same rule as always: token
+   NAMES kept as-is, only values changed, so no template/JS edit was
+   needed for the swap itself. Two things this pass adds that weren't a
+   simple value swap:
+     1. --accent-foreground: the old blue --accent was mid-tone, so white/
+        light text sitting on it (`.btn-primary`, `.view-pill-btn.active`
+        etc.) read fine. The new --accent is a near-white light grey --
+        the same light text on it is light-on-light. Every rule that puts
+        text ON an accent background now pairs it with
+        var(--accent-foreground) instead of a hardcoded white or the
+        inherited light --text-color. Same reasoning applies to
+        --border-color-strong and --surface-hover below, which didn't
+        exist as literal values in the source palette and are DERIVED
+        (interpolated to match the palette's own ~0.06 lightness step
+        between --background/--card/--secondary) rather than sourced --
+        flagged here, not silently invented.
+     2. --danger swapped to the palette's own --destructive rather than
+        kept as the old #e74c3c -- same semantic role, and the palette
+        actually supplies a value for it (unlike success/warning, which
+        have no equivalent and stay hand-picked, per Harry 30 Aug).
+   ----------------------------------------------------------------------- */
+/* RETHEMED 5 Sep 2026 -- GitHub Dark / Linear-style cool slate palette.
+   Deep slate-black canvas (#0d1117), elevated card surfaces (#161b22 / #21262d),
+   slate borders (#30363d), crisp light text (#e6edf3 / #8b949e), and vibrant
+   electric blue accent (#2f81f7) paired with clean white accent-foreground (#ffffff).
+   Token names preserved identically so all template and component rules inherit
+   the new theme cleanly across the entire site. */
+:root {
+    --bg-color: #0d1117;
+    --card-bg: #161b22;
+    --text-color: #e6edf3;
+
+    --accent: #2f81f7;
+    --accent-foreground: #ffffff;
+    --success: #2ecc71;
+    --warning: #f1c40f;
+    --danger: #f85149;
+
+    --text-secondary: #8b949e;
+    --text-tertiary: #6e7681;
+
+    --border-color: #30363d;
+    --border-color-strong: rgba(240, 246, 252, 0.15);
+    --link-color: #58a6ff;
+    --link-color-hover: #79c0ff;
+    --surface-inset: #090d13;
+    --surface-raised: #21262d;
+    --sentence-control-bg: #21262d;
+    --sentence-control-text: #c9d1d9;
+    --surface-hover: #262c36;
+
+    --ring: rgba(56, 139, 253, 0.4);
+    --input-border: #30363d;
+    --radius: 0.625rem;
+    /* NEW 4 Sep 2026 -- referenced as var(--radius-sm)/var(--radius-md) by
+       dashboard.html/import.html/sanity_check.html for a while before ever
+       being declared here (audit_css.py flagged them as undeclared -- they
+       were, just not a rendering bug since an undeclared var() resolves to
+       nothing/inherit, not an error). Values picked to match the two most
+       common hardcoded border-radius values already in use site-wide (26x
+       4px, 25x 6px, next most common tier after this file's own --radius
+       at 10px) rather than invented numbers. */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    /* NEW 4 Sep 2026 -- moved here from sidebar.html's own local :root,
+       same reasoning as radius above: sidebar width is referenced from
+       multiple places (this file's own layout offsets included, once
+       .sb-body-collapsed-aware pages need it) and is exactly the kind of
+       thing that should have one canonical source, not a value duplicated
+       wherever it's needed. Values unchanged, just relocated. */
+    --sb-expanded: 220px;
+    --sb-collapsed: 56px;
+    --top-nav-height: 58px;
+
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+}
+
+
+/* -----------------------------------------------------------------------
+   2. BASE ELEMENTS
+   No bare `button {}`, `table {}`, or `select {}` rules -- 10 of 17
+   original pages had a bare `button {}` rule, a real specificity bug
+   pattern (a page-wide rule silently outranks a more specific one
+   written later; already bit Sandbox's own table headers once this
+   week). Structural resets (box-sizing, body, a) are the only bare-tag
+   rules here, because nothing reasonable would want to override those
+   per-component.
+   ----------------------------------------------------------------------- */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+}
+
+a {
+    color: var(--link-color);
+}
+a:hover {
+    color: var(--link-color-hover);
+}
+
+
+/* -----------------------------------------------------------------------
+   3. PAGE LAYOUT
+   `.container` was on ALL 16 non-partial pages, missed entirely in v1.
+   Two widths were in use: 1200px (majority, 3+ pages) and 1280px (2
+   pages, both mine -- Sandbox, Daily). Majority wins per the same
+   reasoning as the colour tokens.
+   ----------------------------------------------------------------------- */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Fluid modifier for full-bleed charts, studios, calendar, and dashboards */
+.container.container-fluid,
+.container.full-width {
+    max-width: none;
+    width: 100%;
+    box-sizing: border-box;
+    padding-right: 20px;
+    margin: 0;
+}
+
+/* Canonical Page Footer: Centered, smaller text, and muted secondary grey */
+.page-footer,
+footer.page-footer {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    padding: var(--space-4) 0;
+    margin-top: var(--space-4);
+}
+
+/* Generic flex row for a card's own header (title + controls) --
+   "header-controls" in the AGP/Dashboard/Timeline family. */
+.header-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+/* Two-column split layout (e.g. chart + description side by side).
+   Ported as-is from the Advanced Analytics family -- already token-built,
+   already a coherent little system (30/70 and 50/50 and 40/60-ish splits
+   via flex-basis, plus optional divider/gap modifiers). */
+.split-card {
+    display: flex;
+    gap: var(--space-5);
+    align-items: stretch;
+    flex-wrap: wrap;
+}
+.col-left  { flex: 0 0 40%; min-width: 320px; display: flex; flex-direction: column; justify-content: flex-start; }
+.col-right { flex: 1; min-width: 400px; }
+.col-30    { flex: 0 0 30%; min-width: 280px; display: flex; flex-direction: column; justify-content: flex-start; }
+.col-50    { flex: 1; min-width: 300px; }
+.col-70    { flex: 1; min-width: 400px; }
+.col-split-gap-right { padding-right: var(--space-5); }
+.col-split-divider   { border-left: 1px solid var(--border-color); padding-left: var(--space-5); }
+
+/* A full-width row that wraps below a .split-card's normal columns (e.g.
+   an explanation section under a score+chart row) -- flex: 0 0 100% has no
+   room left in the row once the other columns claim their share, so
+   .split-card's own flex-wrap: wrap sends it onto its own line. Divider
+   above separates it from the columns it sits under. */
+.split-card-full-row {
+    flex: 0 0 100%;
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: var(--space-2);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border-color);
+}
+
+/* Auto-fitting stat/summary card grid -- index/import/logs family. */
+/* .stat-grid/.stat-value/.stat-label removed 24 Aug 2026 -- Harry's call:
+   .score-block (section 9 below) is now THE single scoring system, not one
+   of two competing ones. This class was never actually consumed by any
+   live page even before removal (index/import/logs.html each have their
+   own fully-local .stat-value/.stat-label, unrelated to this file) -- so
+   nothing broke by retiring it. If a future page wants an auto-fit grid
+   layout specifically, that's still a legitimate ask, but it should wrap
+   .score-block items, not reintroduce a second value/label naming scheme.
+*/
+
+
+/* -----------------------------------------------------------------------
+   4. CARD
+   REAL DIFF, corrected from v1: v1 claimed .card was "universal, no
+   drift" -- that was wrong, I'd only confirmed the SELECTOR existed
+   everywhere, never diffed the body. It doesn't agree: box-shadow
+   opacity was .1 on some pages and .2 on others, margin-bottom was
+   16px/20px/absent, border and position:relative were present on some
+   pages and not others. Averaged per Harry's instruction (opacity ->
+   .15, a defensible middle value) rather than arbitrarily picking one
+   page's exact numbers. position:relative kept (harmless, useful as an
+   anchor for absolutely-positioned children like .loading-overlay).
+   border kept -- subtle, present on more pages once actually counted,
+   doesn't visually clash with either box-shadow value.
+   ----------------------------------------------------------------------- */
+.card {
+    background: var(--card-bg);
+    border-radius: 8px;
+    padding: var(--space-5);
+    margin-bottom: var(--space-5);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
+}
+
+
+/* -----------------------------------------------------------------------
+   5. TYPOGRAPHY SCALE
+   Ported as-is from the Advanced Analytics family -- a single, complete,
+   already-coherent scale existed only there (4 pages, byte-identical to
+   each other). Nowhere else on the site had anything comparable to
+   average against, so this is adoption, not averaging.
+   ----------------------------------------------------------------------- */
+.panel-h1 { font-size: 1.9em; font-weight: 700; color: var(--text-color); margin: 0 0 var(--space-4) 0; }
+.panel-h2 {
+    font-size: 1.5em;
+    font-weight: 700;
+    color: var(--text-color);
+    margin-top: 0;
+    border-bottom: 1px solid var(--border-color-strong);
+    padding-bottom: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+.panel-h3 { font-size: 1.1em; font-weight: 600; color: var(--text-secondary); margin: 0 0 var(--space-3) 0; }
+.panel-heading-sm { font-size: 1.1em; font-weight: 700; color: var(--text-color); margin-top: 0; margin-bottom: var(--space-3); }
+.panel-text { font-size: 1em; font-weight: 400; color: var(--text-color); line-height: 1.5; margin: 0 0 var(--space-3) 0; }
+.panel-text-minor { font-size: 0.85em; font-weight: 400; color: var(--text-secondary); line-height: 1.4; }
+.panel-list { margin: var(--space-2) 0; padding-left: 22px; list-style-type: disc; }
+.panel-list--minor { font-size: 0.85em; color: var(--text-secondary); }
+.panel-link {
+    color: var(--link-color);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.divider { border: none; border-top: 1px solid var(--border-color); margin: var(--space-4) 0; }
+.divider--strong { border: none; border-top: 1px solid var(--border-color-strong); margin: var(--space-5) 0; }
+
+/* -----------------------------------------------------------------------
+   DETAIL LIST -- label + one-line-per-authored-value blocks, optionally
+   laid out in two columns, with an aligned change-marker gutter per line.
+   (Profiles page, 1 Sep 2026.)
+   ----------------------------------------------------------------------- */
+.detail-cols {
+    display: flex;
+    gap: var(--space-6);
+    flex-wrap: wrap;
+}
+.detail-col { flex: 1 1 0; min-width: 160px; }
+
+.detail-list-row { font-size: 0.85em; line-height: 1.5; }
+.detail-list-label {
+    font-weight: 600;
+    color: var(--text-color);
+    margin-top: var(--space-3);
+}
+.detail-list-lines { margin: 2px 0 0 0; color: var(--text-secondary); }
+.detail-list-line { display: flex; align-items: baseline; }
+/* Fixed-width gutter so the value text starts at the same x position
+   whether or not this particular line is marked -- an inline "*" prefix
+   would shift only the marked lines' text and break alignment. */
+.detail-list-marker {
+    display: inline-block;
+    width: 14px;
+    flex: 0 0 14px;
+    color: var(--accent);
+    font-weight: 700;
+    text-align: center;
+}
+
+/* Sized mount point for a small inline chart (e.g. an ECharts instance)
+   sitting alongside a detail list rather than as the page's main chart. */
+.chart-node-sm { height: 260px; width: 100%; }
+
+.text-center { text-align: center; }
+.text-muted  { color: var(--text-secondary); font-size: 0.85em; }
+
+/* "Hint" and "help-text" were the same component under two names on
+   different pages (near-identical bodies: small, muted, margin-top 5px).
+   Standardised on .hint (used on 5 pages vs help-text's 1). */
+.hint {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    margin-top: var(--space-1);
+    line-height: 1.4;
+}
+
+
+/* -----------------------------------------------------------------------
+   6. BUTTONS
+   .btn / .btn-primary / .btn-danger from v1, plus .btn-secondary and
+   .btn-success now added (found on the Advanced Analytics + import
+   families). NOT ported: .btn-back (export/sanity_check) and .action-btn
+   (sanity_check) -- both are older one-off buttons whose actual visual
+   INTENT (a muted secondary action, a affirmative success action) is
+   already covered by .btn.btn-secondary / .btn.btn-success. Retrofitting
+   those two pages should replace the one-offs with the shared classes,
+   not port them as a third and fourth button system.
+   ----------------------------------------------------------------------- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    background: var(--surface-raised);
+    color: var(--text-color);
+    border: 1px solid var(--border-color-strong);
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 0.95em;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.btn:hover { background: var(--surface-hover); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+
+/* Small button modifier -- exclusively used by the filter/target sentence
+   builder's "Add condition" / "Add a group of conditions" / "Add Modifier"
+   buttons (ns-filter-builder.js). Confirmed via grep: btn-sm has no other
+   usage site-wide, so real styling here has zero ripple elsewhere.
+   Deliberately placed before .btn-primary/.btn-secondary so their own
+   `color` declarations still win when combined with .btn-sm -- matters
+   for the AND/OR toggle pill (also .btn.btn-sm, primary when active),
+   which must keep --accent-foreground's dark text for contrast against
+   its light accent background. Harry's steer, 31 Aug 2026: match "Add
+   Modifier"'s existing look/size, tone down the others to match. */
+.btn-sm {
+    font-size: 0.82rem;
+    padding: 3px 8px;
+    color: var(--sentence-control-text);
+}
+
+.btn-primary   { background: var(--accent);   border-color: var(--accent);   color: var(--accent-foreground); }
+
+/* Text-only button, no background/border -- for low-emphasis actions
+   sitting inline with other controls (e.g. "Select all" / "Deselect all"
+   in a popover list). Phase A, 31 Aug 2026. */
+.btn-link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--text-secondary);
+    font-size: 0.78em;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+}
+.btn-link:hover {
+    color: var(--accent);
+}
+.btn-secondary { background: var(--surface-raised); border-color: var(--surface-raised); }
+.btn-success   { background: var(--success);  border-color: var(--success); }
+.btn-danger    { background: var(--danger);   border-color: var(--danger); }
+.btn-primary:hover, .btn-secondary:hover, .btn-success:hover, .btn-danger:hover {
+    filter: brightness(1.12);
+}
+
+.btn-group { display: flex; gap: var(--space-2); }
+
+/* Ghost icon button (transparent at rest, highlights on hover) */
+.btn-ghost-icon {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    padding: 5px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.95em;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.btn-ghost-icon:hover {
+    background: var(--surface-hover);
+    color: var(--accent);
+}
+.btn-ghost-icon.btn-ghost-danger:hover {
+    background: var(--surface-hover);
+    color: var(--danger);
+}
+
+
+/* -----------------------------------------------------------------------
+   7. FORMS
+   Genuinely missing from v1, as flagged. Not built from nothing though --
+   generalised from `.select-dropdown` (Advanced Analytics family, 4
+   pages) which already existed and already matched the token system.
+   `.form-group`/`.help-text` (index/import) folded in as the wrapper/
+   label pattern; `.help-text` merged into `.hint` above rather than kept
+   as a duplicate name for the same thing.
+
+   FIXED 23 Aug 2026, found during the Sandbox retrofit (first real page
+   to use this): two real defects, not style nitpicks.
+   1. Background was `--surface-raised` (lighter than the card -- correct
+      for BUTTONS, which should look raised/clickable) instead of
+      `--surface-inset` (darker -- correct for form fields, which should
+      look recessed/"a slot to type into"). Copied the wrong surface
+      token when generalising from `.select-dropdown` without checking
+      the raised/inset distinction actually applied to a field, not a
+      button.
+   2. `font-size: 0.85em` was hardcoded from `.select-dropdown`'s own
+      context (a compact select next to an AGP chart) without checking
+      it against other usage. On Sandbox's sentence-builder UI, the
+      surrounding text is 1.02rem -- the fields read as visibly smaller
+      than the sentence around them. Changed to `font-size: inherit` so
+      a field always matches whatever text size it's actually sitting
+      in, rather than asserting a specific size that only suited one
+      original source page.
+   ----------------------------------------------------------------------- */
+.form-select,
+.form-input {
+    background-color: var(--surface-inset);
+    border: 1px solid var(--input-border);
+    /* Was var(--text-color) at weight 600 (full-bright white, bold) --
+       harsh against the dark --surface-inset background, most visible on
+       a plain text field like Filter Name. Softened to match
+       .sentence-select/.sentence-input's already-approved tone (31 Aug
+       2026, Harry's direct comparison against the TDD/clause-builder
+       fields) -- same --sentence-control-text value and weight 500,
+       reused rather than duplicated as a new token. This is a site-wide
+       change: every .form-input/.form-select on every page (Filter Name,
+       Description, all page search/date/settings fields) gets the
+       softer tone, not just the filter form. */
+    color: var(--sentence-control-text);
+    font-size: inherit;
+    font-family: inherit;
+    font-weight: 500;
+    border-radius: 6px;
+    padding: 5px 10px;
+    outline: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.form-select {
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='%23ffffff'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 10px;
+    padding-right: 28px;
+    appearance: none;
+    -webkit-appearance: none;
+}
+.form-select:hover {
+    background-color: var(--surface-raised);
+}
+.form-select:focus,
+.form-input:focus {
+    background-color: var(--surface-raised);
+    border-color: var(--ring);
+    box-shadow: 0 0 0 1px var(--ring);
+}
+
+.form-group {
+    margin-bottom: var(--space-4);
+}
+
+.form-label {
+    display: block;
+    margin-bottom: var(--space-1);
+    color: var(--text-color);
+    font-size: 0.88em;
+    font-weight: 500;
+}
+.form-label-bold {
+    font-weight: 700;
+    margin-bottom: var(--space-2);
+}
+.form-input-full,
+.form-select-full {
+    width: 100%;
+}
+
+/* Small field-size variant -- 0.82rem, explicit rather than relying on
+   .form-input/.form-select's own font-size:inherit. Added 31 Aug 2026 for
+   the Smart Filter form's Filter Name/Description fields, which need to
+   match the rest of that form's text (already 0.82rem via
+   .sentence-select/.sentence-input/.btn-sm etc) but sit in a plain
+   .form-input/.form-select that would otherwise inherit whatever ambient
+   size the page happens to have. An ancestor-scoped inherit rule
+   (#filter-modal-backdrop .modal-body { font-size: 0.82rem }) was tried
+   first and didn't reach these two fields for reasons not conclusively
+   pinned down without live rendering to inspect -- this explicit class
+   sidesteps that inheritance question entirely and is the standardised,
+   reusable version (was briefly patched as page-local ID selectors in
+   targets.html/calendar.html; consolidated here instead of staying
+   duplicated in two places). Apply alongside .form-input/.form-select,
+   doesn't replace them. */
+.form-input-sm,
+.form-select-sm {
+    font-size: 0.82rem;
+}
+
+/* Dimmed/smaller label variant -- for a secondary field label sitting next
+   to a primary one (e.g. Filter Name / Description), not the main
+   .form-label weight. Phase 0, 31 Aug 2026. */
+.form-label-minor {
+    display: block;
+    margin-bottom: var(--space-1);
+    color: var(--text-secondary);
+    font-size: 0.82rem; /* was 0.78em, unified 31 Aug 2026 -- exclusively
+                            used by Filter Name/Description, confirmed via
+                            grep, safe to change directly */
+    font-weight: 500;
+}
+
+/* Two fields sharing a row at ~50% width each, wrapping to full-width
+   stacked below a narrow breakpoint. */
+.form-row-split {
+    display: flex;
+    gap: var(--space-4);
+    align-items: flex-start;
+}
+.form-row-split > .form-group {
+    flex: 1 1 50%;
+    min-width: 0;
+    margin-bottom: 0;
+}
+@media (max-width: 640px) {
+    .form-row-split { flex-direction: column; }
+}
+
+.char-counter {
+    font-size: 0.82rem; /* was 0.72em, unified 31 Aug 2026 -- exclusively
+                            used in the same Filter form, confirmed via grep */
+    color: var(--text-secondary);
+    text-align: right;
+    margin-top: var(--space-1);
+}
+.char-counter.char-counter--over {
+    color: var(--danger);
+}
+
+.rule-definition-box {
+    background: var(--surface-inset);
+    padding: var(--space-3);
+    border-radius: 6px;
+    margin-bottom: var(--space-4);
+}
+.rule-definition-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr auto;
+    gap: var(--space-2);
+    align-items: center;
+}
+
+
+/* -----------------------------------------------------------------------
+   8. STATUS / BADGES
+   REAL DIFF, flagged rather than merged: `.status-chip` (index.css -- a
+   neutral grey pill, coloured via a nested/modifier class) and `.ok`/
+   `.fail`/`.warn` (logs.css -- solid-coloured pills directly) are two
+   different visual solutions to the same problem ("show a pass/fail/warn
+   badge"). Collapsing them would visibly change whichever page loses.
+   `.status-chip` + the colour-utility classes below is kept as canonical
+   (more composable, already token-based); logs.css's solid-pill version
+   should convert to `.status-chip.status-ok` etc on retrofit -- not
+   decided/ported as a second badge system here.
+
+   `.status-ok`/`.status-err`/`.status-warn` are colour-only utilities,
+   deliberately KEPT SEPARATE from `.metric-better`/`.metric-worse`
+   below even though the colour values are identical -- different
+   semantic role (operation outcome vs "is this number good"), not
+   worth collapsing into one name just because the hex matches.
+   ----------------------------------------------------------------------- */
+.status-chip {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75em;
+    font-weight: bold;
+    color: white;
+    background: var(--surface-raised);
+    margin: 2px;
+}
+.status-ok   { color: var(--success); }
+.status-err  { color: var(--danger); }
+.status-warn { color: var(--warning); }
+
+.status-chip.status-ok {
+    background: var(--success);
+    color: #ffffff;
+}
+.status-chip.status-warn {
+    background: var(--warning);
+    color: #000000;
+}
+.status-chip.status-err {
+    background: var(--danger);
+    color: #ffffff;
+}
+
+
+/* -----------------------------------------------------------------------
+   9. METRIC / SCORE DISPLAY
+   From v1, unchanged. "Is this number good or bad" -- see note above on
+   why this stays separate from the status-* utilities.
+   ----------------------------------------------------------------------- */
+.metric-better { color: var(--success); font-weight: bold; }
+.metric-worse  { color: var(--danger); font-weight: bold; }
+/* Third state for significance-tested comparisons (e.g. Omnipod's
+   milestone tables) -- "not better, not worse, just not conclusive". */
+.metric-neutral { color: var(--text-secondary); font-weight: 400; }
+
+.score-block { display: flex; flex-direction: column; gap: var(--space-1); }
+.score-value { font-size: 2em; font-weight: 700; }
+.score-label { display: block; font-size: 0.8em; color: var(--text-secondary); margin-top: 2px; }
+.score-delta { font-size: 0.95em; font-weight: 600; }
+
+/* Vertical stack of .score-block items -- the vertical complement to a
+   horizontal row of them (see e.g. Omnipod's own local .stat-row). */
+.score-stack { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* Horizontal row of .score-block items -- the row complement to
+   .score-stack (e.g. a page's top-of-panel summary numbers side by side). */
+.score-row { display: flex; gap: var(--space-5); flex-wrap: wrap; }
+
+/* For a .score-value used inline inside a running sentence (e.g. "SD1:
+   0.21 mmol/L") rather than stacked in a .score-block -- default
+   line-height would otherwise blow out the surrounding paragraph's
+   line spacing. */
+.score-value--inline { line-height: 1; vertical-align: middle; }
+
+
+/* -----------------------------------------------------------------------
+   10. LOADING OVERLAY
+   REAL DIFF, flagged: the majority pattern (dashboard.css/timeline.css,
+   byte-identical) is an always-flex overlay meant to be added/removed
+   from the DOM by the page's own JS. dashboard_daily.html (mine) instead
+   defaults to `display: none` and toggles visibility via a class -- a
+   materially different mechanism, not just a colour tweak. Majority
+   pattern kept as the base here; dashboard_daily's JS would need to
+   switch from toggling display to adding/removing the element on
+   retrofit, or this class gains a `.loading-overlay.hidden` modifier --
+   not decided here, left for Phase 5 when that page is actually touched.
+   ----------------------------------------------------------------------- */
+.loading-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(45, 45, 45, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    z-index: 10;
+}
+/* The modifier the comment above already anticipated -- toggled via
+   classList instead of an inline style="display:..." attribute (Profiles
+   page, 1 Sep 2026). Safe to adopt elsewhere: only ever adds display:none
+   on top of the base rule, never removes anything the base rule set. */
+.loading-overlay.hidden { display: none; }
+/* Generic positioned wrapper for a .loading-overlay to anchor to -- it
+   needs *some* positioned ancestor, this is that ancestor with no other
+   opinions about the content inside it. */
+.chart-wrap { position: relative; }
+
+
+/* -----------------------------------------------------------------------
+   11. TOOLTIP
+   Ported as-is (AGP/Dashboard/Timeline family) -- simple hover-reveal
+   pattern, no drift found across its users.
+   ----------------------------------------------------------------------- */
+.tooltip {
+    position: relative;
+    display: inline-block;
+    cursor: help;
+}
+.tooltip .tooltiptext {
+    display: none;
+    width: 280px;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 12px;
+    position: absolute;
+    z-index: 10000;
+    top: 130%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.85em;
+    line-height: 1.5;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+    border: 1px solid #666;
+    pointer-events: none;
+}
+.tooltip:hover .tooltiptext {
+    display: block;
+}
+
+/* The common "small circled ? symbol" tooltip trigger -- combine with
+   .tooltip for the hover mechanics, e.g.:
+   <span class="tooltip tooltip-icon">?<span class="tooltiptext">...</span></span>
+   Not baked into .tooltip itself since that class is also used to wrap
+   longer phrases, which shouldn't be forced into a small circle. */
+.tooltip-icon {
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--border-color-strong);
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8em;
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+
+/* -----------------------------------------------------------------------
+   12. TABLE
+   From v1, unchanged. `.panel-table` was already the name on 4 pages
+   and already the documented-but-unenforced intent -- adopted as-is.
+   ----------------------------------------------------------------------- */
+.panel-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85em;
+    line-height: 1.4;
+}
+.panel-table th {
+    text-align: left;
+    padding: var(--space-2);
+    border-bottom: 2px solid var(--border-color-strong);
+    color: var(--text-tertiary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+.panel-table td {
+    padding: var(--space-2);
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+}
+/* Modifier for a .panel-table whose cells hold long-form prose (e.g. a
+   glossary Description column) rather than short values -- default
+   nowrap is correct for most panel-table uses (numeric/short data) but
+   forces long sentences into one unbroken line that pushes the table
+   width off-screen instead of wrapping. Apply to the <table>, not
+   individual <td>s, since a table using this pattern needs it on every
+   cell, not selectively. */
+.panel-table.wrap-cells td {
+    white-space: normal;
+}
+.panel-table tr:last-child td {
+    border-bottom: none;
+}
+.panel-table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+/* Deliberate exception to "no bare tags": <th class="num"> needs the SAME
+   specificity as <td class="num"> or the header silently loses (0,1,1 for
+   `.panel-table th` beats a bare `.num` at 0,1,0) -- the exact bug
+   already hit once on Sandbox's own table. */
+.panel-table th.num,
+.panel-table td.num {
+    text-align: right;
+}
+
+/* Table column highlighted as the point of comparison -- AGP family. */
+.highlight-col {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: var(--text-color);
+    font-weight: bold;
+}
+
+
+/* -----------------------------------------------------------------------
+   13. EMPTY / ERROR STATES
+   From v1, unchanged -- generalised from Sandbox's best/worst search
+   (.bw-error/.bw-empty), promoted here as the site-wide version.
+   ----------------------------------------------------------------------- */
+.empty-state {
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+/* Optional bold headline + muted italic subtext inside an .empty-state,
+   for messages that need more explanation than a single muted line
+   (e.g. a chart's "select at least 2 days" guard). Subtitle inherits
+   .empty-state's own text-secondary colour, just adds the italic. */
+.empty-state-title { font-size: 1.15em; font-weight: 600; color: var(--text-color); margin-bottom: var(--space-2); }
+.empty-state-subtitle { font-size: 0.85em; font-style: italic; }
+
+.error-banner {
+    padding: 10px 12px;
+    border-radius: 4px;
+    background: oklch(0.704 0.191 22.216 / 12%);
+    border: 1px solid oklch(0.704 0.191 22.216 / 40%);
+    color: var(--danger);
+    font-size: 0.92em;
+}
+
+
+/* -----------------------------------------------------------------------
+   14. TABBED PANELS
+   From v1, unchanged -- already token-built in its source, just
+   retargets the token values above.
+   ----------------------------------------------------------------------- */
+.tab-bar {
+    display: flex;
+    gap: 3px;
+    padding: 8px 8px 0 8px;
+    background: var(--surface-inset);
+    border-radius: 8px 8px 0 0;
+}
+.tab-item {
+    background: var(--surface-raised);
+    color: var(--text-secondary);
+    border: none;
+    padding: 10px 20px;
+    min-width: 92px;
+    text-align: center;
+    font-size: 0.9em;
+    font-weight: 600;
+    font-family: inherit;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.tab-item:hover { color: var(--text-color); }
+.tab-item.active { background: var(--card-bg); color: var(--text-color); }
+.tab-panel { margin-top: 0; }
+
+
+/* -----------------------------------------------------------------------
+   15. DATE RANGE POPOVER
+   From v1, unchanged. Still flagged: this is one of (at least) four
+   independent date-range pickers in the codebase (see STATUS.md) --
+   which one becomes canonical is a Phase 5 decision, not made here.
+   ----------------------------------------------------------------------- */
+.date-picker-wrap { position: relative; display: inline-block; margin-bottom: var(--space-6); }
+
+.date-picker-trigger-group {
+    display: inline-flex;
+    align-items: stretch;
+    border: 1px solid var(--border-color-strong);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.trigger-step-btn {
+    background: var(--surface-raised);
+    border: none;
+    color: var(--text-secondary);
+    padding: 0 14px;
+    cursor: pointer;
+    font-size: 1.2em;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.trigger-step-btn:hover { background: var(--surface-hover); color: var(--text-color); }
+
+.date-picker-trigger {
+    background: var(--surface-raised);
+    border: none;
+    border-left: 1px solid var(--border-color-strong);
+    border-right: 1px solid var(--border-color-strong);
+    color: var(--text-color);
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    transition: background 0.15s ease;
+}
+.date-picker-trigger:hover { background: var(--surface-hover); }
+.date-picker-trigger .trigger-compare-text { color: var(--text-secondary); font-weight: 400; }
+
+.date-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    left: auto;
+    z-index: 100;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color-strong);
+    border-radius: 12px;
+    width: 380px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    overflow: visible;
+}
+.date-popover-section { padding: var(--space-5); }
+.date-popover-section.compare-section {
+    background: var(--card-bg);
+    border-top: 1px solid var(--border-color);
+}
+.date-popover .tooltip .tooltiptext {
+    width: 330px;
+    left: -40px;
+    transform: none;
+    top: calc(100% + 8px);
+    text-align: left;
+    background-color: var(--surface-raised, #333);
+    border: 1px solid var(--border-color-strong, #555);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8);
+    font-size: 0.82em;
+    line-height: 1.45;
+}
+.date-popover-title {
+    font-size: 0.75em;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-weight: 600;
+    margin-bottom: var(--space-3);
+}
+.date-pill {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface-raised);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: var(--space-4);
+}
+.step-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    cursor: pointer;
+    border-radius: 6px;
+    font-size: 1.2em;
+    line-height: 1;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.step-btn:hover { background: var(--surface-hover); color: var(--text-color); }
+
+.date-input-group { display: flex; align-items: center; gap: 2px; }
+.pill-date-input {
+    background: transparent;
+    border: none;
+    color: var(--text-color);
+    font-size: 0.85em;
+    font-weight: 500;
+    text-align: center;
+    outline: none;
+    padding: 4px 2px;
+    font-family: inherit;
+    color-scheme: dark;
+}
+/* Calendar, month, and time picker glyphs across the entire site.
+   Browsers render WebKit indicator SVGs in black or muted low-contrast gray.
+   A universal invert and opacity treatment provides crisp, readable icons across
+   all dark surfaces (header popover, Diary stage, Trace, Targets, Sanity Check,
+   Import, Export) while brightening on hover. */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.85);
+    opacity: 0.7;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover,
+input[type="month"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+}
+.date-separator { color: var(--text-secondary); font-size: 0.8em; margin: 0 2px; }
+
+.popover-controls-row { display: flex; justify-content: space-between; align-items: center; }
+
+.checkbox-label {
+    font-size: 0.85em;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+
+/* -----------------------------------------------------------------------
+   16. PRINT
+   Clean print styles for report generation. Unconditionally hides all
+   interactive chrome (sidebar, navigation, header toolbars, date pickers,
+   popovers, menus, alert banners) and resets margins/padding so charts
+   and tables print cleanly centered.
+   ----------------------------------------------------------------------- */
+.print-break-avoid {
+    page-break-inside: avoid;
+}
+
+@media print {
+    html, body, body.sb-body-collapsed {
+        background: white !important;
+        color: black !important;
+        padding: 0 !important;
+        padding-left: 0 !important;
+        margin: 0 auto !important;
+        width: 100% !important;
+    }
+
+    /* Unconditionally hide all sidebar, menus, navigation, date controls, footers, popovers */
+    .sidebar,
+    .sidebar-wrapper,
+    #sidebar,
+    .sb-toggle,
+    .page-header,
+    .page-footer,
+    .alert,
+    .panel-header-toolbar,
+    .header-action-buttons,
+    .view-pill-container,
+    .settings-menu-container,
+    .settings-popover,
+    .view-dropdown-popover,
+    .tab-context-menu,
+    .loading-overlay,
+    .date-selector,
+    .date-range-container,
+    .date-selector-wrapper,
+    .controls,
+    form,
+    header,
+    footer,
+    input,
+    select,
+    button {
+        display: none !important;
+    }
+
+    .container {
+        max-width: 100% !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    .card {
+        background: white !important;
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 auto !important;
+        width: 100% !important;
+    }
+
+    h1, h2, h3,
+    .panel-table th,
+    label,
+    .text-muted,
+    .hint {
+        color: #333 !important;
+    }
+
+    .panel-table th,
+    .panel-table td {
+        border-bottom: 1px solid #ddd !important;
+    }
+}
+
+
+/* -----------------------------------------------------------------------
+   18. CHARTS
+   Added 24 Aug 2026, generalised from Novel Reports' Smoothness/CONGA
+   charts -- more graphs/pages are coming, so these are here from the
+   first real use rather than waiting for a second page to duplicate them.
+   ----------------------------------------------------------------------- */
+
+/* A custom 2-row "This Period / Comparison Period"-style legend (used in
+   place of a charting library's built-in legend when it can't produce
+   this exact 2-column, date-aligned shape). grid-template-columns:
+   max-content max-content means both rows share the same 2 column
+   widths, so the second column (typically a date range) lines up
+   regardless of how long the first column's labels are. */
+.chart-legend-grid {
+    display: grid;
+    grid-template-columns: max-content max-content;
+    column-gap: var(--space-3);
+    row-gap: 4px;
+    justify-content: end;
+    font-size: 0.85em;
+    margin-bottom: var(--space-3);
+}
+/* Colour swatch for a .chart-legend-grid row -- background-color is set
+   inline per-series (it's a runtime value, not something CSS can know),
+   everything else (size/shape/spacing) stays here. */
+.legend-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+    margin-right: 6px;
+}
+
+/* Muted date range centred above a chart. */
+.chart-date-range { text-align: center; margin-bottom: var(--space-2); }
+/* Chart title centred below it -- combine with .panel-h3 for the actual
+   font styling, e.g. class="panel-h3 chart-title-footer". */
+.chart-title-footer { text-align: center; margin: var(--space-2) 0 0 0; }
+
+
+/* -----------------------------------------------------------------------
+   20. CONTROLS, POPOVERS & VIEW SELECTORS
+   Added 25 Aug 2026, generalised from AGP / 24h Modal Patterns view management
+   and overlay display controls -- structured for cross-page chart panels.
+   ----------------------------------------------------------------------- */
+
+/* Action button cluster in a card header */
+.header-action-buttons {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+/* Square/icon button for card headers (e.g. settings gear, print, options) */
+.panel-icon-btn {
+    background: var(--surface-raised);
+    border: 1px solid var(--border-color-strong);
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 6px 8px;
+    font-size: 0.95em;
+    line-height: 1;
+    border-radius: 6px;
+    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.panel-icon-btn:hover {
+    color: var(--text-color);
+    background: var(--surface-hover);
+    border-color: var(--border-color-strong);
+}
+.panel-icon-btn:focus {
+    outline: none;
+}
+
+/* View / Preset selector dropdown container & pill button */
+.view-pill-container {
+    position: relative;
+}
+
+.view-pill-btn {
+    display: inline-flex;
+    align-items: center;
+    background: var(--surface-raised);
+    border: 1px solid var(--border-color-strong);
+    color: var(--text-color);
+    font-size: 0.82em;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+.view-pill-btn:hover {
+    background: var(--surface-hover);
+    color: #fff;
+    border-color: var(--border-color-strong);
+}
+.view-pill-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-foreground);
+    font-weight: 600;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+.view-pill-btn.active:hover {
+    background: var(--link-color-hover);
+    border-color: var(--link-color-hover);
+    color: var(--accent-foreground);
+}
+
+/* Popover list for saved views / presets */
+.view-dropdown-popover {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color-strong);
+    border-radius: 8px;
+    padding: var(--space-2) 0;
+    min-width: 260px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75);
+    z-index: 1000;
+    display: none;
+    color: var(--text-color);
+}
+.view-dropdown-popover.active {
+    display: block;
+}
+
+.view-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.view-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 14px;
+    font-size: 0.84em;
+    color: var(--text-color);
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+.view-list-item:hover {
+    background: var(--surface-hover);
+    color: #fff;
+}
+.view-list-item.active {
+    color: var(--accent);
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.08);
+}
+.view-list-item .item-title {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.view-item-delete {
+    opacity: 0;
+    color: var(--text-tertiary);
+    font-size: 0.85em;
+    transition: opacity 0.15s;
+    padding: 2px 4px;
+}
+.view-list-item:hover .view-item-delete {
+    opacity: 0.7;
+}
+.view-item-delete:hover {
+    opacity: 1 !important;
+    color: var(--danger) !important;
+}
+
+.view-save-section {
+    padding: 8px 14px 4px 14px;
+    border-top: 1px solid var(--border-color);
+    margin-top: 6px;
+}
+.btn-save-view {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: none;
+    color: var(--accent);
+    font-size: 0.82em;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 0;
+}
+.btn-save-view:hover {
+    color: var(--link-color-hover);
+}
+
+.view-save-input-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.view-save-input-row input {
+    background: var(--surface-inset);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    font-size: 0.82em;
+    padding: 4px 8px;
+    border-radius: 4px;
+    outline: none;
+    flex: 1;
+}
+.view-save-input-row input:focus {
+    border-color: var(--accent);
+}
+.btn-confirm-save {
+    background: var(--accent);
+    border: none;
+    color: var(--accent-foreground);
+    font-size: 0.8em;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.btn-cancel-save {
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 4px;
+}
+
+/* Right-Click Context Menu */
+.tab-context-menu {
+    position: fixed;
+    z-index: 2500;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color-strong);
+    border-radius: 6px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.8);
+    min-width: 210px;
+    padding: 6px 0;
+    color: var(--text-color);
+    font-size: 0.82em;
+    display: none;
+}
+.tab-context-header {
+    font-size: 0.74em;
+    font-weight: bold;
+    color: var(--text-tertiary);
+    padding: 4px 14px 6px 14px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 4px;
+}
+.tab-context-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+.tab-context-item i {
+    width: 16px;
+    text-align: center;
+    flex-shrink: 0;
+}
+.tab-context-item:hover {
+    background: var(--surface-hover);
+    color: #ffffff;
+}
+.tab-context-item.danger {
+    color: var(--danger);
+}
+.tab-context-item.danger:hover {
+    background: oklch(0.704 0.191 22.216 / 15%);
+}
+
+/* Settings / Overlay Menu Container & Popover */
+.settings-menu-container {
+    position: relative;
+}
+
+.settings-popover {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color-strong);
+    border-radius: 8px;
+    padding: 14px 16px;
+    min-width: 310px;
+    max-height: 480px;
+    overflow-y: auto;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85);
+    z-index: 1200;
+    display: none;
+    color: var(--text-color);
+}
+.settings-popover.active {
+    display: block;
+}
+
+.settings-popover-title {
+    font-size: 0.82em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    font-size: 0.88em;
+    gap: 12px;
+}
+.settings-row:last-child {
+    margin-bottom: 0;
+}
+.settings-row label {
+    color: var(--text-color);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Segmented pill toggle group */
+.settings-toggle-group {
+    display: flex;
+    background: var(--surface-inset);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 2px;
+    gap: 2px;
+}
+
+.settings-toggle-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.75em;
+    padding: 3px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.15s ease;
+}
+.settings-toggle-btn.active {
+    background: var(--accent);
+    color: var(--accent-foreground);
+}
+
+.settings-note {
+    font-size: 0.74em;
+    color: var(--text-tertiary);
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+    font-style: italic;
+}
+
+/* Settings Popover Checklist (Calendar, Patterns, Trends, Trace) */
+.overlay-list-container {
+    max-height: 260px;
+    overflow-y: auto;
+    margin: 8px 0;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--surface-inset);
+}
+.overlay-list-empty {
+    padding: 14px 10px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.85em;
+}
+.overlay-list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+.overlay-list-row:last-child {
+    border-bottom: none;
+}
+.overlay-list-row-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1 1 auto;
+    cursor: pointer;
+}
+.overlay-list-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-color);
+    font-size: 0.88em;
+}
+.overlay-list-type {
+    font-size: 0.68em;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+.overlay-list-actions-icons {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+.overlay-list-actions-icons .panel-icon-btn {
+    width: 24px;
+    height: 24px;
+    font-size: 0.78em;
+}
+.overlay-list-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 2px 2px 2px;
+    font-size: 0.82em;
+}
+.overlay-list-toggle-all-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text-color);
+}
+.overlay-list-toggle-all.is-partial {
+    opacity: 0.55;
+    accent-color: #94a3b8;
+}
+.overlay-list-actions .btn-link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--link-color);
+    cursor: pointer;
+    text-decoration: underline;
+    font-size: inherit;
+}
+.overlay-list-actions .btn-link:hover {
+    color: var(--link-color-hover);
+}
+
+/* Modal Shared Component */
+.modal-backdrop {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.modal-backdrop.active {
+    display: flex;
+}
+.modal-box {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    width: 100%;
+    max-width: 580px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.85);
+    color: var(--text-color);
+}
+.modal-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.modal-title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+.modal-body {
+    padding: 18px;
+    overflow-y: auto;
+    flex: 1 1 auto;
+}
+.modal-footer {
+    padding: 12px 18px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Axis Scale Limits (Min / Max Inputs inside Settings Popover) */
+.axis-bounds-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 0.8em;
+}
+.axis-bounds-inputs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.axis-bound-input {
+    width: 54px;
+    padding: 2px 4px;
+    font-size: 0.75em;
+    text-align: center;
+    background: var(--surface-inset, #141414);
+    border: 1px solid var(--border-color, #444);
+    color: var(--text-color, #fff);
+    border-radius: 3px;
+}
+.axis-bound-input:focus {
+    border-color: var(--accent, oklch(0.922 0 0));
+    outline: none;
+}
+.btn-reset-axis {
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary, #888);
+    cursor: pointer;
+    padding: 2px 5px;
+    font-size: 0.75em;
+    border-radius: 3px;
+}
+.btn-reset-axis:hover {
+    color: var(--text-color, #fff);
+    background: var(--surface-raised, #444);
+}
+
+/* Floating Axis Scale Hint Badge */
+#axis-scale-hint,
+.axis-scale-hint {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    background: rgba(20, 20, 20, 0.94);
+    color: #ffffff;
+    border: 1px solid var(--border-color-strong, #555);
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: bold;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    display: none;
+    transform: translate(14px, -50%);
+    white-space: nowrap;
+}
+
+/* Axis Scale Gesture Pillars */
+.axis-pillars-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.axis-pillar {
+    position: absolute;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.axis-pillar-half {
+    flex: 1;
+    /* iPad touch pass (3 Sep 2026): a vertical drag on this element IS the
+       resize gesture (unlike Trace's #chart, which needs to let vertical
+       page-scroll pass through) -- claim the gesture fully so iPadOS
+       Safari doesn't try to scroll the page instead of firing pointermove.
+       See docs/analysis/ipad-touch-support-plan.md Phase A. */
+    touch-action: none;
+}
+.axis-pillar-half.upper {
+    cursor: n-resize;
+}
+.axis-pillar-half.lower {
+    cursor: s-resize;
+}
+
+/* Multi-Grain Selector Bar (Trends over Time) */
+.grain-controls {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 10px;
+    padding: 10px;
+    border-top: 1px solid var(--border-color, #444);
+    flex-wrap: wrap;
+}
+.grain-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary, #888);
+    cursor: pointer;
+    font-size: 0.9em;
+}
+.grain-label.highlight {
+    color: var(--success, #2ecc71);
+    font-weight: bold;
+}
+.grain-label input[type="checkbox"],
+.grain-label input[type="radio"] {
+    cursor: pointer;
+}
+
+/* Card / Panel Header Toolbar (Patterns, Trends, Reports) */
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-3, 12px);
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.panel-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.panel-header-left h2 {
+    margin: 0;
+    padding: 0;
+    border: none;
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--text-color, #e0e0e0);
+}
+
+.panel-header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+}
+
+
+/* -----------------------------------------------------------------------
+   21. STICKY PAGE HEADERS WITH EMBEDDED CONTROLS
+   Canonical sticky header format (Novel Reports / Clinical Reports /
+   AGP Patterns / Trends / Omnipod / Sandbox / Trace). Locks the page title
+   and date controls to the top of the viewport when scrolling.
+   ----------------------------------------------------------------------- */
+header.page-header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: var(--bg-color, #1a1a1a);
+    padding: var(--space-3) 0;
+    margin-bottom: var(--space-4);
+    border-bottom: 2px solid var(--border-color, #333);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+header.page-header h1.panel-h1,
+header.page-header h1 {
+    font-size: 1.9em;
+    font-weight: 700;
+    color: var(--text-color, #e0e0e0);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    line-height: 1;
+}
+
+header.page-header .date-picker-wrap {
+    margin-bottom: 0;
+    display: inline-flex;
+    align-items: center;
+}
+
+.trace-header-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.trace-header-controls .date-pill,
+header.page-header .date-pill {
+    margin-bottom: 0;
+}
+
+.date-popover .form-select {
+    max-width: 170px;
+}
+
+
+/* -----------------------------------------------------------------------
+   22. NOT INCLUDED, DELIBERATELY -- see STATUS.md for why
+   - .hamburger / .nav-menu / .open / .menu-section: CONFIRMED DEAD, not a
+     scope decision. Checked on all 11 pages that declare it: none render
+     a matching `class="hamburger"` element, so the CSS paints nothing and
+     the wired-up JS (`getElementById('hamburger-btn')`) targets an
+     element that doesn't exist. Leftover from before `sidebar.html`
+     existed. Recommended for deletion, not preservation -- see Outstanding.
+   - .agp-container: deliberately page-local (AGP's chart image needs a
+     white background specifically, not a general container pattern).
+   - .image-container / .chart-container / .kin-stat / .kin-description:
+     single-family (Advanced Analytics only) and specific to that report
+     layout's own content, not a general cross-page pattern.
+   ----------------------------------------------------------------------- */
+
+
+/* -----------------------------------------------------------------------
+   23. SENTENCE BUILDER & CONVERSATIONAL FILTER UI
+   Provides natural language sentence layout for Daily Goals and Smart Filters.
+   ----------------------------------------------------------------------- */
+.sentence-builder-card {
+    background: var(--surface-inset);
+    border: 1px solid var(--border-color-strong);
+    border-radius: 6px;
+    padding: 14px;
+    margin-bottom: 12px;
+}
+
+.sentence-builder-standalone {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 8px 0 16px 0;
+}
+
+.sentence-root-phrase {
+    /* 0.95rem -> 0.82rem: unified with every other field/label/button in
+       the filter form (31 Aug 2026, Harry's steer -- match "Add
+       Modifier"'s size across the whole form, title excepted). */
+    font-size: 0.82rem;
+    font-weight: 600;
+    /* Was var(--text-color) -- full-bright, visibly harsher than
+       .sentence-nested-connector's var(--text-secondary) right below it
+       even though both are the same "condition group header" role at
+       two nesting depths. Matched to --text-secondary (31 Aug 2026,
+       Harry's direct comparison of the two). */
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.sentence-flow-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    /* 0.95rem -> 0.82rem, var(--text-color) -> var(--sentence-control-text):
+       same unification pass, 31 Aug 2026. */
+    font-size: 0.82rem;
+    color: var(--sentence-control-text);
+    line-height: 1.6;
+}
+
+.sentence-select {
+    background-color: var(--sentence-control-bg);
+    color: var(--sentence-control-text);
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    padding: 5px 28px 5px 12px;
+    font-size: 0.82rem; /* was 0.92rem, unified 31 Aug 2026 */
+    font-weight: 500;
+    cursor: pointer;
+    outline: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='%23b3b3b3'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 10px;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.sentence-select:hover {
+    background-color: var(--surface-raised);
+}
+
+.sentence-select:focus {
+    background-color: var(--surface-raised);
+    border-color: var(--ring);
+    box-shadow: 0 0 0 1px var(--ring);
+}
+
+.sentence-input {
+    background-color: var(--sentence-control-bg);
+    color: var(--sentence-control-text);
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 0.82rem; /* was 0.92rem, unified 31 Aug 2026 */
+    font-weight: 500;
+    width: 75px;
+    outline: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sentence-input:focus {
+    background-color: var(--surface-raised);
+    border-color: var(--ring);
+    box-shadow: 0 0 0 1px var(--ring);
+}
+
+.sentence-unit {
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.sentence-modifier-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface-raised);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 0.82rem; /* was 0.85rem */
+    color: var(--sentence-control-text); /* was var(--text-color), 31 Aug 2026 */
+}
+
+.sentence-modifier-chip .chip-label {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.sentence-modifier-chip .chip-dismiss {
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+}
+
+.sentence-modifier-chip .chip-dismiss:hover {
+    color: var(--danger);
+}
+
+.sentence-clause-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 10px;
+    background: var(--surface-raised);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.sentence-bullet-dot {
+    color: var(--accent);
+    font-size: 1.2rem;
+    line-height: 1.5;
+    user-select: none;
+}
+
+.sentence-clause-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sentence-modifier-wrap {
+    position: relative;
+    display: inline-block;
+}
+
+.sentence-modifier-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 1100;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color-strong);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    min-width: 220px;
+    display: none;
+    padding: 4px 0;
+}
+
+.sentence-modifier-menu.show {
+    display: block;
+}
+
+.sentence-modifier-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 12px;
+    font-size: 0.82rem; /* was 0.85rem */
+    color: var(--sentence-control-text); /* was var(--text-color), 31 Aug 2026 */
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    width: 100%;
+    text-align: left;
+}
+
+.sentence-modifier-item:hover:not(:disabled) {
+    background: var(--surface-inset);
+    color: var(--accent);
+}
+
+.sentence-modifier-item:disabled {
+    color: var(--text-tertiary);
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.sentence-nested-connector {
+    font-size: 0.82rem; /* was 0.9rem, unified 31 Aug 2026 */
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.sentence-intent-select {
+    font-weight: 600;
+    color: var(--sentence-control-text); /* was hardcoded #ffffff, 31 Aug 2026 */
+}
+
+.sentence-sub-modifiers-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+    padding-left: 20px;
+    font-size: 0.82rem; /* was 0.95rem */
+    color: var(--sentence-control-text); /* was var(--text-color), 31 Aug 2026 */
+}
+
+.target-sentence-line {
+    color: var(--text-color);
+    font-size: 0.92rem;
+    line-height: 1.4;
+}
+
+.target-modifier-line {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    line-height: 1.4;
+    padding-left: 12px;
+    margin-top: 2px;
+}
+
+.filter-tree-connector {
+    font-weight: 600;
+    color: var(--accent);
+    font-size: 0.88rem;
+    margin-bottom: 4px;
+}
+
+.filter-clause-item {
+    color: var(--text-color);
+    font-size: 0.88rem;
+    line-height: 1.4;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.filter-clause-bullet {
+    color: var(--accent);
+    font-size: 1rem;
+    line-height: 1.2;
+    user-select: none;
+}
+
+/* Clinical Notes: Calendar day pill, note panel cards (day popup) and the
+   dedicated Weight/HbA1c table screens.
+   See docs/analysis/notes-weight-hba1c-implementation-plan.md (v3). */
+.cal-day-pill.cal-day-num {
+    background: var(--accent);
+    color: var(--accent-foreground) !important;
+    border-radius: 12px;
+    padding: 1px 7px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    line-height: 1.2;
+    /* !important + the compound selector's higher specificity together are
+       both needed here: calendar.html's own page-local
+       .cal-day-month-start rule sets `color: var(--text-color) !important`
+       (light text, for the plain "1 Sep" label on month-boundary days).
+       Against a light --accent pill background that's light-on-light --
+       exactly the low-contrast "hard to read" pill Harry flagged when a
+       note landed on the 1st of a month. Without !important here too,
+       that page-local !important always wins regardless of specificity;
+       with it, the compound selector (two classes) beats the single-class
+       .cal-day-month-start rule and dark text on the light pill wins. */
+    min-width: 28px;
+    min-height: 28px;
+}
+.cal-day-pill.cal-day-num:hover {
+    filter: brightness(1.08);
+}
+
+.form-input-sm {
+    padding: 3px 6px;
+    font-size: 0.85rem;
+}
+
+.note-panel-card {
+    background: var(--surface-inset);
+    border: 1px solid var(--border-color-strong);
+    border-radius: var(--radius);
+    padding: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+.note-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.note-panel-type-badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--card-bg);
+    color: var(--text-secondary);
+}
+.note-panel-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.note-panel-actions .btn {
+    padding: 3px 9px;
+    font-size: 0.8rem;
+}
+.note-panel-textarea {
+    width: 100%;
+    min-height: 60px;
+    resize: vertical;
+    background-color: var(--surface-inset);
+    border: 1px solid var(--input-border);
+    color: var(--sentence-control-text);
+    border-radius: var(--radius);
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 0.9rem;
+}
+.note-panel-hint {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    font-style: italic;
+}
+.note-modal-empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+.note-modal-empty-state i {
+    font-size: 1.8rem;
+    opacity: 0.5;
+    margin-bottom: 10px;
+    display: block;
+}
+.metric-sync-icon {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+.note-metric-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.note-metric-row .form-input {
+    width: 90px;
+}
+
+/* Dedicated Weight/HbA1c table screens (/metrics) */
+.metric-table-row.dirty {
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.metric-table-row input.form-input {
+    width: 100%;
+}
+
+/* Native <input type="color"> swatch reset -- Harry's ask: "just a colour
+   circle is good", nothing more. Unstyled, this renders wildly differently
+   per platform: Firefox draws a rectangle with a heavy grey/white border,
+   iOS/iPadOS draws a circle but with its own multicoloured ring chrome
+   around it. Neither browser respects a plain `border` on the outer
+   element for this -- each has its own shadow-DOM swatch part that has to
+   be targeted with a vendor pseudo-element to actually remove the ring,
+   which is why this needs both -moz- and -webkit- rules rather than one
+   generic one. Applies to every type="color" input in the app (currently
+   .form-input-color in targets.html's Chart Display Settings, and
+   #msm-color-picker in ns-chart-customizer.js) so any future one gets
+   this for free without remembering to opt in. */
+input[type="color"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+    background: none;
+}
+input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+    border-radius: 50%;
+    overflow: hidden;
+}
+input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 50%;
+}
+input[type="color"]::-moz-color-swatch {
+    border: none;
+    border-radius: 50%;
+}
+input[type="color"]::-moz-focus-inner {
+    border: none;
+}
+
+/* -----------------------------------------------------------------------
+   22. GRIDSTACK 24-COLUMN RESPONSIVE LAYOUT SYSTEM
+   Canonical percentage-based column positions and widths for 24-column
+   clinical dashboard layouts. Dynamically scales with container width.
+   ----------------------------------------------------------------------- */
+.grid-stack > .grid-stack-item[gs-w="1"]  { width: calc(100% * 1 / 24); }
+.grid-stack > .grid-stack-item[gs-w="2"]  { width: calc(100% * 2 / 24); }
+.grid-stack > .grid-stack-item[gs-w="3"]  { width: calc(100% * 3 / 24); }
+.grid-stack > .grid-stack-item[gs-w="4"]  { width: calc(100% * 4 / 24); }
+.grid-stack > .grid-stack-item[gs-w="5"]  { width: calc(100% * 5 / 24); }
+.grid-stack > .grid-stack-item[gs-w="6"]  { width: calc(100% * 6 / 24); }
+.grid-stack > .grid-stack-item[gs-w="7"]  { width: calc(100% * 7 / 24); }
+.grid-stack > .grid-stack-item[gs-w="8"]  { width: calc(100% * 8 / 24); }
+.grid-stack > .grid-stack-item[gs-w="9"]  { width: calc(100% * 9 / 24); }
+.grid-stack > .grid-stack-item[gs-w="10"] { width: calc(100% * 10 / 24); }
+.grid-stack > .grid-stack-item[gs-w="11"] { width: calc(100% * 11 / 24); }
+.grid-stack > .grid-stack-item[gs-w="12"] { width: calc(100% * 12 / 24); }
+.grid-stack > .grid-stack-item[gs-w="13"] { width: calc(100% * 13 / 24); }
+.grid-stack > .grid-stack-item[gs-w="14"] { width: calc(100% * 14 / 24); }
+.grid-stack > .grid-stack-item[gs-w="15"] { width: calc(100% * 15 / 24); }
+.grid-stack > .grid-stack-item[gs-w="16"] { width: calc(100% * 16 / 24); }
+.grid-stack > .grid-stack-item[gs-w="17"] { width: calc(100% * 17 / 24); }
+.grid-stack > .grid-stack-item[gs-w="18"] { width: calc(100% * 18 / 24); }
+.grid-stack > .grid-stack-item[gs-w="19"] { width: calc(100% * 19 / 24); }
+.grid-stack > .grid-stack-item[gs-w="20"] { width: calc(100% * 20 / 24); }
+.grid-stack > .grid-stack-item[gs-w="21"] { width: calc(100% * 21 / 24); }
+.grid-stack > .grid-stack-item[gs-w="22"] { width: calc(100% * 22 / 24); }
+.grid-stack > .grid-stack-item[gs-w="23"] { width: calc(100% * 23 / 24); }
+.grid-stack > .grid-stack-item[gs-w="24"] { width: 100%; }
+
+.grid-stack > .grid-stack-item[gs-x="0"]  { left: 0%; }
+.grid-stack > .grid-stack-item[gs-x="1"]  { left: calc(100% * 1 / 24); }
+.grid-stack > .grid-stack-item[gs-x="2"]  { left: calc(100% * 2 / 24); }
+.grid-stack > .grid-stack-item[gs-x="3"]  { left: calc(100% * 3 / 24); }
+.grid-stack > .grid-stack-item[gs-x="4"]  { left: calc(100% * 4 / 24); }
+.grid-stack > .grid-stack-item[gs-x="5"]  { left: calc(100% * 5 / 24); }
+.grid-stack > .grid-stack-item[gs-x="6"]  { left: calc(100% * 6 / 24); }
+.grid-stack > .grid-stack-item[gs-x="7"]  { left: calc(100% * 7 / 24); }
+.grid-stack > .grid-stack-item[gs-x="8"]  { left: calc(100% * 8 / 24); }
+.grid-stack > .grid-stack-item[gs-x="9"]  { left: calc(100% * 9 / 24); }
+.grid-stack > .grid-stack-item[gs-x="10"] { left: calc(100% * 10 / 24); }
+.grid-stack > .grid-stack-item[gs-x="11"] { left: calc(100% * 11 / 24); }
+.grid-stack > .grid-stack-item[gs-x="12"] { left: calc(100% * 12 / 24); }
+.grid-stack > .grid-stack-item[gs-x="13"] { left: calc(100% * 13 / 24); }
+.grid-stack > .grid-stack-item[gs-x="14"] { left: calc(100% * 14 / 24); }
+.grid-stack > .grid-stack-item[gs-x="15"] { left: calc(100% * 15 / 24); }
+.grid-stack > .grid-stack-item[gs-x="16"] { left: calc(100% * 16 / 24); }
+.grid-stack > .grid-stack-item[gs-x="17"] { left: calc(100% * 17 / 24); }
+.grid-stack > .grid-stack-item[gs-x="18"] { left: calc(100% * 18 / 24); }
+.grid-stack > .grid-stack-item[gs-x="19"] { left: calc(100% * 19 / 24); }
+.grid-stack > .grid-stack-item[gs-x="20"] { left: calc(100% * 20 / 24); }
+.grid-stack > .grid-stack-item[gs-x="21"] { left: calc(100% * 21 / 24); }
+.grid-stack > .grid-stack-item[gs-x="22"] { left: calc(100% * 22 / 24); }
+.grid-stack > .grid-stack-item[gs-x="23"] { left: calc(100% * 23 / 24); }
+

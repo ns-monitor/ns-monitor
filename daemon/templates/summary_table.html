@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Summary Table - ns-monitor</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <style>
+        /* Retrofitted onto ns-shared.css 23 Aug 2026 (Phase 5, second page).
+           :root/.container/.card/.header-controls/.highlight-col/
+           .text-center/.text-muted/.print-break-avoid/@media print all
+           removed -- duplicated ns-shared.css exactly or closely enough
+           to rely on the shared (averaged) version. Bare-tag rules for
+           table/th/td, input[type=date]/select, button, h2, and
+           input[type=checkbox] removed -- markup below now carries real
+           classes (.panel-table, .form-input, .btn, .panel-h2) instead
+           of relying on unscoped tag selectors.
+
+           Confirmed entirely UNUSED on this page (verified against the
+           actual markup, not assumed) and deleted outright, not ported
+           anywhere: .tooltip/.tooltiptext, .agp-container (+ its img
+           rule), .loading-overlay, input[type=checkbox] (no checkbox
+           exists on this page). Also removed: a leftover EMPTY
+           `@media print {}` block that did nothing, and the
+           confirmed-dead .hamburger/.nav-menu/.menu-section CSS + the
+           matching JS block (see STATUS.md -- same pattern as every
+           other page, verified no `class="hamburger"` element exists
+            in this page's markup either). */
+
+        .header-controls form {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        /* Bare `label {}` kept as the one deliberate exception: unlike
+           button/table, a label has no competing more-specific rule
+           anywhere on the site to lose a specificity fight to, so the
+           risk this file's "no bare tags" rule guards against doesn't
+           apply here. Converting every <label> to a class for no
+           practical benefit wasn't worth doing. */
+        label {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    {% include "sidebar.html" %}
+
+    <!-- Dashboard Version 1.1.1 - Force Template Refresh -->
+    <div class="container">
+        <!-- Integrity Alert -->
+        {% if has_gaps %}
+        <div
+            style="background: rgba(231, 76, 60, 0.2); border: 1px solid var(--danger); color: #ffadad; padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 15px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.4em;">⚠️</span>
+                <span><strong>Data Continuity Alert:</strong> Gaps detected in recent ingestion. Charts may be
+                    incomplete.</span>
+            </div>
+            <a href="/maintenance" class="btn"
+                style="background: var(--danger); color: white; padding: 6px 14px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 0.85em;">Repair
+                Gaps</a>
+        </div>
+        {% endif %}
+
+        <!-- Header Controls -->
+        <header class="page-header"><h1 class="panel-h1">Summary Table</h1></header>
+
+        <div class="card"
+            style="padding:8px 12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px; margin-bottom: 20px;">
+            <div style="display:flex;gap:8px;">
+                <button type="button" class="btn btn-secondary" onclick="setToday()">Today</button>
+                <button type="button" class="btn btn-secondary" onclick="setYesterday()">Yesterday</button>
+            </div>
+            
+            <form method="GET" action="/summary_table" id="date-form" style="display:flex;align-items:center;gap:6px; margin: 0;">
+                <button type="button" class="btn btn-secondary" onclick="shiftAnchor(-1)">&#8592;</button>
+                <input type="date" id="anchor_date" name="anchor_date" value="{{ anchor_date }}" onchange="submitAnchor()" class="form-input">
+                <button type="button" class="btn btn-secondary" onclick="shiftAnchor(1)">&#8594;</button>
+            </form>
+        </div>
+
+
+        <!-- 2. Metrics Comparison Table -->
+        <!-- Heading removed 23 Aug 2026 (Harry's call) -- redundant with the
+             page's own <h1>, plus the full-width underline it brought via
+             .panel-h2. Panel now opens directly with the table. -->
+        <div class="card print-break-avoid">
+            <div style="overflow-x: auto;">
+                <table class="panel-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th class="highlight-col">{{ anchor_date }}</th>
+                            <th>7 Day MAvg</th>
+                            <th>14 Day MAvg</th>
+                            <th>30 Day MAvg</th>
+                            <th>60 Day MAvg</th>
+                            <th>90 Day MAvg</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in metrics %}
+                        <tr>
+                            <td style="font-weight: bold;">{{ m['Metric'] }}</td>
+                            <td class="highlight-col">{{ m['Selected Day'] }}</td>
+                            <td>{{ m['7 Day Avg'] }}</td>
+                            <td>{{ m['14 Day Avg'] }}</td>
+                            <td>{{ m['30 Day Avg'] }}</td>
+                            <td>{{ m['60 Day Avg'] }}</td>
+                            <td>{{ m['90 Day Avg'] }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted" style="padding: 40px;">
+                                No metric data found for {{ anchor_date }}. <br>
+                                Ensure Nightscout ingestion is running and <a href="/settings"
+                                    style="color:var(--accent)">Database Status</a> shows recent data.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 3. Glossary -->
+        <div class="card print-break-avoid">
+            <h2 class="panel-h2">Glossary</h2>
+            <div style="overflow-x: auto;">
+                <table class="panel-table wrap-cells" id="glossary-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 160px;">Name</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="font-weight: bold;">TIR (3.9-10) (%)</td>
+                            <td><strong>Time in Range.</strong> The percentage of sensor readings falling within the standard target glucose range of 3.9-10.0 mmol/L (70-180 mg/dL). Calculated as (readings in range &divide; total readings) &times; 100. This is the headline metric recommended by the 2019 international CGM consensus guidelines for overall glycemic control.</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold;">TITR (3.9-7.8) (%)</td>
+                            <td><strong>Time in Tight Range.</strong> The percentage of readings within a stricter target band of 3.9-7.8 mmol/L (70-140 mg/dL), used alongside standard TIR as a more demanding measure of control, particularly relevant for closed-loop/AID systems capable of tighter regulation.</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold;">Avg BG</td>
+                            <td><strong>Average Blood Glucose.</strong> The simple arithmetic mean of all CGM glucose readings across the period, in mmol/L.</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold;">GMI (%)</td>
+                            <td><strong>Glucose Management Indicator.</strong> An estimate of what an equivalent HbA1c would be, derived from mean CGM glucose rather than a blood test. Formula: GMI = 3.31 + (0.431 &times; mean glucose in mmol/L). It approximates but does not replace a lab HbA1c, since it reflects only the measured CGM period rather than the ~3-month red cell lifespan HbA1c averages over.</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold;">CV (%) (not MAVG)</td>
+                            <td><strong>Coefficient of Variation.</strong> A normalized measure of glucose variability: (standard deviation &divide; mean) &times; 100. Calculated directly over the full window rather than as an average of daily values (hence "not MAVG"), since averaging daily CV values would distort the result. Consensus guidelines target CV &le;36% as an indicator of stable, predictable glucose patterns.</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold;">GVI</td>
+                            <td><strong>Glycemic Variability Index.</strong> Compares the actual length of the glucose trace over time to the length of a perfectly flat line at the same average value. A ratio of 1.0 represents no variability; higher values indicate a more jagged, unstable trace. Calculated as the summed curve length of the glucose trace divided by the summed elapsed time, capturing both the frequency and magnitude of fluctuations rather than just their spread.</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold;">HBGI (High Risk)</td>
+                            <td><strong>High Blood Glucose Risk Index.</strong> A weighted risk score (Kovatchev et al.) quantifying the risk contributed by high readings, giving disproportionately more weight to more extreme highs. Glucose values are first transformed onto a symmetric risk scale, then only the "high" side of that scale is summed and averaged. Unlike TIR, it captures the severity of excursions, not just their frequency.</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold;">LBGI (Low Risk)</td>
+                            <td><strong>Low Blood Glucose Risk Index.</strong> The same risk-transformation method as HBGI, but summing only the "low" side of the scale, so it specifically quantifies hypoglycemia risk with more weight given to more severe lows. Considered clinically more sensitive to dangerous lows than a simple time-below-range percentage.</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold;">TDD</td>
+                            <td><strong>Total Daily Dose.</strong> Total insulin delivered per day, combining both bolus (meal/correction) and basal (background) insulin, in units.</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold;">Carbs</td>
+                            <td><strong>Carbohydrates.</strong> Total grams of carbohydrate logged per day, from meal entries.</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold;">V.Low (&lt;3) (%)</td>
+                            <td><strong>Very Low.</strong> Percentage of time spent below 3.0 mmol/L (54 mg/dL) - classified as "Level 2 hypoglycemia" under the international CGM consensus, representing clinically significant, dangerous hypoglycemia.</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold;">Low (3-3.8) (%)</td>
+                            <td><strong>Low.</strong> Percentage of time spent between 3.0-3.8 mmol/L (54-69 mg/dL) - "Level 1 hypoglycemia," a glucose alert level below target but above the more severe Very Low threshold.</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold;">High (10.1-13.9) (%)</td>
+                            <td><strong>High.</strong> Percentage of time spent between 10.1-13.9 mmol/L (181-250 mg/dL) - "Level 1 hyperglycemia," above target but below the more severe Very High threshold.</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold;">V.High (&gt;13.9) (%)</td>
+                            <td><strong>Very High.</strong> Percentage of time spent above 13.9 mmol/L (250 mg/dL) - "Level 2 hyperglycemia," representing clinically significant, severe hyperglycemia.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+
+    <script>
+        // Confirmed-dead hamburger/nav-menu JS removed here (23 Aug 2026
+        // Phase 5 retrofit) -- same pattern as every other page, verified
+        // no class="hamburger" element exists in this page's markup.
+        function initControls() {
+            const savedAnchor = localStorage.getItem('ns_anchor_date');
+            const params = new URLSearchParams(window.location.search);
+
+            if (!params.get('anchor_date') && savedAnchor) {
+                params.set('anchor_date', savedAnchor);
+                window.location.search = params.toString();
+                return;
+            }
+
+            const anchorVal = document.getElementById('anchor_date').value;
+
+            if (anchorVal) {
+                localStorage.setItem('ns_anchor_date', anchorVal);
+            }
+            
+            updateToggleLinks(anchorVal);
+        }
+
+        function updateToggleLinks(anchor) {
+            const btns = document.querySelectorAll('a.btn');
+            btns.forEach(b => {
+                if (b.href.includes('start_date=')) {
+                    const url = new URL(b.href);
+                    
+                    const ed = new Date(anchor + 'T00:00:00');
+                    const sd = new Date(ed);
+                    sd.setDate(sd.getDate() - 13); // fallback defaults to a nice 14-day trend window
+                    
+                    function localDateStr(d) {
+                        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                    }
+                    
+                    url.searchParams.set('start_date', localDateStr(sd));
+                    url.searchParams.set('end_date', anchor);
+                    b.href = url.toString();
+                }
+            });
+        }
+
+        function submitAnchor() {
+            const anchorVal = document.getElementById('anchor_date').value;
+            if (anchorVal) {
+                localStorage.setItem('ns_anchor_date', anchorVal);
+            }
+            document.getElementById('date-form').submit();
+        }
+
+        function setToday() {
+            const todayStr = new Date().toLocaleDateString('en-CA');
+            document.getElementById('anchor_date').value = todayStr;
+            submitAnchor();
+        }
+
+        function setYesterday() {
+            const d = new Date(); 
+            d.setDate(d.getDate() - 1);
+            document.getElementById('anchor_date').value = d.toLocaleDateString('en-CA');
+            submitAnchor();
+        }
+
+        function shiftAnchor(direction) {
+            const anchorVal = document.getElementById('anchor_date').value;
+            if (!anchorVal) return;
+            
+            const [y, m, d] = anchorVal.split('-').map(Number);
+            const anchor = new Date(y, m - 1, d);
+            anchor.setDate(anchor.getDate() + direction);
+            
+            function localDateStr(dateObj) {
+                return dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + String(dateObj.getDate()).padStart(2, '0');
+            }
+            
+            const aStr = localDateStr(anchor);
+            document.getElementById('anchor_date').value = aStr;
+            submitAnchor();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initControls();
+        });
+    </script>
+</body>
+
+</html>

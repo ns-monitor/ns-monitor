@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profiles - ns-monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+</head>
+
+<body>
+    {% include "sidebar.html" %}
+
+    <div class="container">
+        <header class="page-header">
+            <h1 class="panel-h1">Profiles</h1>
+            <div class="trace-header-controls">
+                <button type="button" class="btn btn-secondary" onclick="nsApplyPreset('today')">Now</button>
+                {% include "_header_date_selector.html" %}
+            </div>
+        </header>
+
+        <div class="loading-overlay hidden" id="profiles-loading">Loading profile history...</div>
+
+        <div id="profiles-list"></div>
+
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+
+    <script src="/static/js/ns-date-selector.js"></script>
+    <script>
+        let profileCharts = [];
+
+        // 96 x 15-minute buckets spanning 00:00 -> 24:00, same category-axis
+        // shape AGP's 24h chart uses (agp.html) -- reused here rather than a
+        // bespoke numeric axis so 3-hourly ticks/gridlines come from the
+        // same interval:11 convention already established there.
+        const CHART_CATEGORIES = Array.from({ length: 96 }, (_, i) => {
+            const totalMin = i * 15;
+            const h = Math.floor(totalMin / 60).toString().padStart(2, '0');
+            const m = (totalMin % 60).toString().padStart(2, '0');
+            return `${h}:${m}`;
+        });
+
+        // basal_series is [{seconds, rate}, ...] sorted by time-of-day, one
+        // entry per authored change. Resample onto the fixed 15-min bucket
+        // grid so every chart shares the same x-axis regardless of how many
+        // (or few) times that era's basal actually changes during the day.
+        function bucketizeBasal(basalSeries) {
+            const rates = new Array(96).fill(null);
+            if (!basalSeries || basalSeries.length === 0) return rates;
+            for (let i = 0; i < 96; i++) {
+                const bucketSec = i * 900;
+                let rate = basalSeries[0].rate;
+                for (let j = 0; j < basalSeries.length; j++) {
+                    if (basalSeries[j].seconds <= bucketSec) rate = basalSeries[j].rate;
+                    else break;
+                }
+                rates[i] = rate;
+            }
+            return rates;
+        }
+
+        function escapeHtml(s) {
+            const div = document.createElement('div');
+            div.textContent = (s === null || s === undefined) ? '' : String(s);
+            return div.innerHTML;
+        }
+
+        // One line per authored time-of-day entry, each with its own
+        // fixed-width marker slot (see .detail-list-marker in ns-shared.css)
+        // so a "*" on a changed line never shifts that line's text out of
+        // alignment with the unmarked lines above/below it.
+        function renderDetailLines(lines, changed) {
+            return lines.map(line => {
+                const marker = changed ? '*' : '';
+                return `<div class="detail-list-line"><span class="detail-list-marker">${marker}</span><span>${escapeHtml(line)}</span></div>`;
+            }).join('');
+        }
+
+        function renderDetailBlock(label, lines, changed) {
+            if (!lines || lines.length === 0) return '';
+            return `<div class="detail-list-row">
+                <div class="detail-list-label">${label}</div>
+                <div class="detail-list-lines">${renderDetailLines(lines, changed)}</div>
+            </div>`;
+        }
+
+        // Builds the card's DOM (fast, synchronous) and returns the chart
+        // node id + option, WITHOUT calling echarts.init() yet -- see
+        // loadProfiles() for why that's deferred to a second pass.
+        function buildEraCard(era, index) {
+            const toLabel = era.to ? era.to : 'present';
+            const chartNodeId = `profile-chart-${index}`;
+            const changed = era.changed || {};
+
+            const diaBlock = (era.dia !== null && era.dia !== undefined)
+                ? renderDetailBlock('DIA', [`${era.dia} hours`], changed.dia)
+                : '';
+
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <div class="panel-header">
+                    <div class="panel-header-left">
+                        <h2>${escapeHtml(era.name || '(unnamed profile)')}</h2>
+                    </div>
+                    <div class="panel-header-right">
+                        <span class="text-muted">${escapeHtml(era.from)} to ${escapeHtml(toLabel)}</span>
+                    </div>
+                </div>
+                <div class="split-card">
+                    <div class="col-left">
+                        <div class="detail-cols">
+                            <div class="detail-col">
+                                ${diaBlock}
+                                ${renderDetailBlock('IC', era.ic_lines, changed.ic)}
+                                ${renderDetailBlock('ISF', era.isf_lines, changed.isf)}
+                                ${renderDetailBlock('TARGET', era.target_lines, changed.target)}
+                            </div>
+                            <div class="detail-col">
+                                ${renderDetailBlock('BASAL', era.basal_lines, changed.basal)}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-right">
+                        <div id="${chartNodeId}" class="chart-node-sm"></div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('profiles-list').appendChild(card);
+
+            return {
+                nodeId: chartNodeId,
+                option: {
+                    animation: false,
+                    backgroundColor: '#ffffff',
+                    grid: { left: 50, right: 20, top: 20, bottom: 40 },
+                    xAxis: {
+                        type: 'category',
+                        data: CHART_CATEGORIES,
+                        boundaryGap: false,
+                        axisLine: { lineStyle: { color: '#888888' } },
+                        axisLabel: { interval: 11 },
+                        splitLine: {
+                            show: true,
+                            interval: 11,
+                            lineStyle: { color: '#e8e8e8', type: 'dashed', width: 1 }
+                        }
+                    },
+                    yAxis: {
+                        type: 'value',
+                        name: 'U/hr',
+                        axisLine: { show: true, lineStyle: { color: '#888888' } },
+                        splitLine: { show: true, lineStyle: { color: '#e8e8e8' } }
+                    },
+                    tooltip: { trigger: 'axis' },
+                    series: [{
+                        type: 'line',
+                        step: 'end',
+                        data: bucketizeBasal(era.basal_series),
+                        areaStyle: { opacity: 0.15, color: '#3498db' },
+                        lineStyle: { width: 2, color: '#3498db' },
+                        itemStyle: { color: '#3498db' },
+                        symbol: 'none'
+                    }]
+                }
+            };
+        }
+
+        // Charts are initialised in a second pass, after every card's DOM
+        // has been appended and a requestAnimationFrame has let the browser
+        // actually lay them out. Calling echarts.init() immediately after
+        // appendChild (in the same synchronous loop as N other panels) was
+        // intermittently reading a not-yet-laid-out container and silently
+        // rendering nothing -- most visible on the very first panel(s).
+        // `seq` is the request-generation token from loadProfiles() -- if a
+        // newer request has started by the time this rAF fires, the DOM it
+        // was built for may already have been cleared/replaced, so bail out
+        // rather than initing charts into stale or reused node ids.
+        function initCharts(pending, seq) {
+            requestAnimationFrame(() => {
+                if (seq !== profilesRequestSeq) return;
+                pending.forEach(({ nodeId, option }) => {
+                    const node = document.getElementById(nodeId);
+                    if (!node) return;
+                    const chart = echarts.init(node, null, { renderer: 'canvas' });
+                    chart.setOption(option);
+                    profileCharts.push(chart);
+                });
+            });
+        }
+
+        window.addEventListener('resize', () => {
+            profileCharts.forEach(c => c.resize());
+        });
+
+        // Bumped on every call so a slow, now-superseded request can never
+        // clobber a faster/later one's rendered result. Without this, firing
+        // the date picker again before the previous fetch had returned (a
+        // completely normal thing to do -- the endpoint scans full profile
+        // history and isn't instant) let the stale response arrive after the
+        // new one, wipe the freshly-rendered panels via its own
+        // listEl.innerHTML reset, and re-append its own (wrong-range) panels
+        // using the same profile-chart-N ids -- which is exactly what
+        // produced the duplicated panels / charts-that-never-render Harry
+        // saw (getElementById only ever finds the first of two same-id
+        // nodes, so the second copy's chart div was permanently orphaned).
+        let profilesRequestSeq = 0;
+
+        async function loadProfiles() {
+            const mySeq = ++profilesRequestSeq;
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+
+            const listEl = document.getElementById('profiles-list');
+            const loadingEl = document.getElementById('profiles-loading');
+
+            profileCharts.forEach(c => c.dispose());
+            profileCharts = [];
+            listEl.innerHTML = '';
+            loadingEl.classList.remove('hidden');
+
+            try {
+                const resp = await fetch(`/api/v1/profiles/history?start_date=${startDate}&end_date=${endDate}`);
+                const payload = await resp.json();
+
+                // A newer loadProfiles() call has started since this fetch
+                // began -- its own render (or clear) already owns the DOM.
+                // Applying this stale response now would either duplicate
+                // panels or fight the newer render for the same node ids.
+                if (mySeq !== profilesRequestSeq) return;
+
+                loadingEl.classList.add('hidden');
+
+                if (payload.error) {
+                    listEl.innerHTML = `<div class="empty-state"><div class="empty-state-title">Error loading profile history</div><div class="empty-state-subtitle">${escapeHtml(payload.error)}</div></div>`;
+                    return;
+                }
+
+                const eras = payload.eras || [];
+                if (eras.length === 0) {
+                    listEl.innerHTML = `<div class="empty-state"><div class="empty-state-title">No saved profile changes in this range</div><div class="empty-state-subtitle">Try widening the date range using the selector above.</div></div>`;
+                    return;
+                }
+
+                const pending = eras.map((era, i) => buildEraCard(era, i));
+                initCharts(pending, mySeq);
+            } catch (err) {
+                if (mySeq !== profilesRequestSeq) return;
+                loadingEl.classList.add('hidden');
+                listEl.innerHTML = `<div class="empty-state"><div class="empty-state-title">Error loading profile history</div><div class="empty-state-subtitle">${escapeHtml(String(err))}</div></div>`;
+            }
+        }
+
+        // ns-date-selector.js calls window.syncAndSubmit() after any date
+        // change (preset pick, custom range, prev/next step) -- same hook
+        // agp.html/timeline.html use.
+        window.syncAndSubmit = () => loadProfiles();
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadProfiles();
+        });
+    </script>
+</body>
+
+</html>

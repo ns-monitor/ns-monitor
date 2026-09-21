@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Empirical Periodicity Explorer - ns-monitor</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        .container.periodicity-container {
+            max-width: 80% !important;
+            width: 80% !important;
+            margin: 0 auto !important;
+        }
+        @media (max-width: 1200px) {
+            .container.periodicity-container {
+                max-width: 95% !important;
+                width: 95% !important;
+            }
+        }
+        .periodicity-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-4);
+            margin-bottom: var(--space-6);
+        }
+        .periodicity-eyebrow {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            margin-bottom: var(--space-1);
+            flex-wrap: wrap;
+        }
+        .periodicity-badge-discovery {
+            display: inline-block;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: rgba(46, 204, 113, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(46, 204, 113, 0.4);
+            border-radius: var(--radius-sm);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+        .periodicity-eyebrow-sub {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+        .periodicity-page-subtitle {
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+            margin-top: var(--space-1);
+            max-width: 860px;
+            line-height: 1.45;
+        }
+        .periodicity-control-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-4);
+            flex-wrap: wrap;
+            padding: var(--space-3) var(--space-4);
+            background: var(--surface-raised);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+        }
+        .periodicity-metric-group {
+            display: inline-flex;
+            align-items: center;
+            background: var(--surface-inset);
+            padding: 3px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            gap: 2px;
+            flex-wrap: wrap;
+        }
+        .periodicity-metric-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .periodicity-metric-btn:hover {
+            color: var(--text-color);
+            background: var(--surface-hover);
+        }
+        .periodicity-metric-btn.active {
+            background: var(--accent);
+            color: var(--accent-foreground);
+            font-weight: 600;
+        }
+        .periodicity-metric-select {
+            background: rgba(47, 129, 247, 0.15);
+            color: var(--link-color);
+            border: 1px solid rgba(47, 129, 247, 0.35);
+            border-radius: var(--radius-sm);
+            padding: 2px 8px;
+            font-size: 0.72rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-weight: 600;
+            cursor: pointer;
+            outline: none;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .periodicity-metric-select:hover {
+            background: rgba(47, 129, 247, 0.25);
+            border-color: var(--link-color);
+        }
+        .periodicity-metric-select option {
+            background: var(--card-bg);
+            color: var(--text-color);
+        }
+        .periodicity-toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.82rem;
+            color: var(--text-color);
+        }
+        .periodicity-toggle-group label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+        .periodicity-meta-stats {
+            display: flex;
+            align-items: center;
+            gap: var(--space-5);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.8rem;
+        }
+        .periodicity-meta-block {
+            display: flex;
+            flex-direction: column;
+        }
+        .periodicity-meta-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            letter-spacing: 0.05em;
+        }
+        .periodicity-meta-val {
+            color: var(--text-color);
+            font-weight: 600;
+        }
+        .periodicity-findings-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: var(--space-3);
+        }
+        @media (max-width: 900px) {
+            .periodicity-findings-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .periodicity-finding-card {
+            background: var(--surface-raised);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: var(--space-4);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: var(--space-2);
+        }
+        .periodicity-finding-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-2);
+        }
+        .periodicity-finding-title {
+            font-size: 0.72rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            letter-spacing: 0.04em;
+        }
+        .periodicity-finding-badge {
+            font-size: 0.68rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: var(--radius-sm);
+        }
+        .periodicity-badge-sig {
+            background: rgba(46, 204, 113, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(46, 204, 113, 0.4);
+        }
+        .periodicity-badge-mod {
+            background: rgba(241, 196, 15, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(241, 196, 15, 0.4);
+        }
+        .periodicity-badge-flat {
+            background: var(--surface-inset);
+            color: var(--text-tertiary);
+            border: 1px solid var(--border-color);
+        }
+        .periodicity-finding-val {
+            font-size: 1.3rem;
+            font-weight: 700;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            color: var(--text-color);
+            margin: var(--space-1) 0;
+        }
+        .periodicity-finding-desc {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+        .periodicity-finding-foot {
+            border-top: 1px solid var(--border-color);
+            padding-top: var(--space-2);
+            font-size: 0.7rem;
+            color: var(--text-tertiary);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+        .periodicity-section-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: var(--space-4);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+            position: relative;
+        }
+        .periodicity-section-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: var(--space-3);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: var(--space-3);
+            flex-wrap: wrap;
+        }
+        .periodicity-section-title-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .periodicity-section-title-row {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            flex-wrap: wrap;
+        }
+        .periodicity-section-h2 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-color);
+            margin: 0;
+        }
+        .periodicity-pill {
+            display: inline-block;
+            padding: 2px 7px;
+            font-size: 0.7rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-weight: 600;
+            border-radius: var(--radius-sm);
+            background: rgba(47, 129, 247, 0.15);
+            color: var(--link-color);
+            border: 1px solid rgba(47, 129, 247, 0.3);
+        }
+        .periodicity-section-sub {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+        .periodicity-legend {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            font-size: 0.75rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            flex-wrap: wrap;
+        }
+        .periodicity-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .periodicity-legend-line {
+            width: 14px;
+            height: 2px;
+            display: inline-block;
+        }
+        .periodicity-peaks-bar {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            flex-wrap: wrap;
+            padding-top: var(--space-2);
+            border-top: 1px solid var(--border-color);
+            font-size: 0.75rem;
+        }
+        .periodicity-peak-pill {
+            background: rgba(46, 204, 113, 0.12);
+            color: #34d399;
+            border: 1px solid rgba(46, 204, 113, 0.35);
+            padding: 3px 8px;
+            border-radius: var(--radius-sm);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .periodicity-peak-pill:hover {
+            background: rgba(46, 204, 113, 0.25);
+            border-color: #34d399;
+        }
+        .periodicity-telemetry-box {
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+            background: var(--surface-inset);
+            border: 1px solid var(--border-color);
+            padding: var(--space-2) var(--space-3);
+            border-radius: var(--radius-md);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.78rem;
+            flex-wrap: wrap;
+        }
+        .periodicity-progress-bar-wrap {
+            width: 140px;
+            height: 6px;
+            background: var(--surface-raised);
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 4px 0;
+        }
+        .periodicity-progress-bar-fill {
+            height: 100%;
+            background: #38bdf8;
+            border-radius: 3px;
+            transition: width 0.2s ease, background 0.2s ease;
+        }
+        .periodicity-stepping-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-3);
+            background: var(--surface-inset);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: var(--space-2) var(--space-3);
+            flex-wrap: wrap;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.78rem;
+        }
+        .periodicity-stepper-cluster {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            background: var(--surface-raised);
+            padding: 2px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+        }
+        .periodicity-step-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .periodicity-step-btn:hover {
+            background: var(--surface-hover);
+        }
+        .periodicity-current-display {
+            padding: 4px 8px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+        .periodicity-snap-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(47, 129, 247, 0.15);
+            color: var(--link-color);
+            border: 1px solid rgba(47, 129, 247, 0.35);
+            padding: 4px 10px;
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .periodicity-snap-btn:hover {
+            background: rgba(47, 129, 247, 0.28);
+        }
+        .periodicity-scrub-group {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+        .periodicity-range-slider {
+            width: 140px;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }
+        .periodicity-heat-legend-bar {
+            width: 120px;
+            height: 10px;
+            border-radius: 4px;
+            background: linear-gradient(to right, #065f46 0%, #10b981 22%, #84cc16 40%, #eab308 55%, #f97316 82%, #ef4444 100%);
+            border: 1px solid var(--border-color);
+            transition: background 0.05s ease;
+        }
+        .periodicity-slant-slider {
+            appearance: none;
+            -webkit-appearance: none;
+            outline: none;
+            cursor: ew-resize;
+            margin: 0;
+            padding: 0;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .periodicity-slant-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 6px;
+            height: 16px;
+            border-radius: 2px;
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.5);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+            cursor: ew-resize;
+        }
+        .periodicity-slant-slider::-moz-range-thumb {
+            width: 6px;
+            height: 16px;
+            border-radius: 2px;
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.5);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+            cursor: ew-resize;
+        }
+        .periodicity-edu-card {
+            background: var(--surface-raised);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: var(--space-4);
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+        .periodicity-edu-card strong {
+            color: var(--text-color);
+        }
+        .periodicity-edu-card ul {
+            margin: 0;
+            padding-left: 20px;
+            line-height: 1.5;
+        }
+        .periodicity-status-msg {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            display: none;
+            padding: var(--space-2) var(--space-3);
+            background: var(--surface-inset);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+        }
+        .periodicity-popover-wrapper {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+        .periodicity-popover-trigger {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+        .periodicity-popover-trigger:hover,
+        .periodicity-popover-trigger.active {
+            color: var(--link-color);
+            border-color: var(--link-color);
+            background: rgba(47, 129, 247, 0.12);
+        }
+        .periodicity-guide-popover {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color-strong);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            width: 330px;
+            max-width: calc(100vw - 40px);
+            max-height: 420px;
+            overflow-y: auto;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+            z-index: 1300;
+            display: none;
+            color: var(--text-color);
+            font-size: 0.8rem;
+            line-height: 1.45;
+            text-align: left;
+            box-sizing: border-box;
+        }
+        .periodicity-guide-popover.active {
+            display: block;
+        }
+        .periodicity-guide-popover h4 {
+            margin: 0 0 8px 0;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 6px;
+        }
+        .periodicity-guide-popover h5 {
+            margin: 10px 0 4px 0;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--link-color);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .periodicity-guide-popover p {
+            margin: 0 0 8px 0;
+            color: var(--text-secondary);
+        }
+        .periodicity-guide-popover ul {
+            margin: 4px 0 8px 0;
+            padding-left: 16px;
+            color: var(--text-secondary);
+        }
+        .periodicity-guide-popover li {
+            margin-bottom: 4px;
+        }
+        .periodicity-guide-popover strong {
+            color: var(--text-color);
+        }
+    </style>
+</head>
+
+<body>
+    {% include "sidebar.html" %}
+
+    <div class="container periodicity-container">
+        <header class="page-header">
+            <div>
+                <div class="periodicity-eyebrow">
+                    <span class="periodicity-badge-discovery">Empirical Periodicity Engine</span>
+                    <span class="periodicity-eyebrow-sub">Zero Hardcoded Hardware Labels • Continuous Spectral Scan</span>
+                </div>
+                <h1 class="panel-h1">Empirical Periodicity Explorer</h1>
+                <p class="periodicity-page-subtitle">
+                    Uses raw daily readings to detect whether your diabetes numbers follow real recurring cycles. Pinpoints genuine device and seasonal trends while filtering out statistical illusions
+                </p>
+            </div>
+            {% set has_compare = false %}
+            {% set long_term_presets = true %}
+            {% set date_state_namespace = 'sandbox' %}
+            {% include "_header_date_selector.html" %}
+        </header>
+
+        <div class="periodicity-wrapper">
+
+            <!-- Control Bar: Target Metric & Sample Overview -->
+            <div class="periodicity-control-bar">
+                <div style="display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;">
+                    <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-tertiary); letter-spacing: 0.04em;">Target Metric:</span>
+                    <div class="periodicity-metric-group" id="metricBtnGroup">
+                        <button type="button" class="periodicity-metric-btn active" data-metric="cv">CV (%)</button>
+                        <button type="button" class="periodicity-metric-btn" data-metric="titr">TITR (%)</button>
+                        <button type="button" class="periodicity-metric-btn" data-metric="tir">TIR (%)</button>
+                        <button type="button" class="periodicity-metric-btn" data-metric="tdd">TDD (U)</button>
+                        <button type="button" class="periodicity-metric-btn" data-metric="mean">Mean BG</button>
+                        <button type="button" class="periodicity-metric-btn" data-metric="sd">SD (mmol/L)</button>
+                    </div>
+                </div>
+
+                <div class="periodicity-toggle-group">
+                    <label>
+                        <input type="checkbox" id="linearDetrendCheck" checked>
+                        <span>Linear Detrending</span>
+                    </label>
+                    <div class="periodicity-popover-wrapper">
+                        <button type="button" class="periodicity-popover-trigger" aria-label="Linear Detrending Guide" title="Guide">
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                            </svg>
+                        </button>
+                        <div class="periodicity-guide-popover" onclick="event.stopPropagation()">
+                            <h4>Linear Detrending Toggle</h4>
+                            <h5>What this control does:</h5>
+                            <p>Calculates the multi-year straight-line trajectory of your data and subtracts that gradual upward or downward drift before analyzing repeating rhythms.</p>
+                            <h5>Why it matters:</h5>
+                            <ul>
+                                <li><strong>Removes Multi-Year Drift:</strong> Over several years, overall insulin demand or glucose variability may steadily decline as management improves. This long-term drift acts like a gentle ramp across the dataset.</li>
+                                <li><strong>Prevents False Low-Frequency Cycles:</strong> Frequency algorithms can mistake a multi-year downward ramp for a massive, slow-moving wave. Detrending flattens this multi-year baseline so the tool measures true repeating cycles rather than long-term progress.</li>
+                                <li><strong>Sharpens Phase Curves:</strong> On the Phase-Folded Wave Inspector (Tier 3), detrending prevents older years (when numbers were higher) from artificially smearing the shaded variation band against newer years.</li>
+                            </ul>
+                            <h5>When to keep it turned ON (Recommended):</h5>
+                            <p>Keep detrending enabled when scanning for hardware cycles, weekly routines, or annual seasons across multiple years of records.</p>
+                            <h5>When to turn it OFF:</h5>
+                            <p>Turn it off only if you want to inspect absolute historical values without adjusting for long-term clinical baseline changes.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="periodicity-meta-stats">
+                    <div class="periodicity-meta-block">
+                        <span class="periodicity-meta-label">Dataset Span</span>
+                        <span class="periodicity-meta-val" id="displayDateSpan">Loading...</span>
+                    </div>
+                    <div class="periodicity-meta-block">
+                        <span class="periodicity-meta-label">Sample Size</span>
+                        <span class="periodicity-meta-val" id="displayObsCount" style="color: var(--link-color);">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inline Status Banner -->
+            <div id="periodicity-status" class="periodicity-status-msg"></div>
+
+            <!-- Tier 1: High-Level Findings Cards -->
+            <div class="periodicity-section-card">
+                <div class="periodicity-section-header">
+                    <div class="periodicity-section-title-wrap">
+                        <div class="periodicity-section-title-row">
+                            <h2 class="periodicity-section-h2">Tier 1: High-Level Empirical Findings</h2>
+                            <select class="periodicity-metric-select" data-role="metric-select" id="tier1MetricSelect">
+                                <option value="cv">CV (%)</option>
+                                <option value="titr">TITR (%)</option>
+                                <option value="tir">TIR (%)</option>
+                                <option value="tdd">TDD (U)</option>
+                                <option value="mean">Mean BG</option>
+                                <option value="sd">SD (mmol/L)</option>
+                            </select>
+                            <span class="periodicity-pill">Auto-extracted peaks crossing p &lt; 0.01 ceiling</span>
+                        </div>
+                        <p class="periodicity-section-sub">
+                            Continuous scan across short-wave device lifecycles, monthly rolling artifacts, and multi-year seasonal shifts.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="periodicity-findings-grid" id="tier1CardsContainer">
+                    <!-- Injected dynamically by ns-periodicity.js -->
+                </div>
+            </div>
+
+            <!-- Tier 2A: Continuous Lomb-Scargle Spectrum (2 to 400 Days) -->
+            <div class="periodicity-section-card">
+                <div class="periodicity-section-header">
+                    <div class="periodicity-section-title-wrap">
+                        <div class="periodicity-section-title-row">
+                            <h2 class="periodicity-section-h2">Tier 2A: Continuous Lomb-Scargle Spectrum (2 to 400 Days)</h2>
+                            <select class="periodicity-metric-select" data-role="metric-select" id="tier2aMetricSelect">
+                                <option value="cv">CV (%)</option>
+                                <option value="titr">TITR (%)</option>
+                                <option value="tir">TIR (%)</option>
+                                <option value="tdd">TDD (U)</option>
+                                <option value="mean">Mean BG</option>
+                                <option value="sd">SD (mmol/L)</option>
+                            </select>
+                            <span class="periodicity-pill">Logarithmic Period Axis</span>
+                        </div>
+                        <p class="periodicity-section-sub">
+                            Click on any peak pin or anywhere on the spectrum line to immediately drill down into the phase-folded wave below.
+                        </p>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;">
+                        <div class="periodicity-legend">
+                            <div class="periodicity-legend-item" style="color: #34d399;">
+                                <span class="periodicity-legend-line" style="background: #34d399;"></span>
+                                <span>Raw Spectral Power</span>
+                            </div>
+                            <div class="periodicity-legend-item" style="color: #f43f5e;">
+                                <span class="periodicity-legend-line" style="border-top: 2px dashed #f43f5e;"></span>
+                                <span>99% FAP Ceiling (p &lt; 0.01)</span>
+                            </div>
+                            <div class="periodicity-legend-item" style="color: #f59e0b;">
+                                <span class="periodicity-legend-line" style="border-top: 2px dashed #f59e0b;"></span>
+                                <span>95% FAP (p &lt; 0.05)</span>
+                            </div>
+                        </div>
+
+                        <div class="periodicity-popover-wrapper">
+                            <button type="button" class="periodicity-popover-trigger" aria-label="Tier 2A Guide" title="Guide">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                    <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                                </svg>
+                            </button>
+                            <div class="periodicity-guide-popover" onclick="event.stopPropagation()">
+                                <h4>Tier 2A — Continuous Spectrum (Lomb-Scargle)</h4>
+                                <h5>What this graph does:</h5>
+                                <p>This chart searches for repeating rhythms across your data, testing every possible cycle length from 2 days up to 400 days all at once.</p>
+                                <h5>How to read it:</h5>
+                                <ul>
+                                    <li><strong>Horizontal Axis:</strong> Cycle length in days (spaced logarithmically so short cycles on the left have plenty of room).</li>
+                                    <li><strong>Green Line (Power):</strong> Shows how strongly a cycle repeats. A taller peak indicates a clearer, more consistent pattern.</li>
+                                    <li><strong>Dashed Threshold Lines:</strong>
+                                        <ul>
+                                            <li><strong>Amber Line (95% Confidence):</strong> A potential pattern worth reviewing.</li>
+                                            <li><strong>Red Line (99% Confidence):</strong> A confirmed pattern with less than a 1-in-100 chance of being random noise.</li>
+                                        </ul>
+                                    </li>
+                                    <li><strong>Peak Badges:</strong> Any peak crossing these thresholds gets a clickable tag at the bottom.</li>
+                                </ul>
+                                <h5>How to use it:</h5>
+                                <p>Click any peak tag or point on the green line to load that exact cycle into Tier 3 for a detailed breakdown.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="periodicity-spectrum" style="width: 100%; height: 350px;"></div>
+
+                <div class="periodicity-peaks-bar">
+                    <span style="color: var(--text-tertiary); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">Discovered Significant Peaks:</span>
+                    <div id="peakButtonContainer" style="display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;">
+                        <!-- Injected dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tier 3: Empirical Phase-Folded Wave Inspector -->
+            <div class="periodicity-section-card" id="tier3Container">
+                <div class="periodicity-section-header">
+                    <div class="periodicity-section-title-wrap">
+                        <div class="periodicity-section-title-row">
+                            <h2 class="periodicity-section-h2">Tier 3: Empirical Phase-Folded Wave Inspector</h2>
+                            <select class="periodicity-metric-select" data-role="metric-select" id="tier3MetricSelect">
+                                <option value="cv">CV (%)</option>
+                                <option value="titr">TITR (%)</option>
+                                <option value="tir">TIR (%)</option>
+                                <option value="tdd">TDD (U)</option>
+                                <option value="mean">Mean BG</option>
+                                <option value="sd">SD (mmol/L)</option>
+                            </select>
+                            <span class="periodicity-pill" id="foldedPeriodBadge">Period: 14.0 Days</span>
+                            <span id="resonanceLockPill" class="periodicity-finding-badge periodicity-badge-flat">Noise Floor</span>
+                        </div>
+                        <p class="periodicity-section-sub">
+                            Folds all multi-year daily observations into phase bins (0 to T). True rhythms form persistent curves; noise cancels into a flat line.
+                        </p>
+                    </div>
+
+                    <!-- Telemetry and Resonance Meter -->
+                    <div style="display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;">
+                        <div class="periodicity-telemetry-box">
+                            <div>
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);">
+                                    <span style="color: var(--text-secondary);">Phase Coherence:</span>
+                                    <span id="resonancePercentLabel" style="font-weight: 700; color: var(--text-color);">12%</span>
+                                </div>
+                                <div class="periodicity-progress-bar-wrap">
+                                    <div id="resonanceProgressBar" class="periodicity-progress-bar-fill" style="width: 12%;"></div>
+                                </div>
+                                <div id="resonanceSlopeHint" style="font-size: 0.68rem; color: var(--text-tertiary); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    Flat noise floor
+                                </div>
+                            </div>
+
+                            <div style="border-left: 1px solid var(--border-color); padding-left: var(--space-3); display: flex; align-items: center; gap: var(--space-4);">
+                                <div>
+                                    <span style="display: block; font-size: 0.65rem; color: var(--text-tertiary); text-transform: uppercase;">KRUSKAL-WALLIS</span>
+                                    <span id="foldedKruskalBadge" style="font-weight: 700; color: #34d399;">p &lt; 0.001</span>
+                                </div>
+                                <div>
+                                    <span style="display: block; font-size: 0.65rem; color: var(--text-tertiary); text-transform: uppercase;">PHASE SPREAD (Δ)</span>
+                                    <span id="foldedSpreadBadge" style="font-weight: 700; color: var(--text-color);">--</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="periodicity-popover-wrapper">
+                            <button type="button" class="periodicity-popover-trigger" aria-label="Tier 3 Guide" title="Guide">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                    <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                                </svg>
+                            </button>
+                            <div class="periodicity-guide-popover" onclick="event.stopPropagation()">
+                                <h4>Tier 3 — Phase-Folded Wave Inspector</h4>
+                                <h5>What this graph does:</h5>
+                                <p>This tool slices your entire multi-year history into recurring blocks of your chosen cycle length and stacks them on top of each other. This reveals what happens on Day 1 versus Day 2, Day 3, and so on.</p>
+                                <h5>How to read it:</h5>
+                                <ul>
+                                    <li><strong>Solid Line (Median):</strong> The typical trend across the cycle. A flat line means the cycle has no real effect; a clear curve (like a dip or rise) indicates a genuine repeating pattern.</li>
+                                    <li><strong>Shaded Band (IQR):</strong> The spread of normal daily variation. A narrow band indicates high consistency across cycles.</li>
+                                    <li><strong>Phase Coherence (%):</strong> Measures how neatly cycles align. Scores above 80% indicate strong resonance; lower scores suggest background noise or an echo from a different cycle.</li>
+                                    <li><strong>Phase Spread (&Delta;):</strong> The real-world difference between the highest and lowest points of the cycle (e.g., a 3% swing in variability).</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Stepping Bar -->
+                <div class="periodicity-stepping-bar">
+                    <div style="display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;">
+                        <span style="color: var(--text-tertiary);">Step Period:</span>
+                        <div class="periodicity-stepper-cluster">
+                            <button type="button" class="periodicity-step-btn" id="stepMinus1" title="Decrease by 1.0 Day">-1.0d</button>
+                            <button type="button" class="periodicity-step-btn" id="stepMinus01" title="Decrease by 0.1 Day">-0.1d</button>
+                            <span class="periodicity-current-display" id="stepCurrentDisplay">14.0d</span>
+                            <button type="button" class="periodicity-step-btn" id="stepPlus01" title="Increase by 0.1 Day">+0.1d</button>
+                            <button type="button" class="periodicity-step-btn" id="stepPlus1" title="Increase by 1.0 Day">+1.0d</button>
+                        </div>
+                        <button type="button" class="periodicity-snap-btn" id="snapNearestPeakBtn">
+                            <span>⚡ Snap to Peak</span>
+                        </button>
+                    </div>
+
+                    <div class="periodicity-scrub-group">
+                        <select id="periodicityBand" style="background: var(--surface-raised); border: 1px solid var(--border-color); color: var(--text-color); font-size: 0.75rem; border-radius: var(--radius-sm); padding: 2px 6px;">
+                            <option value="60">Micro 2–60d</option>
+                            <option value="400">Macro 60–400d</option>
+                        </select>
+                        <input type="range" id="periodScrubber" min="2.0" max="60.0" step="0.1" value="14.0" class="periodicity-range-slider">
+                        <span style="font-size: 0.7rem; color: var(--text-tertiary);">Use ← → keys</span>
+                    </div>
+                </div>
+
+                <!-- Phase Fold EChart -->
+                <div id="epochFoldChart" style="width: 100%; height: 290px;"></div>
+
+                <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: var(--space-2); font-size: 0.75rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; color: var(--text-secondary); flex-wrap: wrap; gap: var(--space-2);">
+                    <div>
+                        <span>Cycles Folded: </span>
+                        <strong id="foldedCycleCount" style="color: var(--text-color);">--</strong>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: var(--space-2);">
+                        <span style="color: var(--text-tertiary);">Direct Value:</span>
+                        <input type="number" id="manualPeriodInput" min="2.0" max="400.0" step="0.1" value="14.0" style="width: 70px; background: var(--surface-inset); border: 1px solid var(--border-color); color: var(--text-color); font-size: 0.75rem; border-radius: var(--radius-sm); padding: 3px 6px;">
+                        <button type="button" id="applyManualPeriodBtn" style="background: var(--surface-raised); border: 1px solid var(--border-color); color: var(--text-color); font-size: 0.75rem; border-radius: var(--radius-sm); padding: 3px 8px; cursor: pointer;">Set</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tier 2B: Multi-Year Annual Calendar Raster -->
+            <div class="periodicity-section-card">
+                <div class="periodicity-section-header">
+                    <div class="periodicity-section-title-wrap">
+                        <div class="periodicity-section-title-row">
+                            <h2 class="periodicity-section-h2">Tier 2B: Multi-Year Annual Calendar Raster (Day 1–365 vs. Year)</h2>
+                            <select class="periodicity-metric-select" data-role="metric-select" id="tier2bMetricSelect">
+                                <option value="cv">CV (%)</option>
+                                <option value="titr">TITR (%)</option>
+                                <option value="tir">TIR (%)</option>
+                                <option value="tdd">TDD (U)</option>
+                                <option value="mean">Mean BG</option>
+                                <option value="sd">SD (mmol/L)</option>
+                            </select>
+                            <span class="periodicity-pill">Raw Unsmoothed Daily Matrix</span>
+                        </div>
+                        <p class="periodicity-section-sub">
+                            Zero mathematical filtering or rolling windows. Inspect whether seasonal surges align vertically across all consecutive years.
+                        </p>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: var(--space-2); font-size: 0.75rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">
+                        <span style="color: var(--text-tertiary);">Low (<span id="rasterMinLabel">--</span>)</span>
+                        <input type="range" id="raster-slant-slider" class="periodicity-heat-legend-bar periodicity-slant-slider" min="-1.0" max="1.0" step="0.05" value="0.0" title="Palette Balance: Neutral (0.00) — Drag to shift dominance, double-click to reset">
+                        <span style="color: var(--text-tertiary);">High (<span id="rasterMaxLabel">--</span>)</span>
+                        <span id="rasterSlantLabel" style="color: var(--text-secondary); font-size: 0.7rem; min-width: 34px; cursor: pointer;" title="Double-click slider or click to reset">0.00</span>
+                        <div class="periodicity-popover-wrapper" style="margin-left: var(--space-1);">
+                            <button type="button" class="periodicity-popover-trigger" aria-label="Tier 2B Guide" title="Guide">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                    <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                                </svg>
+                            </button>
+                            <div class="periodicity-guide-popover" onclick="event.stopPropagation()">
+                                <h4>Tier 2B — Multi-Year Annual Calendar Heatmap</h4>
+                                <h5>What this graph does:</h5>
+                                <p>This raster maps every single day of your data on an unsmoothed calendar grid. Each row represents a calendar year (January on the left, December on the right), with day-to-day values color-coded from low (green) to high (orange/red).</p>
+                                <h5>How to read it:</h5>
+                                <ul>
+                                    <li><strong>Vertical Alignment Equals Real Cycles:</strong> Because whole years are stacked directly on top of each other, genuine seasonal patterns form vertical bands across consecutive rows.</li>
+                                    <li><strong>Spotting Seasonal Shifts:</strong> If the mid-year columns (June, July, August) glow warm across multiple years while early months stay cool, you are looking at visual proof of winter insulin resistance.</li>
+                                    <li><strong>Spotting Baseline Improvements:</strong> If the left side of older years is orange but newer years are solid green, your baseline stability has improved over time.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="width: 100%; background: var(--surface-inset); padding: var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--border-color); box-sizing: border-box;">
+                    <canvas id="calendarRasterCanvas" style="width: 100%; height: 190px; display: block;"></canvas>
+                </div>
+
+                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; color: var(--text-secondary); flex-wrap: wrap; gap: var(--space-2); padding-top: var(--space-1);">
+                    <div style="display: flex; align-items: center; gap: var(--space-2);">
+                        <span>Jan–Feb (Summer)</span>
+                        <span>•</span>
+                        <span style="color: #fbbf24; font-weight: 600;">Jun–Aug (Southern Hemisphere Winter Surge)</span>
+                        <span>•</span>
+                        <span>Nov–Dec (Early Summer)</span>
+                    </div>
+                    <div>
+                        Cell color mapped to 3rd–97th percentile of daily metric.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interpretation Educational Footer -->
+            <div class="periodicity-edu-card">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <strong style="font-size: 0.85rem;">How to interpret these empirical results:</strong>
+                    <span style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.72rem; color: var(--text-tertiary);">ns-monitor Statistical Verification</span>
+                </div>
+                <ul>
+                    <li><strong>No Pre-assigned Labels:</strong> The algorithm scans the full continuum from 2 to 400 days and identifies only peaks that statistically rise above the 99% False Alarm Probability ceiling.</li>
+                    <li><strong>Phase-Folding as the Ultimate Truth Test:</strong> If a peak is a genuine physical rhythm (such as a 14-day sensor change or a 3.5-day pod replacement), folding all observations creates a stable, repeatable waveform with a low <em>p</em>-value. An artifact or random noise collapses into a flat horizontal line (<em>p</em> &gt; 0.10).</li>
+                    <li><strong>Why Mid-Frequency is Clean:</strong> In raw daily data, the 28–35 day zone sits at the noise floor. This empirically verifies that any monthly sinusoidal wave seen on rolling graphs was induced by the moving-average filter (the Slutsky-Yule theorem).</li>
+                </ul>
+            </div>
+
+        </div>
+
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+
+    <script src="/static/js/ns-date-selector.js"></script>
+    <script src="/static/js/ns-periodicity.js"></script>
+    <script>
+        window.syncAndSubmit = function () {
+            // Placeholder for prototype executions
+        };
+    </script>
+</body>
+
+</html>

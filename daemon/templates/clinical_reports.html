@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Other Reports - ns-monitor</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        /* Edit Ranges form's table -- deliberately borderless, unlike the
+           canonical .panel-table it's otherwise built from. */
+        #spider-edit-table, #spider-edit-table th, #spider-edit-table td {
+            border: none;
+        }
+
+        /* ---- Single-family components (Advanced Analytics / Novel
+           Reports / Clinical Reports / Omnipod family only) --
+           deliberately NOT in ns-shared.css, see its own section 19
+           "NOT INCLUDED, DELIBERATELY" note for why. ---- */
+        .image-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            background: var(--surface-inset);
+            border-radius: 4px;
+            overflow: hidden;
+            min-height: 480px;
+            position: relative;
+        }
+        .image-container img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+        .chart-container {
+            min-height: 250px;
+            width: 100%;
+        }
+        .kin-stat {
+            font-size: 2em;
+            font-weight: bold;
+            margin: var(--space-2) 0;
+            color: var(--accent);
+        }
+        .kin-description {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            margin-top: var(--space-2);
+        }
+    </style>
+</head>
+<body>
+    {% include "sidebar.html" %}
+
+    <div class="container">
+        {% set has_compare = true %}
+        <header class="page-header">
+            <h1 class="panel-h1">Other Reports</h1>
+            {% include "_header_date_selector.html" %}
+        </header>
+
+        <!-- PANEL TABS -->
+        <div class="tab-bar">
+            <button type="button" class="tab-item active" id="tab-radar" onclick="switchTab('radar')">Radar</button>
+            <button type="button" class="tab-item" id="tab-bgdist" onclick="switchTab('bgdist')">BG Dist</button>
+            <button type="button" class="tab-item" id="tab-gri" onclick="switchTab('gri')">GRI</button>
+        </div>
+
+        <!-- 1. SPIDER PLOT -->
+        <div class="tab-panel" id="panel-radar">
+            <div class="card split-card">
+                <div class="col-left">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3 class="panel-h2" style="margin: 0;">Radar Chart: Key Metrics Visualised</h3>
+                        <button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.85em;"
+                            onclick="toggleSpiderEdit()" title="Edit ideal/critical ranges">
+                            <i class="fas fa-pencil-alt"></i> Edit Ranges
+                        </button>
+                    </div>
+
+                    <table id="spider-table" class="panel-table">
+                        <thead><tr><th>Metric</th><th>This Period</th><th>Last Period</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+
+                    <form id="spider-edit-form" style="display: none;" onsubmit="saveSpiderThresholds(event)">
+                        <table id="spider-edit-table" class="panel-table">
+                            <thead><tr><th>Metric</th><th>Ideal</th><th>Critical</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                        <div class="btn-group" style="margin-top: 15px;">
+                            <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Save Ranges</button>
+                            <button type="button" class="btn btn-secondary" onclick="cancelSpiderEdit()">Cancel</button>
+                        </div>
+                    </form>
+
+                    <div id="spider-area-info" style="margin-top: 15px; font-weight: bold; font-size: 0.95em;">Loading stats...</div>
+                </div>
+                <div class="col-right">
+                    <div class="chart-wrap" style="min-height: 480px;">
+                        <div class="loading-overlay" id="spider-loading">Loading metrics...</div>
+                        <div id="spider-chart" class="chart-container" style="height: 480px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Standalone Glossary Card -->
+            <div class="card print-break-avoid" style="margin-top: 16px;">
+                <h2 class="panel-h2">Glossary</h2>
+                <div style="overflow-x: auto;">
+                    <table class="panel-table wrap-cells" id="radar-glossary-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 160px;">Name</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="font-weight: bold;">TIR (%)</td>
+                                <td><strong>Time in Range.</strong> The percentage of sensor readings falling within the standard target glucose range of 3.9–10.0 mmol/L (70–180 mg/dL). Calculated as (readings in range &divide; total readings) &times; 100. Key consensus target is &gt;70% for overall glycemic control. (Zone: Range)</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">TITR (%)</td>
+                                <td><strong>Time in Tight Range.</strong> The percentage of sensor readings falling within a tighter target band of 3.9–7.8 mmol/L (70–140 mg/dL). Measures precise postprandial and baseline regulation, particularly relevant for closed-loop/automated insulin delivery (AID) systems. (Zone: Range)</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">TBR (%)</td>
+                                <td><strong>Time Below Range.</strong> The percentage of readings below 3.9 mmol/L (70 mg/dL), combining Level 1 (3.0–3.8 mmol/L) and Level 2 (&lt;3.0 mmol/L) hypoglycemia. International consensus guidelines recommend keeping total TBR under 4% (with Level 2 &lt;1%). (Zone: Range)</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">TAR (%)</td>
+                                <td><strong>Time Above Range.</strong> The percentage of readings above 10.0 mmol/L (180 mg/dL), combining Level 1 (10.1–13.9 mmol/L) and Level 2 (&gt;13.9 mmol/L) hyperglycemia. Consensus guidelines recommend keeping total TAR under 25%. (Zone: Range)</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">GMI (%)</td>
+                                <td><strong>Glucose Management Indicator.</strong> An estimate of expected lab HbA1c derived from the mean CGM glucose level across the period: GMI = 3.31 + (0.431 &times; mean glucose in mmol/L). Provides an indicator of overall glycemia for the selected window. (Zone: Stability)</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">CV (%)</td>
+                                <td><strong>Coefficient of Variation.</strong> A normalized measure of glucose variability calculated as (standard deviation &divide; mean glucose) &times; 100. Lower values reflect greater glucose predictability; clinical consensus guidelines recommend CV &le; 36% for stable glycemic control. (Zone: Stability)</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">MAG</td>
+                                <td><strong>Mean Absolute Glucose.</strong> Quantifies the rate and magnitude of glucose fluctuations by summing the absolute rate of change (|&Delta;BG|) between consecutive readings divided by elapsed time (mmol/L/hour). Captures rapid swings and glucose volatility even when overall mean remains steady. (Zone: Stability)</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">LBGI</td>
+                                <td><strong>Low Blood Glucose Index.</strong> A non-linear risk score (Kovatchev et al.) specifically quantifying hypoglycemia risk. Glucose values are transformed onto a progressive risk scale where lower readings receive exponential weighting, providing an early warning of severe low risk. (Zone: Risk)</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">HBGI</td>
+                                <td><strong>High Blood Glucose Index.</strong> The hyperglycemic counterpart to LBGI, applying progressive weighting to elevated glucose readings to quantify the clinical severity and sustained burden of high glucose excursions. (Zone: Risk)</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">GRI</td>
+                                <td><strong>Glycemia Risk Index.</strong> A composite score (0–100) that synthesizes both hypoglycemia and hyperglycemia severity into a single actionable metric: GRI = (3.0 &times; Hypo Component) + (1.6 &times; Hyper Component). Lower scores represent lower overall glycemic risk, with &le; 20 indicating very low risk. (Zone: Risk)</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">Silhouette Area</td>
+                                <td><strong>Normalized Polygon Silhouette Area.</strong> The geometric surface area enclosed by the 10 normalized (0–100) metric vertices on the radar chart. A larger area indicates closer alignment with ideal targets across all range, stability, and risk dimensions; the percentage change reflects overall period-over-period progress.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <!-- 6. BG FREQUENCY DISTRIBUTION -->
+        <div class="card split-card tab-panel" id="panel-bgdist" style="display: none;">
+            <div class="col-30">
+                <h2 class="panel-h2">BG Distribution</h2>
+
+                <div class="kin-description panel-text" style="font-size: 0.8em; margin-top: 15px; color: var(--text-color);">
+                    <strong>Blood Glucose Frequency Distribution:</strong> This chart displays the frequency of your blood glucose levels in 0.1 mmol/L increments. A normal distribution centered around the target range (e.g., 5.0–7.0 mmol/L) with a narrow spread represents optimal glycemic control. A wider, right-skewed distribution indicates frequent excursions into hyperglycemia.
+                </div>
+
+                <!-- Statistical Key Panel -->
+                <div id="bg-dist-stats-key" style="margin-top: 15px; font-size: 0.95em; border: 1px solid #333; border-radius: 4px; padding: 12px; background: #1a1a1a; display: none; box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);">
+                    <div style="font-weight: bold; margin-bottom: 8px; color: #888; text-transform: uppercase; font-size: 0.75em; letter-spacing: 0.5px;">Statistical Key</div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                        <span style="display: flex; align-items: center; gap: 6px; color: #aaa;">
+                            <span style="width: 12px; height: 3px; background: #e74c3c; display: inline-block; border-radius: 1px;"></span>
+                            Mean
+                        </span>
+                        <span id="bg-stat-mean" style="font-weight: bold; color: #fff;">-</span>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                        <span style="display: flex; align-items: center; gap: 6px; color: #aaa;">
+                            <span style="width: 12px; height: 3px; background: #2ecc71; display: inline-block; border-radius: 1px;"></span>
+                            Median
+                        </span>
+                        <span id="bg-stat-median" style="font-weight: bold; color: #fff;">-</span>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                        <span style="display: flex; align-items: center; gap: 6px; color: #aaa;">
+                            <span style="width: 12px; height: 3px; border-top: 2px dashed #95a5a6; display: inline-block;"></span>
+                            Q1 (25%)
+                        </span>
+                        <span id="bg-stat-q1" style="font-weight: bold; color: #fff;">-</span>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="display: flex; align-items: center; gap: 6px; color: #aaa;">
+                            <span style="width: 12px; height: 3px; border-top: 2px dashed #95a5a6; display: inline-block;"></span>
+                            Q3 (75%)
+                        </span>
+                        <span id="bg-stat-q3" style="font-weight: bold; color: #fff;">-</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-70">
+                <h3 class="panel-h3" style="text-align: center; margin-bottom: 0;">Blood Glucose Frequency Distribution (mmol/L)</h3>
+                <div id="bg-distribution-chart" style="height: 410px; width: 100%;"></div>
+            </div>
+        </div>
+
+        <!-- 7. GRI RISK GRID -->
+        <div class="card split-card tab-panel" id="panel-gri" style="display: none;">
+            <div class="col-30">
+                <h2 class="panel-h2">GRI Risk Grid</h2>
+                <div style="display: flex; align-items: baseline; gap: 15px;">
+                    <span id="gri-grid-score" class="kin-stat" style="color: #9b59b6;">-</span>
+                    <span id="gri-grid-change" style="font-size: 1.1em;">-</span>
+                </div>
+
+                <div class="kin-description" style="color: #eee;">
+                    The Glycemia Risk Index (GRI) is a composite, single-number score (0&ndash;100) that evaluates overall glycaemic risk by incorporating the severity and frequency of both high and low blood glucose excursions.
+                </div>
+                <div class="kin-description" style="color: #eee;">
+                    Traditional metrics like Time in Range (TIR) or GMI measure averages or time spent within a target zone, but they can't capture the danger of extreme fluctuations &mdash; two people can share an identical TIR while one experiences severe, life-threatening hypoglycaemia and the other stays relatively stable.
+                </div>
+                <div class="kin-description" style="color: #eee;">
+                    The GRI applies heavier mathematical penalties to extreme highs (&gt;13.9 mmol/L) and severe lows (&lt;3.0 mmol/L), condensing both into one actionable score.
+                </div>
+
+                <div class="kin-description" style="margin-top: 15px; font-size: 0.75em; color: #888;">
+                    X-axis (hypoglycaemia component) = V.Low + (0.8 &times; Low). Y-axis (hyperglycaemia component) = V.High + (0.5 &times; High). GRI = (3.0 &times; X) + (1.6 &times; Y). The coloured bands are the diagonal isobars where that equation crosses the 20/40/60/80 cutoffs.
+                </div>
+            </div>
+            <div class="col-70">
+                <h3 class="panel-h3" style="text-align: center; margin-bottom: 0;">GRI Risk Grid &mdash; Current vs Previous Period</h3>
+                <div id="gri-grid-chart" style="width: 100%; min-height: 440px; text-align: center; padding-top: 190px; box-sizing: border-box;">
+                    <span style="color: #666; font-style: italic;">Loading grid...</span>
+                </div>
+            </div>
+        </div>
+
+
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+
+    <script src="/static/js/ns-date-selector.js"></script>
+    <script>
+        const todayStr = "{{ today_local }}";
+
+        function formatLocal(d) {
+            return d.getFullYear() + '-'
+                + String(d.getMonth() + 1).padStart(2, '0') + '-'
+                + String(d.getDate()).padStart(2, '0');
+        }
+
+        // Fixed-anchor presets (Today/Yesterday/Last 2 Days/Last 3 Days): unlike the
+        // N-day presets below, these always resolve to the same calendar dates
+        // regardless of the "Include Today" checkbox -- Today is Today. They also
+        // deliberately do NOT touch the checkbox (same as the prev_Nm presets already
+        // didn't), so the checkbox is left exactly as the user set it.
+        const FIXED_DATE_PRESETS = {
+            today:     () => { const d = new Date(); return [d, d]; },
+            yesterday: () => { const d = new Date(); d.setDate(d.getDate() - 1); return [d, d]; },
+            last2:     () => { const e = new Date(); const s = new Date(); s.setDate(s.getDate() - 1); return [s, e]; },
+            last3:     () => { const e = new Date(); const s = new Date(); s.setDate(s.getDate() - 2); return [s, e]; },
+        };
+
+        function applyPreset(daysParam) {
+            let preset = daysParam !== undefined ? daysParam.toString() : document.getElementById('date-preset').value;
+
+            const includeToday = document.getElementById('include-today').checked;
+            const now = new Date();
+            let start, end;
+
+            if (preset in FIXED_DATE_PRESETS) {
+                [start, end] = FIXED_DATE_PRESETS[preset]();
+            } else if (preset === 'prev_1m') {
+                start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                end = new Date(now.getFullYear(), now.getMonth(), 0);
+            } else if (preset === 'prev_3m') {
+                start = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+                end = new Date(now.getFullYear(), now.getMonth(), 0);
+            } else if (preset === 'prev_6m') {
+                start = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+                end = new Date(now.getFullYear(), now.getMonth(), 0);
+            } else if (preset === 'prev_12m') {
+                start = new Date(now.getFullYear(), now.getMonth() - 12, 1);
+                end = new Date(now.getFullYear(), now.getMonth(), 0);
+            } else {
+                if (!preset) preset = "7"; // default to 7 if empty/custom
+                end = new Date();
+                if (!includeToday) end.setDate(end.getDate() - 1);
+                start = new Date(end);
+                start.setDate(start.getDate() - parseInt(preset) + 1);
+            }
+
+            if (start && end) {
+                const sStr = formatLocal(start);
+                const eStr = formatLocal(end);
+
+                document.getElementById('start_date').value = sStr;
+                document.getElementById('end_date').value = eStr;
+
+                syncAndSubmit();
+            }
+        }
+
+        function onPresetChange() {
+            const val = document.getElementById('date-preset').value;
+            localStorage.setItem('ns_date_preset', val);
+            applyPreset(val);
+        }
+
+        function syncInputs() {
+            const sVal = document.getElementById('start_date').value;
+            const eVal = document.getElementById('end_date').value;
+
+            // Clear preset selection when manually changing dates
+            document.getElementById('date-preset').value = "";
+
+            // Update "Include Today" status based on end date
+            const isToday = (eVal === todayStr);
+            document.getElementById('include-today').checked = isToday;
+
+            syncAndSubmit();
+        }
+
+        function onIncludeTodayChange() {
+            // When toggled, we just re-apply the current preset
+            applyPreset();
+        }
+
+        // Month-preset spans: how many calendar months each "Previous N
+        // Months" preset covers. Shifted using calendar-month arithmetic
+        // (built fresh from year/month/1 or year/month/0, same as
+        // applyPreset() does) rather than a fixed day-count, since months
+        // vary from 28-31 days and a fixed-day shift drifts out of
+        // calendar alignment across repeated clicks.
+        const MONTH_PRESET_SPANS = { prev_1m: 1, prev_3m: 3, prev_6m: 6, prev_12m: 12 };
+
+        function shiftPeriod(direction) {
+            const startVal = document.getElementById('start_date').value;
+            const endVal = document.getElementById('end_date').value;
+            const currentPreset = document.getElementById('date-preset').value;
+
+            if (!startVal || !endVal) return;
+
+            // Parse as local dates
+            const [sy, sm, sd] = startVal.split('-').map(Number);
+            const [ey, em, ed] = endVal.split('-').map(Number);
+            const start = new Date(sy, sm - 1, sd);
+            const end = new Date(ey, em - 1, ed);
+
+            let sStr, eStr, newPreset;
+
+            if (currentPreset in MONTH_PRESET_SPANS) {
+                const n = MONTH_PRESET_SPANS[currentPreset];
+                const anchorIndex = end.getFullYear() * 12 + end.getMonth() + 1;
+                const newAnchorIndex = anchorIndex + direction * n;
+                const newAnchorYear = Math.floor(newAnchorIndex / 12);
+                const newAnchorMonth = ((newAnchorIndex % 12) + 12) % 12;
+
+                const newStart = new Date(newAnchorYear, newAnchorMonth - n, 1);
+                const newEnd = new Date(newAnchorYear, newAnchorMonth, 0);
+
+                sStr = formatLocal(newStart);
+                eStr = formatLocal(newEnd);
+                newPreset = currentPreset;
+            } else {
+                const spanDays = Math.round((end - start) / 86400000) + 1;
+                start.setDate(start.getDate() + direction * spanDays);
+                end.setDate(end.getDate() + direction * spanDays);
+                sStr = formatLocal(start);
+                eStr = formatLocal(end);
+                newPreset = '';
+            }
+
+            document.getElementById('start_date').value = sStr;
+            document.getElementById('end_date').value = eStr;
+
+            document.getElementById('date-preset').value = newPreset;
+
+            const isToday = (eStr === todayStr);
+            document.getElementById('include-today').checked = isToday;
+
+            syncAndSubmit();
+        }
+
+
+
+        let loadSeqId = 0;
+        let lastSpiderData = null; // most recent /spider_data response, cached for the edit form
+        let lastKinData = null; // most recent /kinematics response, cached to re-render ApexCharts on tab switch
+        async function syncAndSubmit() {
+            const start = document.getElementById('start_date').value;
+            const end = document.getElementById('end_date').value;
+            if (!start || !end) return;
+
+            const cid = ++loadSeqId;
+            document.getElementById('spider-loading').style.display = 'flex';
+            
+            const paramsObj = { start_date: start, end_date: end };
+
+            // If "Compare to" is enabled, pass its dates through as an explicit
+            // override of the comparison period -- consumed server-side by
+            // database.resolve_comparison_period(), used by spider/GRI and by
+            // the kinematics endpoint (J-Index/kurtosis/BG distribution).
+            const compareToggle = document.getElementById('compare-toggle');
+            if (compareToggle && compareToggle.checked) {
+                const lpStart = document.getElementById('start_date-lastperiod').value;
+                const lpEnd = document.getElementById('end_date-lastperiod').value;
+                if (lpStart && lpEnd) {
+                    paramsObj.prev_start_date = lpStart;
+                    paramsObj.prev_end_date = lpEnd;
+                }
+            }
+
+            const params = new URLSearchParams(paramsObj).toString();
+            updateTriggerText();
+            try { window.history.replaceState(null, '', '?' + params); } catch (e) {}
+
+            // Store choices
+            localStorage.setItem('ns_date_start', start);
+            localStorage.setItem('ns_date_end', end);
+
+            try {
+                // 1. Fetch Spider Data
+                const resSpider = await fetch(`/api/v1/advanced_metrics/spider_data?${params}`);
+                const dataSpider = await resSpider.json();
+                if (cid === loadSeqId && dataSpider.status === 'success') {
+                    lastSpiderData = dataSpider; // cached for the edit form
+                    const tbody = document.querySelector("#spider-table tbody");
+                    tbody.innerHTML = "";
+
+                    // Higher-is-better metrics (a rise = green); everything else is lower-is-better.
+                    const higherIsBetter = ["tir", "titr"];
+                    // Display precision + unit suffix per metric.
+                    const fmtRules = {
+                        tir: [1, "%"], titr: [1, "%"], tbr: [1, "%"], tar: [1, "%"],
+                        gmi: [1, "%"], cv: [1, "%"], mag: [2, ""],
+                        lbgi: [2, ""], hbgi: [2, ""], gri: [1, ""],
+                    };
+
+                    dataSpider.metrics.forEach((m, i) => {
+                        const l = dataSpider.labels[i];
+                        const cur = dataSpider.current_raw[i];
+                        const prev = dataSpider.previous_raw[i];
+                        const curScore = dataSpider.current_score[i];
+                        const prevScore = dataSpider.previous_score[i];
+
+                        const [dp, unit] = fmtRules[m] || [1, ""];
+                        const curVal = parseFloat(cur) || 0;
+                        const prevVal = parseFloat(prev) || 0;
+                        const curFmt = curVal.toFixed(dp) + unit;
+                        const prevFmt = prevVal.toFixed(dp) + unit;
+
+                        let colorClass = "";
+                        if (curVal !== prevVal) {
+                            const isPositive = higherIsBetter.includes(m);
+                            colorClass = (isPositive ? curVal > prevVal : curVal < prevVal) ? "metric-better" : "metric-worse";
+                        }
+
+                        const scoreSpan = (score) =>
+                            `<span style="font-size: 0.8em; color: #888;"> (${score.toFixed(0)})</span>`;
+
+                        tbody.innerHTML += `<tr>
+                            <td>${l}</td>
+                            <td class="${colorClass}">${curFmt}${scoreSpan(curScore)}</td>
+                            <td>${prevFmt}${scoreSpan(prevScore)}</td>
+                        </tr>`;
+                    });
+                    const chg = dataSpider.area_change;
+                    const chgClass = chg >= 0 ? 'metric-better' : 'metric-worse';
+                    document.getElementById('spider-area-info').innerHTML =
+                        `Polygon Silhouette Area: <span class="${chgClass}">${chg > 0 ? '+' : ''}${chg}%</span>`;
+
+                    try {
+                        renderGriGrid(dataSpider.current_gri_grid, dataSpider.previous_gri_grid);
+                    } catch (griErr) {
+                        console.error("GRI grid rendering error:", griErr);
+                    }
+                }
+
+                // 2. Render Radar chart (migrated 30 Aug 2026 from a server-rendered
+                // matplotlib PNG to a client-side ECharts radar, consuming the same
+                // dataSpider payload the table above already fetched -- no second
+                // request. See STATUS.md; the old /spider_chart PNG route still
+                // exists server-side but nothing calls it any more.
+                if (cid === loadSeqId) {
+                    try {
+                        renderSpiderRadar(dataSpider);
+                    } catch (spErr) {
+                        console.error("Spider radar rendering error:", spErr);
+                    } finally {
+                        document.getElementById('spider-loading').style.display = 'none';
+                    }
+                }
+
+                // 3. Fetch Kinematics -- BG Dist's data lives in this same
+                // response (dataKin.bg_hist); J-Index/CONGA/Smoothness were
+                // the only other consumers and are gone, but the fetch itself
+                // stays for BG Dist's sake (see STATUS.md landmine note).
+                const resKin = await fetch(`/api/v1/experimental/kinematics?${params}`);
+                const dataKin = await resKin.json();
+                if (cid === loadSeqId && dataKin.status === 'success') {
+                    lastKinData = dataKin; // cached for re-render on tab switch (see switchTab)
+
+                    // Only render ApexCharts for whichever tab is currently visible --
+                    // building one into a display:none container sizes it to zero and
+                    // it won't fix itself later. switchTab() re-renders from
+                    // lastKinData when the user navigates to a not-yet-rendered tab.
+                    const activeTabEl = document.querySelector('.tab-item.active');
+                    const activeTab = activeTabEl ? activeTabEl.id.replace('tab-', '') : 'radar';
+                    try {
+                        if (activeTab === 'bgdist') renderBgDistributionChart(dataKin.bg_hist);
+                    } catch (chartErr) {
+                        console.error("Chart rendering error:", chartErr);
+                    }
+                }
+            } catch (err) {
+                console.error("Async load failure:", err);
+            }
+        }
+
+        // ─── Toast (matches the Settings page's pattern) ─────────────────
+        function showToast(msg, isError = false) {
+            const existing = document.getElementById('spider-toast');
+            if (existing) existing.remove();
+
+            const t = document.createElement('div');
+            t.id = 'spider-toast';
+            t.textContent = msg;
+            Object.assign(t.style, {
+                position: 'fixed', bottom: '24px', right: '24px',
+                background: isError ? 'var(--danger)' : 'var(--success)',
+                color: '#fff', padding: '10px 20px', borderRadius: '6px',
+                fontSize: '0.9em', fontWeight: 'bold',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.4)',
+                zIndex: '9999',
+                transition: 'opacity 0.4s'
+            });
+            document.body.appendChild(t);
+            setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 3000);
+        }
+
+        // ─── Spider chart: Edit Ranges (pencil) toggle ────────────────────
+        async function toggleSpiderEdit() {
+            if (!lastSpiderData) { showToast('Metrics still loading, try again shortly', true); return; }
+
+            const editForm = document.getElementById('spider-edit-form');
+            const table = document.getElementById('spider-table');
+            const tbody = document.querySelector('#spider-edit-table tbody');
+            tbody.innerHTML = '';
+
+            lastSpiderData.metrics.forEach((m, i) => {
+                const l = lastSpiderData.labels[i];
+                const t = lastSpiderData.thresholds[m];
+                tbody.innerHTML += `<tr>
+                    <td>${l}</td>
+                    <td><input type="number" step="any" id="spider-ideal-${m}" value="${t.t_ideal}" class="form-input" style="width: 90px;"></td>
+                    <td><input type="number" step="any" id="spider-critical-${m}" value="${t.t_critical}" class="form-input" style="width: 90px;"></td>
+                </tr>`;
+            });
+
+            table.style.display = 'none';
+            document.getElementById('spider-area-info').style.display = 'none';
+            editForm.style.display = 'block';
+        }
+
+        function cancelSpiderEdit() {
+            document.getElementById('spider-edit-form').style.display = 'none';
+            document.getElementById('spider-table').style.display = '';
+            document.getElementById('spider-area-info').style.display = '';
+        }
+
+        async function saveSpiderThresholds(event) {
+            event.preventDefault();
+            const payload = {};
+            for (const m of lastSpiderData.metrics) {
+                payload[m] = {
+                    t_ideal: parseFloat(document.getElementById(`spider-ideal-${m}`).value),
+                    t_critical: parseFloat(document.getElementById(`spider-critical-${m}`).value),
+                };
+            }
+
+            try {
+                const r = await fetch('/api/v1/spider_thresholds', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const res = await r.json();
+                if (res.status === 'ok') {
+                    showToast('✓ Ranges saved');
+                    cancelSpiderEdit();
+                    syncAndSubmit(); // reload table + chart with the new thresholds
+                } else {
+                    showToast('Error: ' + res.message, true);
+                }
+            } catch (e) {
+                showToast('Failed to save: ' + e, true);
+            }
+        }
+
+        // Radar chart (migrated 30 Aug 2026 from matplotlib PNG -- see the
+        // syncAndSubmit call site for why). Zone colours (RANGE/STABILITY/RISK)
+        // are the same chart-data colours the old PNG used -- unchanged by the
+        // site-wide CSS retheme, since these encode metric grouping, not UI
+        // chrome. Zone label text at custom polar radii (a matplotlib-specific
+        // flourish) has no direct ECharts equivalent; approximated here via
+        // rich-text-coloured indicator names instead of separately positioned
+        // labels -- simpler, no custom graphic overlay, same colour-grouping
+        // information.
+        const SPIDER_ZONE_COLORS = { 1: '#00e676', 2: '#3498db', 3: '#e74c3c' };
+        let spiderChart = null;
+        function renderSpiderRadar(dataSpider) {
+            const el = document.getElementById('spider-chart');
+            if (!el) return;
+            if (!spiderChart) {
+                spiderChart = echarts.init(el, null, { renderer: 'canvas' });
+                window.addEventListener('resize', () => spiderChart && spiderChart.resize());
+            }
+
+            const rich = {};
+            const indicator = dataSpider.metrics.map((m, i) => {
+                const zone = dataSpider.zones[m];
+                const key = `z${zone}`;
+                rich[key] = { color: SPIDER_ZONE_COLORS[zone] || '#e0e0e0', fontWeight: 'bold', fontSize: 11 };
+                return { name: `{${key}|${dataSpider.labels[i]}}`, max: 100 };
+            });
+
+            spiderChart.setOption({
+                animation: false,
+                backgroundColor: 'transparent',
+                legend: {
+                    data: ['Current', 'Previous Period'],
+                    textStyle: { color: '#e0e0e0' },
+                    bottom: 0
+                },
+                radar: {
+                    indicator: indicator,
+                    shape: 'polygon',
+                    axisName: { rich: rich },
+                    splitLine: { lineStyle: { color: '#555555', type: 'dashed' } },
+                    splitArea: { show: false },
+                    axisLine: { lineStyle: { color: '#444444' } }
+                },
+                series: [{
+                    type: 'radar',
+                    data: [
+                        {
+                            name: 'Current',
+                            value: dataSpider.current_score,
+                            lineStyle: { color: '#00e676', width: 2 },
+                            itemStyle: { color: '#00e676' },
+                            areaStyle: { color: 'rgba(0, 230, 118, 0.15)' }
+                        },
+                        {
+                            name: 'Previous Period',
+                            value: dataSpider.previous_score,
+                            lineStyle: { color: '#aaaaaa', width: 1.5, type: 'dashed' },
+                            itemStyle: { color: '#aaaaaa' },
+                            areaStyle: { color: 'rgba(170, 170, 170, 0.05)' }
+                        }
+                    ]
+                }]
+            }, true);
+        }
+
+        let bgDistributionChart = null;
+        function renderBgDistributionChart(data) {
+            const el = document.querySelector("#bg-distribution-chart");
+            if (!bgDistributionChart) {
+                bgDistributionChart = echarts.init(el, null, { renderer: 'canvas' });
+                window.addEventListener('resize', () => bgDistributionChart && bgDistributionChart.resize());
+            }
+
+            // Populate the Sidebar Statistical Key
+            if (data.stats) {
+                document.getElementById('bg-stat-mean').innerText = `${data.stats.mean.toFixed(1)} mmol/L (${Math.round(data.stats.mean * 18.0182)} mg/dL)`;
+                document.getElementById('bg-stat-median').innerText = `${data.stats.median.toFixed(1)} mmol/L (${Math.round(data.stats.median * 18.0182)} mg/dL)`;
+                document.getElementById('bg-stat-q1').innerText = `${data.stats.q1.toFixed(1)} mmol/L (${Math.round(data.stats.q1 * 18.0182)} mg/dL)`;
+                document.getElementById('bg-stat-q3').innerText = `${data.stats.q3.toFixed(1)} mmol/L (${Math.round(data.stats.q3 * 18.0182)} mg/dL)`;
+                document.getElementById('bg-dist-stats-key').style.display = 'block';
+            } else {
+                document.getElementById('bg-dist-stats-key').style.display = 'none';
+            }
+
+            const bins = data.bins.map(b => b.toFixed(1));
+            const markLines = [];
+            if (data.stats) {
+                markLines.push({ xAxis: data.stats.mean.toFixed(1), lineStyle: { color: '#e74c3c', width: 2 }, label: { formatter: 'Mean' } });
+                markLines.push({ xAxis: data.stats.median.toFixed(1), lineStyle: { color: '#2ecc71', width: 2 }, label: { formatter: 'Median' } });
+                markLines.push({ xAxis: data.stats.q1.toFixed(1), lineStyle: { color: '#95a5a6', type: 'dashed' }, label: { formatter: 'Q1' } });
+                markLines.push({ xAxis: data.stats.q3.toFixed(1), lineStyle: { color: '#95a5a6', type: 'dashed' }, label: { formatter: 'Q3' } });
+            }
+
+            const seriesList = [];
+            seriesList.push({
+                name: 'This Period',
+                type: 'line',
+                data: data.current,
+                smooth: true,
+                symbol: 'none',
+                lineStyle: { color: '#e67e22', width: 2 },
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: 'rgba(230, 126, 34, 0.45)' },
+                        { offset: 1, color: 'rgba(230, 126, 34, 0.05)' }
+                    ])
+                },
+                markLine: {
+                    symbol: 'none',
+                    data: markLines
+                }
+            });
+            if (data.previous && data.previous.length) {
+                seriesList.push({
+                    name: 'Last Period',
+                    type: 'line',
+                    data: data.previous,
+                    smooth: true,
+                    symbol: 'none',
+                    lineStyle: { color: '#7f8c8d', width: 2 },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(127, 140, 141, 0.35)' },
+                            { offset: 1, color: 'rgba(127, 140, 141, 0.05)' }
+                        ])
+                    }
+                });
+            }
+
+            bgDistributionChart.setOption({
+                animation: false,
+                backgroundColor: 'transparent',
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'cross' },
+                    formatter: function(params) {
+                        const mmol = parseFloat(params[0].axisValue);
+                        const mgdl = Math.round(mmol * 18.0182);
+                        let h = `<div style="padding:4px;font-weight:bold;color:#fff">${mmol.toFixed(1)} mmol/L (${mgdl} mg/dL)</div>`;
+                        params.forEach(p => {
+                            if (p.value !== undefined && p.value !== null) {
+                                h += `<div style="margin:2px 0;"><span style="color:${p.color}">●</span> ${p.seriesName}: <b>${p.value.toFixed(1)}%</b></div>`;
+                            }
+                        });
+                        return h;
+                    }
+                },
+                legend: { data: seriesList.map(s => s.name), textStyle: { color: '#e0e0e0' }, top: 0, right: 10 },
+                grid: { top: 35, bottom: 40, left: 50, right: 20 },
+                xAxis: {
+                    type: 'category',
+                    data: bins,
+                    name: 'mmol/L',
+                    axisLabel: { color: '#888', rotate: -45 }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: 'Frequency (%)',
+                    axisLabel: { color: '#888', formatter: '{value}%' },
+                    splitLine: { lineStyle: { color: '#333' } }
+                },
+                series: seriesList
+            }, true);
+        }
+
+
+        // ─── GRI Risk Grid (19 Aug 2026) ────────────────────────────────
+        // Diagonal-isobar background: GRI = (3.0*X) + (1.6*Y), banded at the
+        // 20/40/60/80 cutoffs. Drawn as many thin stacked columns rather than
+        // analytic polygons -- since the boundaries are straight lines, fine
+        // columns look identical to true polygons and the code stays simple.
+        function griZoneColor(score) {
+            if (score <= 20) return '#2ecc71';
+            if (score <= 40) return '#c8e666';
+            if (score <= 60) return '#f5a623';
+            if (score <= 80) return '#f2705c';
+            return '#c0392b';
+        }
+
+        function renderGriGrid(current, previous) {
+            const container = document.getElementById('gri-grid-chart');
+            if (!container) return;
+            container.style.paddingTop = '0';
+            if (!current || current.x == null || current.y == null || current.gri == null) {
+                container.innerHTML = '<span style="color:#666; font-style: italic;">No data for this period.</span>';
+                return;
+            }
+
+            const curX = current.x, curY = current.y, curGri = current.gri;
+            const prevX = (previous && previous.x != null) ? previous.x : null;
+            const prevY = (previous && previous.y != null) ? previous.y : null;
+            const prevGri = (previous && previous.gri != null) ? previous.gri : null;
+
+            // Only the current-period point/score is coloured -- green if it
+            // improved (lower GRI) vs. the prior period, red if it worsened.
+            // The previous-period point always stays neutral grey.
+            const changeColor = (prevGri == null) ? '#e0e0e0'
+                : (curGri < prevGri ? '#2ecc71' : (curGri > prevGri ? '#e74c3c' : '#e0e0e0'));
+
+            const scoreEl = document.getElementById('gri-grid-score');
+            if (scoreEl) {
+                scoreEl.innerText = curGri.toFixed(1);
+                scoreEl.style.color = changeColor;
+            }
+            const changeEl = document.getElementById('gri-grid-change');
+            if (changeEl) {
+                if (prevGri != null) {
+                    const delta = curGri - prevGri;
+                    changeEl.innerText = (delta > 0 ? '+' : '') + delta.toFixed(1);
+                    changeEl.className = delta <= 0 ? 'metric-better' : 'metric-worse'; // lower GRI = better
+                } else {
+                    changeEl.innerText = '';
+                    changeEl.className = '';
+                }
+            }
+
+            // Domain: standard GRI grid view (X 0-30, Y 0-60), auto-extended
+            // with 15% headroom (rounded to the nearest 5) if the data exceeds it.
+            const dataMaxX = Math.max(curX, prevX || 0);
+            const dataMaxY = Math.max(curY, prevY || 0);
+            const xMax = Math.max(30, Math.ceil((dataMaxX * 1.15) / 5) * 5);
+            const yMax = Math.max(60, Math.ceil((dataMaxY * 1.15) / 5) * 5);
+
+            const W = 560, H = 440;
+            const margin = { top: 20, right: 20, bottom: 55, left: 60 };
+            const plotW = W - margin.left - margin.right;
+            const plotH = H - margin.top - margin.bottom;
+            const xPix = (x) => margin.left + (x / xMax) * plotW;
+            const yPix = (y) => margin.top + plotH - (y / yMax) * plotH;
+
+            const BOUNDS = [20, 40, 60, 80, 100];
+            const COLORS = ['#2ecc71', '#c8e666', '#f5a623', '#f2705c', '#c0392b'];
+
+            const N_COLS = 140;
+            let bandsSvg = '';
+            for (let i = 0; i < N_COLS; i++) {
+                const x0 = (i / N_COLS) * xMax;
+                const x1 = ((i + 1) / N_COLS) * xMax;
+                const xMid = (x0 + x1) / 2;
+                // Edges from the 5 cutoffs (20/40/60/80/100) only -- nothing
+                // is drawn beyond the 100-line since GRI can't exceed 100.
+                const yBounds = BOUNDS.map(s => Math.max(0, Math.min(yMax, (s - 3.0 * xMid) / 1.6)));
+                const edges = [0, ...yBounds];
+                const colX = xPix(x0);
+                const colW = Math.max(1, xPix(x1) - xPix(x0) + 0.5); // slight overlap avoids hairline gaps
+                for (let z = 0; z < 5; z++) {
+                    const yLo = edges[z], yHi = edges[z + 1];
+                    if (yHi <= yLo) continue;
+                    const rectY = yPix(yHi);
+                    const rectH = yPix(yLo) - yPix(yHi);
+                    bandsSvg += `<rect x="${colX.toFixed(2)}" y="${rectY.toFixed(2)}" width="${colW.toFixed(2)}" height="${rectH.toFixed(2)}" fill="${COLORS[z]}" />`;
+                }
+            }
+
+            const xTickStep = xMax / 4, yTickStep = yMax / 4;
+            let ticksSvg = '';
+            for (let x = 0; x <= xMax + 0.01; x += xTickStep) {
+                const px = xPix(x);
+                ticksSvg += `<line x1="${px}" y1="${margin.top}" x2="${px}" y2="${margin.top + plotH}" stroke="#333" stroke-width="1" stroke-dasharray="2,3" />`;
+                ticksSvg += `<text x="${px}" y="${margin.top + plotH + 18}" fill="#888" font-size="11" text-anchor="middle">${x.toFixed(0)}</text>`;
+            }
+            for (let y = 0; y <= yMax + 0.01; y += yTickStep) {
+                const py = yPix(y);
+                ticksSvg += `<line x1="${margin.left}" y1="${py}" x2="${margin.left + plotW}" y2="${py}" stroke="#333" stroke-width="1" stroke-dasharray="2,3" />`;
+                ticksSvg += `<text x="${margin.left - 8}" y="${py + 4}" fill="#888" font-size="11" text-anchor="end">${y.toFixed(0)}</text>`;
+            }
+
+            const curPx = xPix(Math.min(curX, xMax)), curPy = yPix(Math.min(curY, yMax));
+            let pointsSvg = '';
+            if (prevX != null && prevY != null) {
+                const prevPx = xPix(Math.min(prevX, xMax)), prevPy = yPix(Math.min(prevY, yMax));
+                pointsSvg += `<circle cx="${prevPx}" cy="${prevPy}" r="8" fill="#aaaaaa" opacity="0.55" stroke="#eee" stroke-width="1.5" />`;
+            }
+            pointsSvg += `<circle cx="${curPx}" cy="${curPy}" r="9" fill="${changeColor}" stroke="#ffffff" stroke-width="2" />`;
+
+            // In-chart zone key -- own dark styling (not a copy of any
+            // reference image), overlaid in the corner with room the
+            // narrower 30-wide X domain now leaves free.
+            const ZONE_KEY = [
+                ['A', '0–20', 'Optimal', '#2ecc71'],
+                ['B', '20–40', 'Good', '#c8e666'],
+                ['C', '40–60', 'Marginal', '#f5a623'],
+                ['D', '60–80', 'Poor', '#f2705c'],
+                ['E', '80–100', 'Severe Risk', '#c0392b'],
+            ];
+            const legendW = 182, legendH = 116;
+            const legendX = margin.left + plotW - legendW - 8;
+            const legendY = margin.top + 8;
+            let legendSvg = `<rect x="${legendX}" y="${legendY}" width="${legendW}" height="${legendH}" rx="6" fill="rgba(10,10,10,0.82)" stroke="#555" stroke-width="1" />`;
+            ZONE_KEY.forEach((row, i) => {
+                const ry = legendY + 18 + i * 20;
+                legendSvg += `<rect x="${legendX + 10}" y="${ry - 9}" width="11" height="11" rx="2" fill="${row[3]}" />`;
+                legendSvg += `<text x="${legendX + 27}" y="${ry}" fill="#eee" font-size="10.5" font-weight="bold">${row[0]}</text>`;
+                legendSvg += `<text x="${legendX + 40}" y="${ry}" fill="#ccc" font-size="10.5">${row[1]}</text>`;
+                legendSvg += `<text x="${legendX + 96}" y="${ry}" fill="#ccc" font-size="10.5">${row[2]}</text>`;
+            });
+
+            container.innerHTML = `
+                <svg viewBox="0 0 ${W} ${H}" style="width: 100%; height: auto; max-height: 460px;">
+                    ${bandsSvg}
+                    ${ticksSvg}
+                    <rect x="${margin.left}" y="${margin.top}" width="${plotW}" height="${plotH}" fill="none" stroke="#555" stroke-width="1.5" />
+                    ${pointsSvg}
+                    ${legendSvg}
+                    <text x="${margin.left + plotW / 2}" y="${H - 10}" fill="#aaa" font-size="12" text-anchor="middle">Hypoglycaemia Component (X = V.Low + 0.8&#215;Low)</text>
+                    <text x="14" y="${margin.top + plotH / 2}" fill="#aaa" font-size="12" text-anchor="middle" transform="rotate(-90 14 ${margin.top + plotH / 2})">Hyperglycaemia Component (Y = V.High + 0.5&#215;High)</text>
+                </svg>
+                <div style="display:flex; gap:16px; justify-content:center; margin-top:6px; font-size:0.75em; color:#aaa;">
+                    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${changeColor};margin-right:5px;"></span>This period</span>
+                    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#aaaaaa;opacity:0.6;margin-right:5px;"></span>Last period</span>
+                </div>
+            `;
+        }
+
+
+        // ─── "Compare to" checkbox: auto (default) vs manual override ─────
+        // Comparison is always computed for panels that support it -- this
+        // checkbox does NOT turn comparison on/off, it toggles between the
+        // auto-derived default (immediately preceding period, same length)
+        // and a manually-chosen override. Persisted the same way as the main
+        // date range (localStorage, matching how this page already works).
+        function onCompareToggleChange() {
+            const checked = document.getElementById('compare-toggle').checked;
+            const details = document.getElementById('compare-details');
+            details.style.display = checked ? 'block' : 'none';
+            localStorage.setItem('ns_compare_enabled', checked ? 'true' : 'false');
+
+            if (checked && !document.getElementById('start_date-lastperiod').value) {
+                // First time enabling this session with nothing saved -- seed it
+                // with the auto-computed previous period so it's not blank.
+                seedLastPeriodFromAuto();
+            }
+            syncAndSubmit();
+        }
+
+        function seedLastPeriodFromAuto() {
+            const start = document.getElementById('start_date').value;
+            const end = document.getElementById('end_date').value;
+            if (!start || !end) return;
+            const [sy, sm, sd] = start.split('-').map(Number);
+            const [ey, em, ed] = end.split('-').map(Number);
+            const s = new Date(sy, sm - 1, sd);
+            const e = new Date(ey, em - 1, ed);
+            const span = Math.round((e - s) / 86400000) + 1;
+            const prevEnd = new Date(s);
+            prevEnd.setDate(prevEnd.getDate() - 1);
+            const prevStart = new Date(prevEnd);
+            prevStart.setDate(prevStart.getDate() - span + 1);
+            document.getElementById('start_date-lastperiod').value = formatLocal(prevStart);
+            document.getElementById('end_date-lastperiod').value = formatLocal(prevEnd);
+            persistLastPeriod();
+        }
+
+        function persistLastPeriod() {
+            localStorage.setItem('ns_compare_start', document.getElementById('start_date-lastperiod').value);
+            localStorage.setItem('ns_compare_end', document.getElementById('end_date-lastperiod').value);
+            localStorage.setItem('ns_compare_preset', document.getElementById('date-preset-lastperiod').value);
+        }
+
+        function onPresetChangeLastPeriod() {
+            applyPresetLastPeriod(document.getElementById('date-preset-lastperiod').value);
+        }
+
+        function onIncludeTodayChangeLastPeriod() {
+            applyPresetLastPeriod();
+        }
+
+        function applyPresetLastPeriod(daysParam) {
+            let preset = daysParam !== undefined ? daysParam.toString() : document.getElementById('date-preset-lastperiod').value;
+
+            const includeToday = document.getElementById('include-today-lastperiod').checked;
+            const now = new Date();
+            let start, end;
+
+            if (preset in FIXED_DATE_PRESETS) {
+                [start, end] = FIXED_DATE_PRESETS[preset]();
+            } else if (preset === 'prev_1m') {
+                start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                end = new Date(now.getFullYear(), now.getMonth(), 0);
+            } else if (preset === 'prev_3m') {
+                start = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+                end = new Date(now.getFullYear(), now.getMonth(), 0);
+            } else if (preset === 'prev_6m') {
+                start = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+                end = new Date(now.getFullYear(), now.getMonth(), 0);
+            } else if (preset === 'prev_12m') {
+                start = new Date(now.getFullYear(), now.getMonth() - 12, 1);
+                end = new Date(now.getFullYear(), now.getMonth(), 0);
+            } else {
+                if (!preset) preset = "7";
+                end = new Date();
+                if (!includeToday) end.setDate(end.getDate() - 1);
+                start = new Date(end);
+                start.setDate(start.getDate() - parseInt(preset) + 1);
+            }
+
+            if (start && end) {
+                document.getElementById('start_date-lastperiod').value = formatLocal(start);
+                document.getElementById('end_date-lastperiod').value = formatLocal(end);
+                persistLastPeriod();
+                syncAndSubmit();
+            }
+        }
+
+        function syncInputsLastPeriod() {
+            document.getElementById('date-preset-lastperiod').value = "";
+            persistLastPeriod();
+            syncAndSubmit();
+        }
+
+        const MONTH_PRESET_SPANS_LP = MONTH_PRESET_SPANS;
+        function shiftPeriodLastPeriod(direction) {
+            const startVal = document.getElementById('start_date-lastperiod').value;
+            const endVal = document.getElementById('end_date-lastperiod').value;
+            const currentPreset = document.getElementById('date-preset-lastperiod').value;
+
+            if (!startVal || !endVal) return;
+
+            const [sy, sm, sd] = startVal.split('-').map(Number);
+            const [ey, em, ed] = endVal.split('-').map(Number);
+            const start = new Date(sy, sm - 1, sd);
+            const end = new Date(ey, em - 1, ed);
+
+            let sStr, eStr, newPreset;
+
+            if (currentPreset in MONTH_PRESET_SPANS_LP) {
+                const n = MONTH_PRESET_SPANS_LP[currentPreset];
+                const anchorIndex = end.getFullYear() * 12 + end.getMonth() + 1;
+                const newAnchorIndex = anchorIndex + direction * n;
+                const newAnchorYear = Math.floor(newAnchorIndex / 12);
+                const newAnchorMonth = ((newAnchorIndex % 12) + 12) % 12;
+
+                const newStart = new Date(newAnchorYear, newAnchorMonth - n, 1);
+                const newEnd = new Date(newAnchorYear, newAnchorMonth, 0);
+
+                sStr = formatLocal(newStart);
+                eStr = formatLocal(newEnd);
+                newPreset = currentPreset;
+            } else {
+                const spanDays = Math.round((end - start) / 86400000) + 1;
+                start.setDate(start.getDate() + direction * spanDays);
+                end.setDate(end.getDate() + direction * spanDays);
+                sStr = formatLocal(start);
+                eStr = formatLocal(end);
+                newPreset = '';
+            }
+
+            document.getElementById('start_date-lastperiod').value = sStr;
+            document.getElementById('end_date-lastperiod').value = eStr;
+            document.getElementById('date-preset-lastperiod').value = newPreset;
+            persistLastPeriod();
+            syncAndSubmit();
+        }
+
+        // ─── Panel tabs ────────────────────────────────────────────────
+        const TAB_IDS = ['radar', 'bgdist', 'gri'];
+        function switchTab(tab) {
+            if (typeof closeDatePopover === 'function') closeDatePopover();
+
+            // Panels aren't destroyed on tab switch (just display:none/flex), so a
+            // panel's transient UI state would otherwise persist exactly as left --
+            // e.g. Radar's "Edit Ranges" form staying open if you navigate away
+            // mid-edit and come back. Defensively reset it here on every switch.
+            const editForm = document.getElementById('spider-edit-form');
+            if (editForm && editForm.style.display !== 'none') {
+                cancelSpiderEdit();
+            }
+
+            TAB_IDS.forEach(t => {
+                const panel = document.getElementById('panel-' + t);
+                if (panel) {
+                    const isSplit = panel.classList.contains('split-card');
+                    panel.style.display = (t === tab) ? (isSplit ? 'flex' : 'block') : 'none';
+                }
+                const btn = document.getElementById('tab-' + t);
+                if (btn) btn.classList.toggle('active', t === tab);
+            });
+            localStorage.setItem('adv_active_tab', tab);
+
+            // ApexCharts panels size themselves off the container at creation
+            // time -- re-render from cached data so a tab that wasn't visible
+            // during the last data fetch shows a correctly-sized chart rather
+            // than whatever it rendered as (or didn't) while hidden.
+            if (lastKinData) {
+                if (tab === 'bgdist') renderBgDistributionChart(lastKinData.bg_hist);
+            }
+            setTimeout(() => {
+                if (bgDistributionChart) bgDistributionChart.resize();
+            }, 50);
+        }
+
+        window.syncAndSubmit = syncAndSubmit;
+        window.onDateOrPresetChange = syncAndSubmit;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const savedTab = localStorage.getItem('adv_active_tab');
+            switchTab(TAB_IDS.includes(savedTab) ? savedTab : 'radar');
+            syncAndSubmit();
+        });
+    </script>
+</body>
+</html>

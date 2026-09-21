@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Export to Excel</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        /* Page-local styling */
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: var(--space-4);
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--space-4);
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .form-group label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            cursor: pointer;
+            padding: 4px 0;
+        }
+
+        .checkbox-group label {
+            cursor: pointer;
+            font-size: 0.9em;
+            color: var(--text-color);
+        }
+
+        .column-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: var(--space-3);
+            padding: var(--space-2) 0;
+        }
+
+        .status-msg {
+            margin-top: var(--space-3);
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .status-msg.error {
+            color: var(--danger);
+            display: block;
+        }
+
+        /* Grouping Styles */
+        .col-group {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: var(--space-3);
+            margin-bottom: var(--space-3);
+        }
+
+        .col-group:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+            margin-bottom: 0;
+        }
+
+        .group-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: var(--space-2);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .column-grid-inner {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: var(--space-3);
+        }
+    </style>
+</head>
+
+<body>
+    {% include "sidebar.html" %}
+    <div class="container">
+        <header class="page-header">
+            <h1 class="panel-h1">
+                Export to Excel
+            </h1>
+            <div style="display: flex; gap: var(--space-2);">
+                <button type="button" class="btn btn-secondary"
+                    onclick="localStorage.removeItem('export_selections'); window.location.reload();">
+                    Reset UI Defaults
+                </button>
+            </div>
+        </header>
+
+        <div class="card">
+            <div class="section-title">Time Range &amp; Format</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="export-start">Start Date (Local 00:00)</label>
+                    <input type="date" id="export-start" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="export-end">End Date (Local 23:59)</label>
+                    <input type="date" id="export-end" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="export-format">Format</label>
+                    <select id="export-format" class="form-select">
+                        <option value="xlsx">Excel (Multi-Sheet)</option>
+                        <option value="csv_daily">CSV - Daily Summary</option>
+                        <option value="csv_hourly">CSV - Hourly Trends</option>
+                        <option value="csv_timeline">CSV - Event Timeline</option>
+                    </select>
+                </div>
+            </div>
+            <div id="status" class="status-msg"></div>
+            <div style="margin-top: var(--space-4); text-align: right;">
+                <button type="button" class="btn btn-success" onclick="startExport()" style="font-size: 1rem; padding: 10px 20px;">
+                    <i id="export-download-icon" class="fas fa-file-excel"></i> <span id="export-download-label">Download XLSX</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="selection-panel">
+            <div class="card">
+                <div class="section-title">
+                    <input type="checkbox" id="sheet-daily" checked onchange="toggleSheet('daily')">
+                    Daily Summary
+                </div>
+                <div class="hint">Includes high-level daily totals (TDD, Basal, Bolus).</div>
+                <div class="column-grid" id="cols-daily">
+                    <!-- Daily Columns -->
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-title">
+                    <input type="checkbox" id="sheet-hourly" checked onchange="toggleSheet('hourly')">
+                    Hourly Trends
+                </div>
+                <div class="hint">Granular hourly rollups for pattern identification.</div>
+                <div class="column-grid" id="cols-hourly">
+                    <!-- Hourly Columns -->
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-title">
+                    <input type="checkbox" id="sheet-timeline" checked onchange="toggleSheet('timeline')">
+                    Event Timeline (High Fidelity)
+                </div>
+                <div class="hint">Chronological view merging Treatments, CGM, and Metabolic State.</div>
+                <div class="column-grid" id="cols-timeline">
+                    <!-- Timeline Columns -->
+                </div>
+            </div>
+        </div>
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+
+    <script>
+
+        // Set external links dynamically
+
+        const config = {
+            daily: [
+                { group: "", cols: ["Date", "Avg_BG", "Carbs", "Data_Points"] },
+                { group: "Glycemic Ranges", cols: ["VLow", "Low", "TITR", "TIR", "High", "VHigh"] },
+                { group: "Metabolic Indices", cols: ["GMI", "LBGI", "HBGI", "GVI", "SD (mmol/L)"] },
+                { group: "Insulin (Totals)", cols: ["Total_Basal", "Total_Bolus", "TDD"] },
+                { group: "Insulin (Detailed components)", cols: ["SMB", "Meal Bolus", "Correction Bolus", "Scheduled_Basal", "Temp_Basal_Impact"] }
+            ],
+            hourly: ["Timestamp", "Avg_BG", "Basal", "Bolus", "Total_Insulin", "Carbs", "Avg_IOB", "Avg_COB", "Avg_Deviation", "Avg_ISF", "Avg_Sensitivity"],
+            timeline: ["Time", "Event Type", "BG", "Insulin", "Carbs", "IOB", "COB", "ISF", "Deviation"]
+        };
+
+        function renderCol(sheet, col, container, saved) {
+            const id = `col-${sheet}-${col}`;
+            const checked = saved[sheet] ? (saved[sheet].cols.includes(col)) : true;
+
+            let labelText = col.replace(/_/g, ' ');
+            if (["BG", "Avg BG", "Deviation", "Avg Deviation"].includes(labelText)) {
+                labelText += " (mmol/L)";
+            } else if (["ISF", "Avg ISF"].includes(labelText)) {
+                labelText += " (mmol/L/U)";
+            } else if (["TIR", "TITR", "TIKR", "VLow", "Low", "High", "VHigh"].includes(labelText)) {
+                const rangeMap = {
+                    "VLow": " (<3.0)",
+                    "Low": " (3.0-3.9)",
+                    "TITR": " (3.9-7.8)",
+                    "TIR": " (3.9-10.0)",
+                    "High": " (10.0-13.9)",
+                    "VHigh": " (>13.9)"
+                };
+                labelText += " (%)" + (rangeMap[col] || "");
+            } else if (labelText === "Data Points") {
+                labelText = "Record Count";
+            } else if (labelText === "GMI") {
+                labelText += " (%)";
+            } else if (labelText === "Avg Sensitivity") {
+                labelText = "Sensitivity Ratio (Autosens)";
+            }
+
+            const div = document.createElement('div');
+            div.className = 'checkbox-group';
+            div.innerHTML = `
+                <input type="checkbox" id="${id}" data-sheet="${sheet}" data-col="${col}" ${checked ? 'checked' : ''} onchange="saveState()">
+                <label for="${id}">${labelText}</label>
+            `;
+            container.appendChild(div);
+        }
+
+        function init() {
+            // Load selections from localStorage
+            const saved = JSON.parse(localStorage.getItem('export_selections') || '{}');
+
+            // Set default dates or loaded dates
+            const today = new Date().toISOString().split('T')[0];
+            const lastWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            document.getElementById('export-start').value = saved.start || lastWeek;
+            document.getElementById('export-end').value = saved.end || today;
+            if (saved.format) document.getElementById('export-format').value = saved.format;
+            updateDownloadButtonLabel();
+
+            // Render columns
+            for (const sheet in config) {
+                const container = document.getElementById(`cols-${sheet}`);
+                const sheetCheckbox = document.getElementById(`sheet-${sheet}`);
+
+                // Set sheet checkbox state
+                if (saved[sheet] !== undefined) {
+                    sheetCheckbox.checked = saved[sheet].enabled;
+                }
+
+                container.innerHTML = ''; // Clear for re-render
+
+                const items = config[sheet];
+                if (Array.isArray(items) && items.length > 0 && typeof items[0] === 'object') {
+                    // Grouped rendering
+                    items.forEach(group => {
+                        const groupDiv = document.createElement('div');
+                        groupDiv.className = 'col-group';
+                        if (group.group) {
+                            groupDiv.innerHTML = `<div class="group-label">${group.group}</div>`;
+                        }
+
+                        const innerGrid = document.createElement('div');
+                        innerGrid.className = 'column-grid-inner';
+
+                        group.cols.forEach(col => renderCol(sheet, col, innerGrid, saved));
+
+                        groupDiv.appendChild(innerGrid);
+                        container.appendChild(groupDiv);
+                    });
+                } else {
+                    // Standard rendering
+                    items.forEach(col => renderCol(sheet, col, container, saved));
+                }
+            }
+
+            // Add listeners for top-level fields
+            ['export-start', 'export-end', 'export-format', 'sheet-daily', 'sheet-hourly', 'sheet-timeline'].forEach(id => {
+                document.getElementById(id).addEventListener('change', saveState);
+            });
+            document.getElementById('export-format').addEventListener('change', updateDownloadButtonLabel);
+
+            function updateDownloadButtonLabel() {
+                const fmt = document.getElementById('export-format').value;
+                const icon = document.getElementById('export-download-icon');
+                const label = document.getElementById('export-download-label');
+                if (fmt === 'xlsx') {
+                    icon.className = 'fas fa-file-excel';
+                    label.textContent = 'Download XLSX';
+                } else {
+                    icon.className = 'fas fa-file-csv';
+                    label.textContent = 'Download CSV';
+                }
+            }
+
+            toggleSheetVisibility();
+        }
+
+        function toggleSheet(sheet) {
+            toggleSheetVisibility();
+            saveState();
+        }
+
+        function toggleSheetVisibility() {
+            ['daily', 'hourly', 'timeline'].forEach(sheet => {
+                const enabled = document.getElementById(`sheet-${sheet}`).checked;
+                const container = document.getElementById(`cols-${sheet}`);
+                container.style.opacity = enabled ? '1' : '0.3';
+                container.style.pointerEvents = enabled ? 'auto' : 'none';
+            });
+        }
+
+        function saveState() {
+            const state = {
+                start: document.getElementById('export-start').value,
+                end: document.getElementById('export-end').value,
+                format: document.getElementById('export-format').value
+            };
+            ['daily', 'hourly', 'timeline'].forEach(sheet => {
+                const enabled = document.getElementById(`sheet-${sheet}`).checked;
+                const cols = [];
+                document.querySelectorAll(`input[data-sheet="${sheet}"]:checked`).forEach(cb => {
+                    cols.push(cb.getAttribute('data-col'));
+                });
+                state[sheet] = { enabled, cols };
+            });
+            localStorage.setItem('export_selections', JSON.stringify(state));
+        }
+
+        async function startExport() {
+            const start = document.getElementById('export-start').value;
+            const end = document.getElementById('export-end').value;
+            const format = document.getElementById('export-format').value;
+            const statusBox = document.getElementById('status');
+
+            if (!start || !end) {
+                statusBox.textContent = "Please select a date range.";
+                statusBox.className = "status-msg error";
+                return;
+            }
+            statusBox.style.display = "none";
+
+            const selections = JSON.parse(localStorage.getItem('export_selections'));
+
+            // Build query params
+            const params = new URLSearchParams({
+                start,
+                end,
+                format,
+                config: JSON.stringify(selections)
+            });
+
+            const url = `/api/export?${params.toString()}`;
+            window.open(url, '_blank');
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

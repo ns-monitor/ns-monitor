@@ -1,0 +1,3157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — ns-monitor</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Gridstack.js vanilla drag/resize engine (MIT, zero-framework) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack-all.js"></script>
+
+    <style>
+        /* Dashboard Header & Slot Switcher */
+        .dash-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .dash-topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .dash-page-title {
+            margin: 0;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text-color);
+            letter-spacing: -0.01em;
+        }
+
+        /* 3-Slot Tabs */
+        .dash-slot-group {
+            display: inline-flex;
+            background: var(--surface-inset, #090d13);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: var(--radius-md, 6px);
+            padding: 3px;
+            gap: 3px;
+        }
+        .dash-slot-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary, #8b949e);
+            padding: 5px 12px;
+            border-radius: var(--radius-sm, 4px);
+            font-size: 0.84rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.12s ease;
+        }
+        .dash-slot-btn:hover {
+            color: var(--text-color, #e6edf3);
+            background: var(--surface-hover, #262c36);
+        }
+        .dash-slot-btn.active {
+            background: var(--surface-raised, #21262d);
+            color: #ffffff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        .dash-slot-num {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            line-height: 18px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            font-size: 0.72rem;
+            text-align: center;
+        }
+        .dash-slot-btn.active .dash-slot-num {
+            background: var(--accent, #2f81f7);
+            color: #ffffff;
+        }
+
+        /* Edit Mode Actions */
+        .dash-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-edit-mode {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 600;
+        }
+
+        /* Edit Mode Notification Banner */
+        .dash-edit-banner {
+            display: none;
+            background: rgba(47, 129, 247, 0.1);
+            border: 1px solid rgba(47, 129, 247, 0.3);
+            border-radius: var(--radius-md, 6px);
+            padding: 10px 16px;
+            margin-bottom: 16px;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .dash-edit-banner.active {
+            display: flex;
+        }
+        .dash-edit-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.88rem;
+            color: #e6edf3;
+        }
+        .dash-edit-info i {
+            color: #58a6ff;
+            font-size: 1.1rem;
+        }
+
+        /* Gridstack Canvas Customization */
+        .grid-stack {
+            margin-bottom: 30px;
+        }
+        .grid-stack-item-content {
+            background: var(--card-bg, #161b22) !important;
+            border: 1px solid var(--border-color, #30363d) !important;
+            border-radius: var(--radius-md, 6px) !important;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
+            overflow: hidden !important;
+            display: flex !important;
+            flex-direction: column !important;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        
+        /* Edit Mode Styling */
+        body.dash-editing .grid-stack {
+            background-image: 
+                /* Bold corner dots at grid snap intersections */
+                radial-gradient(circle at 0 0, #58a6ff 3.5px, transparent 4px),
+                /* Vertical cell boundary dashed lines */
+                linear-gradient(to right, rgba(88, 166, 255, 0.22) 1px, transparent 1px),
+                /* Horizontal cell boundary dashed lines */
+                linear-gradient(to bottom, rgba(88, 166, 255, 0.22) 1px, transparent 1px);
+            background-size: calc(100% / 24) 72px, calc(100% / 24) 72px, calc(100% / 24) 72px;
+            background-position: 0 0;
+            min-height: calc(100vh - 220px);
+            outline: 2px dashed rgba(88, 166, 255, 0.4);
+            border-radius: var(--radius-md, 6px);
+        }
+        body.dash-editing .grid-stack-item-content {
+            border: 1px dashed #58a6ff !important;
+            cursor: move;
+        }
+        body.dash-editing .grid-stack-item-content:hover {
+            box-shadow: 0 4px 14px rgba(47, 129, 247, 0.25) !important;
+        }
+
+        /* Custom Text / Section Header Widget (Frameless in View Mode) */
+        .grid-stack-item[data-widget-type="custom_text_header"] .grid-stack-item-content {
+            background: transparent !important;
+            border: 1px solid transparent !important;
+            box-shadow: none !important;
+        }
+        .grid-stack-item[data-widget-type="custom_text_header"] .widget-header {
+            display: none !important;
+        }
+        body.dash-editing .grid-stack-item[data-widget-type="custom_text_header"] .grid-stack-item-content {
+            border: 1px dashed #58a6ff !important;
+            background: rgba(88, 166, 255, 0.04) !important;
+        }
+        body.dash-editing .grid-stack-item[data-widget-type="custom_text_header"] .widget-header {
+            display: flex !important;
+            background: rgba(88, 166, 255, 0.1) !important;
+        }
+
+        /* Widget Header */
+        .widget-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-color, #30363d);
+            background: rgba(255, 255, 255, 0.015);
+            user-select: none;
+            flex-shrink: 0;
+        }
+        .widget-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-color, #e6edf3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .widget-title i {
+            color: #58a6ff;
+            font-size: 0.9em;
+        }
+        .widget-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .widget-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary, #8b949e);
+            padding: 3px 6px;
+            border-radius: var(--radius-sm, 4px);
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.12s;
+        }
+        .widget-btn:hover {
+            color: #ffffff;
+            background: var(--surface-hover, #262c36);
+        }
+        .widget-btn.btn-remove:hover {
+            color: var(--danger, #f85149);
+            background: rgba(248, 81, 73, 0.15);
+        }
+        .widget-btn.btn-settings:hover {
+            color: var(--accent, #58a6ff);
+        }
+        .widget-btn-edit-only {
+            display: none;
+        }
+        body.dash-editing .widget-btn-edit-only {
+            display: inline-flex;
+        }
+
+        /* Widget Content Area */
+        .widget-body {
+            flex: 1;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Generic Scorecard Pattern (4 Numbers: Today, Yesterday, 14d, Best 14d) */
+        .scorecard-hero {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .scorecard-main-val {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-color, #e6edf3);
+            line-height: 1;
+        }
+        .scorecard-unit {
+            font-size: 0.9rem;
+            color: var(--text-secondary, #8b949e);
+            font-weight: 500;
+            margin-left: 2px;
+        }
+        .scorecard-delta-badge {
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .delta-positive { background: rgba(46, 204, 113, 0.15); color: #2ecc71; }
+        .delta-neutral  { background: rgba(139, 148, 158, 0.15); color: #8b949e; }
+        .delta-negative { background: rgba(248, 81, 73, 0.15); color: #f85149; }
+
+        .scorecard-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            background: var(--surface-inset, #090d13);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: var(--radius-sm, 4px);
+            padding: 6px 8px;
+            margin-top: auto;
+        }
+        .scorecard-subitem {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .scorecard-subitem-lbl {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-tertiary, #6e7681);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .scorecard-subitem-val {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--text-color, #e6edf3);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Pattern 2: Triage Focus Table */
+        .dash-triage-container {
+            height: 100%;
+            overflow-x: auto;
+            overflow-y: auto;
+        }
+        .dash-triage-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+            text-align: right;
+        }
+        .dash-triage-table th {
+            padding: 4px 8px;
+            color: var(--text-secondary, #8b949e);
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color, #30363d);
+            position: sticky;
+            top: 0;
+            background: var(--card-bg, #161b22);
+        }
+        .dash-triage-table td {
+            padding: 5px 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            color: var(--text-color, #e6edf3);
+            font-variant-numeric: tabular-nums;
+        }
+        .dash-triage-table th:first-child,
+        .dash-triage-table td:first-child {
+            text-align: left;
+            font-weight: 600;
+        }
+        .dash-triage-table tr:hover td {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        /* Placeholder Card */
+        .dash-placeholder-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            padding: 8px 12px;
+            color: var(--text-secondary, #8b949e);
+        }
+        .dash-placeholder-icon {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+            opacity: 0.6;
+            color: #58a6ff;
+        }
+        .dash-placeholder-title {
+            font-size: 0.92rem;
+            font-weight: 600;
+            color: #e6edf3;
+            margin-bottom: 4px;
+        }
+        .dash-placeholder-desc {
+            font-size: 0.78rem;
+            line-height: 1.35;
+            color: #8b949e;
+        }
+
+        /* Widget Library Slide-Out Drawer */
+        .lib-drawer-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
+            z-index: 20000;
+        }
+        .lib-drawer-backdrop.open {
+            display: block;
+        }
+        .lib-drawer {
+            position: fixed;
+            top: 0;
+            right: -420px;
+            bottom: 0;
+            width: 400px;
+            background: var(--card-bg, #161b22);
+            border-left: 1px solid var(--border-color, #30363d);
+            box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5);
+            z-index: 20001;
+            display: flex;
+            flex-direction: column;
+            transition: right 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+        }
+        .lib-drawer.open {
+            right: 0;
+        }
+        .lib-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color, #30363d);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .lib-title {
+            margin: 0;
+            font-size: 1.1rem;
+            color: var(--text-color);
+        }
+        .lib-search-box {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border-color, #30363d);
+            background: var(--surface-inset, #090d13);
+        }
+        .lib-search-input {
+            width: 100%;
+            background: var(--surface-raised, #21262d);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: var(--radius-sm, 4px);
+            padding: 8px 12px;
+            color: var(--text-color);
+            font-size: 0.88rem;
+            box-sizing: border-box;
+        }
+        .lib-search-input:focus {
+            outline: none;
+            border-color: #58a6ff;
+            box-shadow: 0 0 0 2px rgba(56, 139, 253, 0.3);
+        }
+        .lib-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .lib-category-title {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-secondary, #8b949e);
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .lib-item-card {
+            background: var(--surface-raised, #21262d);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: var(--radius-sm, 4px);
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            transition: all 0.12s;
+            margin-bottom: 6px;
+        }
+        .lib-item-card:hover {
+            border-color: #58a6ff;
+            background: var(--surface-hover, #262c36);
+        }
+        .lib-item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .lib-item-name {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #e6edf3;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .lib-item-desc {
+            font-size: 0.78rem;
+            color: var(--text-secondary, #8b949e);
+            line-height: 1.3;
+        }
+        .lib-item-badge {
+            font-size: 0.68rem;
+            padding: 1px 5px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.08);
+            color: var(--text-secondary);
+        }
+        .lib-item-card.is-on-dashboard {
+            border-color: rgba(88, 166, 255, 0.5);
+            background: rgba(56, 139, 253, 0.08);
+        }
+        .lib-added-badge {
+            font-size: 0.68rem;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(88, 166, 255, 0.2);
+            color: #58a6ff;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Title Input when Editing */
+        .dash-title-input {
+            background: var(--surface-inset, #090d13);
+            border: 1px solid #58a6ff;
+            border-radius: var(--radius-sm, 4px);
+            color: var(--text-color, #e6edf3);
+            font-size: 1.3rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.25);
+            box-sizing: border-box;
+            max-width: 260px;
+        }
+
+        /* Slot Reorder Pencil Button */
+        .dash-slot-pencil-btn {
+            background: var(--surface-inset, #090d13);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: var(--radius-md, 6px);
+            color: var(--text-secondary, #8b949e);
+            width: 32px;
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.12s ease;
+            flex-shrink: 0;
+        }
+        .dash-slot-pencil-btn:hover {
+            color: #e6edf3;
+            border-color: #58a6ff;
+            background: var(--surface-hover, #262c36);
+        }
+
+        /* Manage Dashboards Modal */
+        .dash-modal-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(2px);
+            z-index: 25000;
+        }
+        .dash-modal-backdrop.open { display: block; }
+        .dash-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 540px;
+            max-width: 95vw;
+            background: var(--card-bg, #161b22);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: var(--radius-md, 8px);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+            z-index: 25001;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .dash-modal.open { display: flex; }
+        .dash-modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color, #30363d);
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+        }
+        .dash-modal-title {
+            margin: 0;
+            font-size: 1.1rem;
+            color: var(--text-color, #e6edf3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .dash-modal-subtitle {
+            font-size: 0.78rem;
+            color: var(--text-secondary, #8b949e);
+            margin-top: 4px;
+        }
+        .dash-modal-body {
+            padding: 16px 20px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        .dash-modal-footer {
+            padding: 12px 20px;
+            border-top: 1px solid var(--border-color, #30363d);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            background: var(--surface-inset, #090d13);
+        }
+        .slot-manager-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .slot-row {
+            background: var(--surface-raised, #21262d);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: var(--radius-sm, 4px);
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.12s, border-color 0.12s;
+            user-select: none;
+        }
+        .slot-row.dragging {
+            opacity: 0.4;
+            border-style: dashed;
+        }
+        .slot-row.drag-over {
+            border-color: #58a6ff;
+            background: var(--surface-hover, #262c36);
+        }
+        .slot-drag-handle {
+            cursor: grab;
+            color: var(--text-tertiary, #6e7681);
+            font-size: 0.95rem;
+            padding: 0 4px;
+        }
+        .slot-drag-handle:active { cursor: grabbing; }
+        .slot-move-btns {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .btn-slot-move {
+            background: none;
+            border: 1px solid var(--border-color, #30363d);
+            color: var(--text-secondary, #8b949e);
+            border-radius: 3px;
+            padding: 1px 4px;
+            font-size: 0.65rem;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .btn-slot-move:hover {
+            color: #e6edf3;
+            border-color: #58a6ff;
+            background: var(--surface-hover, #262c36);
+        }
+        .slot-num-badge {
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            background: var(--surface-inset, #090d13);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 4px;
+            color: var(--text-secondary, #8b949e);
+            white-space: nowrap;
+        }
+        .slot-name-input {
+            flex: 1;
+            background: var(--surface-inset, #090d13);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: var(--radius-sm, 4px);
+            padding: 6px 10px;
+            color: var(--text-color, #e6edf3);
+            font-size: 0.88rem;
+            font-weight: 600;
+        }
+        .slot-name-input:focus {
+            outline: none;
+            border-color: #58a6ff;
+        }
+        .slot-active-pill {
+            font-size: 0.68rem;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 10px;
+            background: rgba(46, 204, 113, 0.15);
+            color: #2ecc71;
+            white-space: nowrap;
+        }
+
+        /* Empty State */
+        .dash-empty-state {
+            padding: 60px 20px;
+            text-align: center;
+            background: var(--surface-inset, #090d13);
+            border: 1px dashed var(--border-color, #30363d);
+            border-radius: var(--radius-md, 6px);
+            color: var(--text-secondary, #8b949e);
+            display: none;
+        }
+        .dash-empty-state.show {
+            display: block;
+        }
+
+        /* Kiosk Mode Styles */
+        body.dash-kiosk-mode .page-header,
+        body.dash-kiosk-mode .nav-header,
+        body.dash-kiosk-mode .top-navbar,
+        body.dash-kiosk-mode .dash-topbar,
+        body.dash-kiosk-mode .dash-edit-banner {
+            display: none !important;
+        }
+        body.dash-kiosk-mode .container.container-fluid {
+            padding: 8px 12px !important;
+            max-width: 100vw !important;
+            margin: 0 !important;
+            width: 100% !important;
+        }
+        .btn-kiosk-toggle {
+            position: fixed;
+            top: 10px;
+            right: 12px;
+            z-index: 10005;
+            background: rgba(22, 27, 34, 0.6);
+            border: 1px solid rgba(48, 54, 61, 0.6);
+            color: var(--text-secondary, #8b949e);
+            border-radius: 4px;
+            padding: 5px 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            opacity: 0.3;
+            transition: opacity 0.15s, color 0.15s, background 0.15s;
+        }
+        .btn-kiosk-toggle:hover {
+            opacity: 1;
+            color: #ffffff;
+            background: var(--surface-hover, #262c36);
+            border-color: #58a6ff;
+        }
+
+        /* Home Assistant Sleep / Standby Overlay */
+        .dash-sleep-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #000000;
+            z-index: 99999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+        }
+        .dash-sleep-overlay.active {
+            display: flex;
+        }
+        .dash-sleep-moon {
+            font-size: 3rem;
+            color: #21262d;
+            margin-bottom: 12px;
+        }
+        .dash-sleep-hint {
+            font-size: 0.78rem;
+            color: #30363d;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    {% include "sidebar.html" %}
+
+    <!-- Floating Kiosk Mode Toggle -->
+    <button type="button" class="btn-kiosk-toggle" id="btn-kiosk-toggle" onclick="toggleKioskMode()" title="Toggle Fullscreen Kiosk Mode">
+        <i class="fa-solid fa-expand" id="kiosk-toggle-icon"></i>
+    </button>
+
+    <!-- Standby Sleep Overlay (HA Display Control) -->
+    <div class="dash-sleep-overlay" id="dash-sleep-overlay" onclick="wakeDashboardFromOverlay()">
+        <div class="dash-sleep-moon"><i class="fa-solid fa-moon"></i></div>
+        <div class="dash-sleep-hint">Tap anywhere to wake</div>
+    </div>
+
+    <div class="container container-fluid" style="padding-top: 14px;" data-initial-slot="{{ initial_slot or '' }}" data-is-kiosk="{{ '1' if is_kiosk else '0' }}">
+        <!-- Topbar: Title, Slots, and Edit Controls -->
+        <div class="dash-topbar">
+            <div class="dash-topbar-left">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <h1 class="dash-page-title" id="dash-title-display">Dashboard</h1>
+                    <input type="text" class="dash-title-input" id="dash-title-input" style="display: none;" placeholder="Dashboard Title..." maxlength="40">
+                </div>
+                
+                <!-- 6-Slot Tabs (Populated dynamically) -->
+                <div class="dash-slot-group" id="dash-slots-container">
+                    <!-- Populated dynamically via renderSlotTabs(slots) -->
+                </div>
+
+                <button type="button" class="dash-slot-pencil-btn" id="btn-manage-slots" onclick="openManageSlotsModal()" title="Manage & Re-order Dashboards">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+            </div>
+
+            <!-- Edit Mode Trigger Buttons -->
+            <div class="dash-actions">
+                <button type="button" class="btn btn-secondary btn-edit-mode" id="btn-toggle-edit" onclick="toggleEditMode()">
+                    <i class="fa-solid fa-pen-ruler"></i>
+                    <span>Edit Layout</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Edit Mode Notification & Actions Banner -->
+        <div class="dash-edit-banner" id="dash-edit-banner">
+            <div class="dash-edit-info">
+                <i class="fa-solid fa-arrows-up-down-left-right"></i>
+                <span><strong>Edit Mode Active:</strong> Drag widgets by their title bar to reposition, or drag bottom-right corners to resize. Changes apply to the currently selected slot.</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button type="button" class="btn btn-secondary" onclick="openWidgetLibrary()">
+                    <i class="fa-solid fa-plus"></i> Add Widget
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="cancelEditMode()">
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-primary" onclick="saveActiveDashboardLayout()">
+                    <i class="fa-solid fa-floppy-disk"></i> Save Layout
+                </button>
+            </div>
+        </div>
+
+        <!-- Empty Grid State -->
+        <div class="dash-empty-state" id="dash-empty-state">
+            <i class="fa-solid fa-cubes" style="font-size: 2.2rem; margin-bottom: 12px; opacity: 0.5;"></i>
+            <h3 style="margin: 0 0 6px 0; color: #e6edf3;">This dashboard slot is empty</h3>
+            <p style="margin: 0 0 16px 0; font-size: 0.9rem;">Add widgets to customize this view for your clinical routine.</p>
+            <button type="button" class="btn btn-primary" onclick="openWidgetLibrary()">
+                <i class="fa-solid fa-plus"></i> Open Widget Library
+            </button>
+        </div>
+
+        <!-- Gridstack Canvas (12 Columns, 60px Chunky Row Units) -->
+        <div class="grid-stack" id="dashboard-grid"></div>
+    </div>
+
+    <!-- Widget Library Drawer -->
+    <div class="lib-drawer-backdrop" id="lib-backdrop" onclick="closeWidgetLibrary()"></div>
+    <aside class="lib-drawer" id="lib-drawer">
+        <div class="lib-header">
+            <h2 class="lib-title">Widget Library</h2>
+            <button type="button" class="widget-btn" onclick="closeWidgetLibrary()" style="font-size:1.1rem;"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="lib-search-box">
+            <input type="text" id="lib-search" class="lib-search-input" placeholder="Search widgets (e.g. TIR, GMI, Battery)..." oninput="filterWidgetLibrary()">
+        </div>
+        <div class="lib-scroll" id="lib-items-list">
+            <!-- Populated dynamically via JS from CATALOG -->
+        </div>
+    </aside>
+
+    <!-- Manage Dashboards Modal -->
+    <div class="dash-modal-backdrop" id="manage-slots-backdrop" onclick="closeManageSlotsModal()"></div>
+    <div class="dash-modal" id="manage-slots-modal">
+        <div class="dash-modal-header">
+            <div>
+                <h2 class="dash-modal-title"><i class="fa-solid fa-table-columns" style="color: #58a6ff;"></i>Manage Dashboards</h2>
+                <div class="dash-modal-subtitle">Drag handles or use the arrows to re-order dashboards. Rename any slot directly.</div>
+            </div>
+            <button type="button" class="widget-btn" onclick="closeManageSlotsModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="dash-modal-body">
+            <div class="slot-manager-list" id="slot-manager-list">
+                <!-- Populated dynamically via JS -->
+            </div>
+        </div>
+        <div class="dash-modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeManageSlotsModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" id="btn-save-slot-reorder" onclick="saveSlotReorder()">
+                <i class="fa-solid fa-check"></i> Save &amp; Apply
+            </button>
+        </div>
+    </div>
+
+    <!-- Configure Widget Settings Modal -->
+    <div class="dash-modal-backdrop" id="widget-settings-backdrop" onclick="closeWidgetConfig()"></div>
+    <div class="dash-modal" id="widget-settings-modal" style="width: 440px;">
+        <div class="dash-modal-header">
+            <div>
+                <h2 class="dash-modal-title"><i class="fa-solid fa-gear" style="color: #58a6ff;"></i><span id="wset-title">Widget Settings</span></h2>
+                <div class="dash-modal-subtitle" id="wset-subtitle">Configure parameters and thresholds</div>
+            </div>
+            <button type="button" class="widget-btn" onclick="closeWidgetConfig()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="dash-modal-body" id="wset-body" style="display:flex;flex-direction:column;gap:14px;">
+            <!-- Generated dynamically based on widget schema -->
+        </div>
+        <div class="dash-modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeWidgetConfig()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="saveWidgetConfig()">
+                <i class="fa-solid fa-check"></i> Save Changes
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // State & Data
+        // =========================================================================
+        var scorecardData = null;
+        var grid = null;
+        var isEditMode = false;
+        var isKioskMode = false;
+        var currentSlot = 1;
+        var currentLayoutData = null;
+        var slotsCache = [];
+        var workingSlots = [];
+        var draggedSlotIndex = null;
+        var wakeLock = null;
+        var sseSource = null;
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function escapeAttr(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+        }
+
+        // =========================================================================
+        // Universal Scorecard & Widget Renderers (Phase 2 Spec)
+        // =========================================================================
+        function renderScorecardMetric(metricKey, unit, isHigherBetter, bestKeyOverride, cfg) {
+            if (!scorecardData) {
+                return '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#8b949e;"><i class="fa-solid fa-spinner fa-spin"></i></div>';
+            }
+            cfg = cfg || {};
+            var rollingWindow = cfg.rolling_window || '14d';
+            var is365 = (cfg.benchmark_period === '365d');
+            var records = (is365 && scorecardData.records_365d) ? scorecardData.records_365d : (scorecardData.records || {});
+            var benchmarkLabel = is365 ? 'Best 365d' : 'Best All-Time';
+
+            var todayObj = scorecardData.today || {};
+            var yestObj = scorecardData.yesterday || {};
+            var rolling = scorecardData.rolling || {};
+
+            var todayVal = todayObj[metricKey];
+            var yestVal = yestObj[metricKey];
+
+            // Resolve baseline value for chosen rolling window (7d, 14d, 30d, 90d, 365d)
+            var baselineKey = metricKey + '_' + rollingWindow;
+            var baselineVal = rolling[baselineKey];
+            if (baselineVal === undefined) baselineVal = todayObj[baselineKey];
+
+            var bKey = bestKeyOverride || metricKey;
+            var bestRec = records[bKey] || { val: null, date: '-' };
+
+            var fmtToday = (todayVal !== null && todayVal !== undefined) ? todayVal + unit : '--';
+            var fmtYest = (yestVal !== null && yestVal !== undefined) ? yestVal + unit : '--';
+            var fmtBaseline = (baselineVal !== null && baselineVal !== undefined) ? baselineVal + unit : '--';
+            var fmtBest = (bestRec.val !== null && bestRec.val !== undefined) ? bestRec.val + unit : '--';
+
+            var baselineLabel = 'Last ' + rollingWindow;
+
+            var deltaHtml = '<span class="scorecard-delta-badge delta-neutral">--</span>';
+            if (todayVal !== null && todayVal !== undefined && baselineVal !== null && baselineVal !== undefined) {
+                var delta = parseFloat((todayVal - baselineVal).toFixed(1));
+                var arrowSign = delta > 0 ? '▲ +' : (delta < 0 ? '▼ ' : '');
+                var isGood = isHigherBetter ? (delta >= 0) : (delta <= 0);
+                var deltaClass = Math.abs(delta) < 0.05 ? 'delta-neutral' : (isGood ? 'delta-positive' : 'delta-negative');
+                deltaHtml = '<span class="scorecard-delta-badge ' + deltaClass + '">' + arrowSign + delta + unit + ' vs ' + rollingWindow + '</span>';
+            }
+
+            return '<div class="scorecard-hero">' +
+                   '<div><span class="scorecard-main-val">' + fmtToday + '</span></div>' +
+                   deltaHtml +
+                   '</div>' +
+                   '<div class="scorecard-grid">' +
+                   '<div class="scorecard-subitem"><span class="scorecard-subitem-lbl">Yesterday</span><span class="scorecard-subitem-val">' + fmtYest + '</span></div>' +
+                   '<div class="scorecard-subitem"><span class="scorecard-subitem-lbl">' + baselineLabel + '</span><span class="scorecard-subitem-val">' + fmtBaseline + '</span></div>' +
+                   '<div class="scorecard-subitem"><span class="scorecard-subitem-lbl">' + benchmarkLabel + '</span><span class="scorecard-subitem-val" title="' + (bestRec.date || '') + '">' + fmtBest + '</span></div>' +
+                   '</div>';
+        }
+
+        function renderStackedRangeBarWidget(cfg) {
+            if (!scorecardData) {
+                return '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#8b949e;"><i class="fa-solid fa-spinner fa-spin"></i></div>';
+            }
+            cfg = cfg || {};
+            var isTight = (cfg.range_type === 'tight');
+            var tf1 = cfg.timeframe_1 || cfg.timeframe || 'today';
+            var tf2 = cfg.timeframe_2 || '14d';
+
+            function getRangeData(tf) {
+                var sourceObj = {};
+                var tfLabel = 'Today';
+                if (tf === 'today') {
+                    sourceObj = scorecardData.today || {};
+                    tfLabel = 'Today (Live)';
+                } else if (tf === 'yesterday') {
+                    sourceObj = scorecardData.yesterday || {};
+                    tfLabel = 'Yesterday';
+                } else {
+                    var rolling = scorecardData.rolling || {};
+                    sourceObj = {
+                        vlow: rolling['vlow_' + tf],
+                        tbr: rolling['tbr_' + tf],
+                        tir: rolling['tir_' + tf],
+                        tar: rolling['tar_' + tf],
+                        titr: rolling['titr_' + tf],
+                        tatr: rolling['tatr_' + tf],
+                        vhigh: rolling['vhigh_' + tf]
+                    };
+                    var labelMap = {
+                        '7d': 'Rolling 7 Days',
+                        '14d': 'Rolling 14 Days',
+                        '30d': 'Rolling 30 Days',
+                        '90d': 'Rolling 90 Days',
+                        '365d': 'Rolling 365 Days'
+                    };
+                    tfLabel = labelMap[tf] || ('Last ' + tf);
+                }
+
+                var vlow = parseFloat(sourceObj.vlow || 0);
+                var tbr = parseFloat(sourceObj.tbr || 0);
+                var low = Math.max(0, parseFloat((tbr - vlow).toFixed(1)));
+                var vhigh = parseFloat(sourceObj.vhigh || 0);
+
+                var inRange = 0;
+                var high = 0;
+
+                if (isTight) {
+                    inRange = parseFloat(sourceObj.titr || 0);
+                    var tatr = parseFloat(sourceObj.tatr !== undefined ? sourceObj.tatr : Math.max(0, 100.0 - inRange - tbr));
+                    high = Math.max(0, parseFloat((tatr - vhigh).toFixed(1)));
+                } else {
+                    inRange = parseFloat(sourceObj.tir || 0);
+                    var tar = parseFloat(sourceObj.tar || 0);
+                    high = Math.max(0, parseFloat((tar - vhigh).toFixed(1)));
+                }
+
+                return {
+                    tf: tf,
+                    label: tfLabel,
+                    vlow: vlow,
+                    low: low,
+                    inRange: inRange,
+                    high: high,
+                    vhigh: vhigh
+                };
+            }
+
+            function renderBarRow(data) {
+                var rangeBadgeLabel = isTight ? 'In Tight Range' : 'In Range';
+                var targetBandName = isTight ? 'In Tight Range' : 'In Range';
+                var targetBandRange = isTight ? '3.9–7.8' : '3.9–10.0';
+                var targetColor = isTight ? '#1b5e20' : '#4caf50';
+                var highBandRange = isTight ? '7.9–13.9' : '10.1–13.9';
+
+                // Clinical horizontal order: Low to High (V.Low -> Low -> In Range -> High -> V.High) matching Patterns TIR Heat
+                var bands = [
+                    { key: 'vlow', name: 'Very Low', range: '< 3.0', val: data.vlow, color: '#7f0000', textCol: '#ffffff' },
+                    { key: 'low', name: 'Low', range: '3.0–3.8', val: data.low, color: '#e74c3c', textCol: '#ffffff' },
+                    { key: 'in_range', name: targetBandName, range: targetBandRange, val: data.inRange, color: targetColor, textCol: '#ffffff' },
+                    { key: 'high', name: 'High', range: highBandRange, val: data.high, color: '#f1c40f', textCol: '#000000' },
+                    { key: 'vhigh', name: 'Very High', range: '> 13.9', val: data.vhigh, color: '#e67e22', textCol: '#ffffff' }
+                ];
+
+                var segmentsHtml = '';
+                bands.forEach(function(b) {
+                    var pct = b.val;
+                    if (pct <= 0) return;
+                    var showLabel = pct >= 6.0;
+
+                    segmentsHtml += 
+                        '<div style="width:' + pct + '%;height:100%;background:' + b.color + ';color:' + b.textCol + ';' +
+                        'display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;' +
+                        'white-space:nowrap;overflow:hidden;transition:width 0.3s ease;" ' +
+                        'title="' + b.name + ' (' + b.range + ' mmol/L): ' + pct.toFixed(1) + '%">' +
+                        (showLabel ? (Math.round(pct) + '%') : '') +
+                        '</div>';
+                });
+
+                return '<div style="display:flex;flex-direction:column;gap:4px;">' +
+                       '<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;">' +
+                       '<span style="font-weight:600;color:#c9d1d9;">' + data.label + '</span>' +
+                       '<span style="font-size:0.74rem;color:#8b949e;"><strong style="color:' + (isTight ? '#4caf50' : '#4caf50') + ';">' + data.inRange.toFixed(1) + '%</strong> ' + rangeBadgeLabel + '</span>' +
+                       '</div>' +
+                       '<div style="display:flex;height:20px;width:100%;border-radius:4px;overflow:hidden;background:#21262d;box-shadow:inset 0 1px 2px rgba(0,0,0,0.4);">' +
+                       segmentsHtml +
+                       '</div>' +
+                       '</div>';
+            }
+
+            var d1 = getRangeData(tf1);
+            var d2 = getRangeData(tf2);
+
+            var bar1Html = renderBarRow(d1);
+            var bar2Html = renderBarRow(d2);
+
+            var inRangeLegendText = isTight ? 'In Tight 3.9–7.8' : 'In Range 3.9–10.0';
+            var inRangeLegendColor = isTight ? '#1b5e20' : '#4caf50';
+            var highLegendText = isTight ? 'High 7.9–13.9' : 'High 10.1–13.9';
+
+            var legendHtml = 
+                '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px 8px;font-size:0.68rem;color:#8b949e;padding-top:4px;border-top:1px solid rgba(255,255,255,0.06);margin-top:auto;">' +
+                '<div style="display:flex;align-items:center;gap:3px;"><span style="width:7px;height:7px;border-radius:2px;background:#7f0000;display:inline-block;"></span><span>V.Low &lt;3.0</span></div>' +
+                '<div style="display:flex;align-items:center;gap:3px;"><span style="width:7px;height:7px;border-radius:2px;background:#e74c3c;display:inline-block;"></span><span>Low 3.0–3.8</span></div>' +
+                '<div style="display:flex;align-items:center;gap:3px;"><span style="width:7px;height:7px;border-radius:2px;background:' + inRangeLegendColor + ';display:inline-block;"></span><span>' + inRangeLegendText + '</span></div>' +
+                '<div style="display:flex;align-items:center;gap:3px;"><span style="width:7px;height:7px;border-radius:2px;background:#f1c40f;display:inline-block;"></span><span>' + highLegendText + '</span></div>' +
+                '<div style="display:flex;align-items:center;gap:3px;"><span style="width:7px;height:7px;border-radius:2px;background:#e67e22;display:inline-block;"></span><span>V.High &gt;13.9</span></div>' +
+                '</div>';
+
+            return '<div style="display:flex;flex-direction:column;justify-content:space-between;height:100%;padding:2px 0;gap:6px;">' +
+                   bar1Html +
+                   '<div style="border-top:1px solid rgba(255,255,255,0.08);margin:1px 0;"></div>' +
+                   bar2Html +
+                   legendHtml +
+                   '</div>';
+        }
+
+        function renderCustomTextHeaderWidget(cfg) {
+            cfg = cfg || {};
+            var text = cfg.text || 'Clinical Focus';
+            var align = cfg.align || 'left';
+            var size = cfg.size || 'hero';
+            var color = cfg.color || 'white';
+
+            var fontSize = '1.8rem';
+            if (size === 'medium') fontSize = '1.3rem';
+            else if (size === 'small') fontSize = '1.0rem';
+
+            var fontColor = '#e6edf3';
+            if (color === 'muted') fontColor = '#8b949e';
+            else if (color === 'accent') fontColor = '#58a6ff';
+
+            var justify = 'flex-start';
+            var textAlign = 'left';
+            if (align === 'center') {
+                justify = 'center';
+                textAlign = 'center';
+            } else if (align === 'right') {
+                justify = 'flex-end';
+                textAlign = 'right';
+            }
+
+            return '<div style="display:flex;align-items:center;height:100%;width:100%;padding:0 6px;justify-content:' + justify + ';text-align:' + textAlign + ';">' +
+                   '<span style="font-size:' + fontSize + ';font-weight:700;color:' + fontColor + ';line-height:1.2;letter-spacing:-0.01em;">' +
+                   escapeHtml(text) +
+                   '</span></div>';
+        }
+
+        function renderHypoStreakWidget(cfg) {
+            cfg = cfg || {};
+            var isAny = String(cfg.hypo_threshold) === '3.9';
+            var streak = isAny ? (scorecardData && scorecardData.streak_any ? scorecardData.streak_any : { days: 0, last_date: 'None recorded' })
+                               : (scorecardData && (scorecardData.streak_severe || scorecardData.streak) ? (scorecardData.streak_severe || scorecardData.streak) : { days: 0, last_date: 'None recorded' });
+            var sublabel = isAny ? 'Days Streak (No BG < 3.9)' : 'Days Streak (No BG < 3.0)';
+            return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;">' +
+                   '<div style="font-size:2.4rem;font-weight:800;color:#2ecc71;">' + streak.days + '</div>' +
+                   '<div style="font-size:0.82rem;color:#8b949e;font-weight:600;text-transform:uppercase;">' + escapeHtml(sublabel) + '</div>' +
+                   '<div style="font-size:0.75rem;color:#6e7681;margin-top:4px;">Last event: ' + escapeHtml(streak.last_date || 'None recorded') + '</div>' +
+                   '</div>';
+        }
+
+        function renderTriageTableWidget(cfg) {
+            cfg = cfg || {};
+            var today = (scorecardData && scorecardData.today) || {};
+            var yest = (scorecardData && scorecardData.yesterday) || {};
+            var roll = (scorecardData && scorecardData.rolling) || {};
+
+            function f(val, unit) {
+                return (val !== null && val !== undefined) ? val + unit : '--';
+            }
+
+            var rows = [
+                { name: 'TIR (3.9–10.0)', today: f(today.tir, '%'), yest: f(yest.tir, '%'), d7: f(roll.tir_7d, '%'), d14: f(roll.tir_14d, '%'), d30: f(roll.tir_30d, '%'), d90: f(roll.tir_90d, '%'), delta: (today.tir !== undefined && roll.tir_14d !== undefined) ? (today.tir - roll.tir_14d) : 0, isHigherBetter: true },
+                { name: 'TITR (3.9–7.8)', today: f(today.titr, '%'), yest: f(yest.titr, '%'), d7: f(roll.titr_7d, '%'), d14: f(roll.titr_14d, '%'), d30: f(roll.titr_30d, '%'), d90: f(roll.titr_90d, '%'), delta: (today.titr !== undefined && roll.titr_14d !== undefined) ? (today.titr - roll.titr_14d) : 0, isHigherBetter: true },
+                { name: 'TBR (< 3.9)', today: f(today.tbr, '%'), yest: f(yest.tbr, '%'), d7: f(roll.tbr_7d, '%'), d14: f(roll.tbr_14d, '%'), d30: f(roll.tbr_30d, '%'), d90: f(roll.tbr_90d, '%'), delta: (today.tbr !== undefined && roll.tbr_14d !== undefined) ? (today.tbr - roll.tbr_14d) : 0, isHigherBetter: false },
+                { name: 'TAR (> 10.0)', today: f(today.tar, '%'), yest: f(yest.tar, '%'), d7: f(roll.tar_7d, '%'), d14: f(roll.tar_14d, '%'), d30: f(roll.tar_30d, '%'), d90: f(roll.tar_90d, '%'), delta: (today.tar !== undefined && roll.tar_14d !== undefined) ? (today.tar - roll.tar_14d) : 0, isHigherBetter: false },
+                { name: 'Mean Glucose', today: f(today.mean_mmol, ''), yest: f(yest.mean_mmol, ''), d7: f(roll.mean_7d, ''), d14: f(roll.mean_14d, ''), d30: f(roll.mean_30d, ''), d90: f(roll.mean_90d, ''), delta: (today.mean_mmol !== undefined && roll.mean_14d !== undefined) ? (today.mean_mmol - roll.mean_14d) : 0, isHigherBetter: false },
+                { name: 'GMI (Est. A1c)', today: f(today.gmi, '%'), yest: f(yest.gmi, '%'), d7: f(roll.gmi_7d, '%'), d14: f(roll.gmi_14d, '%'), d30: f(roll.gmi_30d, '%'), d90: f(roll.gmi_90d, '%'), delta: (today.gmi !== undefined && roll.gmi_14d !== undefined) ? (today.gmi - roll.gmi_14d) : 0, isHigherBetter: false },
+                { name: 'CV (%)', today: f(today.cv, '%'), yest: f(yest.cv, '%'), d7: f(roll.cv_7d, '%'), d14: f(roll.cv_14d, '%'), d30: f(roll.cv_30d, '%'), d90: f(roll.cv_90d, '%'), delta: (today.cv !== undefined && roll.cv_14d !== undefined) ? (today.cv - roll.cv_14d) : 0, isHigherBetter: false },
+                { name: 'GRI', today: f(today.gri, ''), yest: f(yest.gri, ''), d7: f(roll.gri_7d, ''), d14: f(roll.gri_14d, ''), d30: f(roll.gri_30d, ''), d90: f(roll.gri_90d, ''), delta: (today.gri !== undefined && roll.gri_14d !== undefined) ? (today.gri - roll.gri_14d) : 0, isHigherBetter: false }
+            ];
+
+            if (cfg.sort_order === 'worst_first') {
+                rows.sort(function(a, b) {
+                    var scoreA = a.isHigherBetter ? -a.delta : a.delta;
+                    var scoreB = b.isHigherBetter ? -b.delta : b.delta;
+                    return scoreB - scoreA;
+                });
+            } else if (cfg.sort_order === 'best_first') {
+                rows.sort(function(a, b) {
+                    var scoreA = a.isHigherBetter ? -a.delta : a.delta;
+                    var scoreB = b.isHigherBetter ? -b.delta : b.delta;
+                    return scoreA - scoreB;
+                });
+            }
+
+            var html = '<div class="dash-triage-container"><table class="dash-triage-table"><thead><tr>' +
+                       '<th>Metric</th><th>Today</th><th>Yest</th><th>7d</th><th>14d</th><th>30d</th><th>90d</th>' +
+                       '</tr></thead><tbody>';
+            rows.forEach(function(r) {
+                html += '<tr><td>' + r.name + '</td><td>' + r.today + '</td><td>' + r.yest + '</td><td>' + r.d7 + '</td><td style="font-weight:700;color:#58a6ff;">' + r.d14 + '</td><td>' + r.d30 + '</td><td>' + r.d90 + '</td></tr>';
+            });
+            html += '</tbody></table></div>';
+            return html;
+        }
+
+        function getTrendArrowGlyph(dir) {
+            switch(dir) {
+                case 'Flat': return '→';
+                case 'SingleUp': return '↑';
+                case 'DoubleUp': return '⇈';
+                case 'FortyFiveUp': return '↗';
+                case 'FortyFiveDown': return '↘';
+                case 'SingleDown': return '↓';
+                case 'DoubleDown': return '⇊';
+                default: return '→';
+            }
+        }
+
+        function renderCurrentBgHero() {
+            var tel = (scorecardData && scorecardData.telemetry) ? scorecardData.telemetry : {};
+            var sgNum = (tel.sg_mmol !== undefined && tel.sg_mmol !== null) ? parseFloat(tel.sg_mmol) : NaN;
+            var sg = !isNaN(sgNum) ? sgNum.toFixed(1) : '--';
+            var arrow = getTrendArrowGlyph(tel.direction);
+            var deltaNum = (tel.delta_mmol !== undefined && tel.delta_mmol !== null) ? parseFloat(tel.delta_mmol) : NaN;
+            var delta = !isNaN(deltaNum) ? (deltaNum > 0 ? '+' : '') + deltaNum.toFixed(1) + ' mmol' : '--';
+            var mins = (tel.mins_ago !== undefined && tel.mins_ago !== null) ? tel.mins_ago : 0;
+            var timeStr = tel.is_stale ? 'Stale (' + mins + 'm ago)' : 'Synced ' + mins + 'm ago';
+
+            var sgColor = '#e6edf3';
+            if (!isNaN(sgNum)) {
+                if (sgNum < 3.9) sgColor = '#f85149';
+                else if (sgNum <= 10.0) sgColor = '#2ecc71';
+                else if (sgNum <= 13.9) sgColor = '#f1c40f';
+                else sgColor = '#f85149';
+            }
+
+            var deltaClass = (!isNaN(deltaNum) && deltaNum > 0) ? 'delta-positive' : 'delta-neutral';
+
+            return '<div style="display:flex;flex-direction:column;justify-content:center;height:100%;">' +
+                   '<div style="display:flex;align-items:baseline;justify-content:space-between;">' +
+                   '<div style="font-size:2.4rem;font-weight:800;color:' + sgColor + ';" id="dash-live-bg">' + sg + ' <span style="font-size:1.4rem;">' + arrow + '</span></div>' +
+                   '<div class="scorecard-delta-badge ' + deltaClass + '" id="dash-live-delta">' + delta + '</div>' +
+                   '</div>' +
+                   '<div style="font-size:0.78rem;color:#8b949e;margin-top:8px;" id="dash-live-time">' + timeStr + '</div>' +
+                   '</div>';
+        }
+
+        function renderIobCobWidget() {
+            var tel = (scorecardData && scorecardData.telemetry) ? scorecardData.telemetry : {};
+            var iob = (tel.iob !== undefined && tel.iob !== null) ? parseFloat(tel.iob).toFixed(2) : '0.00';
+            var cob = (tel.cob !== undefined && tel.cob !== null) ? Math.round(parseFloat(tel.cob)) : '0';
+
+            return '<div style="display:flex;align-items:center;justify-content:space-around;height:100%;">' +
+                   '<div style="text-align:center;">' +
+                   '<div style="font-size:0.72rem;color:#8b949e;font-weight:700;text-transform:uppercase;">Insulin on Board</div>' +
+                   '<div style="font-size:1.8rem;font-weight:700;color:#58a6ff;" id="dash-live-iob">' + iob + ' <span style="font-size:0.9rem;">U</span></div>' +
+                   '</div>' +
+                   '<div style="width:1px;height:40px;background:var(--border-color);"></div>' +
+                   '<div style="text-align:center;">' +
+                   '<div style="font-size:0.72rem;color:#8b949e;font-weight:700;text-transform:uppercase;">Carbs on Board</div>' +
+                   '<div style="font-size:1.8rem;font-weight:700;color:#f1c40f;" id="dash-live-cob">' + cob + ' <span style="font-size:0.9rem;">g</span></div>' +
+                   '</div>' +
+                   '</div>';
+        }
+
+        function renderRecentNotesWidget(cfg) {
+            var notes = (scorecardData && scorecardData.recent_notes) ? scorecardData.recent_notes : [];
+            if (!notes || notes.length === 0) {
+                return '<div style="color:#8b949e;text-align:center;font-size:0.85rem;padding:12px;">No clinical diary notes logged yet.</div>';
+            }
+
+            var maxItems = parseInt((cfg && cfg.max_items) || 3, 10);
+            var html = '<div style="display:flex;flex-direction:column;gap:6px;justify-content:center;height:100%;font-size:0.82rem;">';
+            notes.slice(0, maxItems).forEach(function(n) {
+                var d = new Date(n.ts);
+                var timeLabel = '';
+                if (n.date_str) {
+                    var parts = n.date_str.split('-');
+                    if (parts.length === 3) {
+                        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                        var mIdx = parseInt(parts[1], 10) - 1;
+                        timeLabel = months[mIdx] + ' ' + parseInt(parts[2], 10);
+                    } else {
+                        timeLabel = n.date_str;
+                    }
+                } else if (!isNaN(d)) {
+                    timeLabel = d.toLocaleDateString([], {month:'short', day:'numeric'});
+                }
+                var text = n.notes || 'Clinical Note';
+                var href = n.id ? ('/diary?note=' + n.id) : '/diary';
+                html += '<a href="' + href + '" style="color:#c9d1d9;text-decoration:none;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:4px;" title="View in Diary Studio">' +
+                        '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px;"><i class="fa-solid fa-pen-to-square" style="font-size:0.75rem;margin-right:6px;color:#58a6ff;opacity:0.8;"></i>' + escapeHtml(text) + '</span>' +
+                        '<span style="color:#8b949e;white-space:nowrap;font-size:0.75rem;">' + timeLabel + '</span></a>';
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function computePodStatus(pod, cfg) {
+            if (!pod || pod.age_hours === null || !pod.last_ts) {
+                return { remHours: 0, remStr: '--', expiryLabel: 'No pod change recorded', isRed: false, statusColor: '#8b949e', cutoffLimit: 80 };
+            }
+            cfg = cfg || {};
+            var cutoffLimit = parseInt(cfg.cutoff_hours || 80, 10);
+            var podStart = new Date(pod.last_ts);
+            var cutoffTime = new Date(podStart.getTime() + (cutoffLimit * 3600 * 1000));
+            var now = new Date();
+            var remHours = (cutoffTime.getTime() - now.getTime()) / (3600 * 1000);
+
+            var remStr = '';
+            if (remHours <= 0) {
+                remStr = 'OVERDUE';
+            } else {
+                var rh = Math.floor(remHours);
+                var rm = Math.round((remHours - rh) * 60);
+                remStr = rh + 'h ' + (rm < 10 ? '0' : '') + rm + 'm';
+            }
+
+            var isToday = cutoffTime.toDateString() === now.toDateString();
+            var tom = new Date(now.getTime() + 86400000);
+            var isTom = cutoffTime.toDateString() === tom.toDateString();
+            var timeStr = (cutoffTime.getHours() < 10 ? '0' : '') + cutoffTime.getHours() + ':' + (cutoffTime.getMinutes() < 10 ? '0' : '') + cutoffTime.getMinutes();
+            var expiryLabel = isToday ? ('Today ' + timeStr) : (isTom ? ('Tomorrow ' + timeStr) : cutoffTime.toLocaleDateString([], {weekday:'short', day:'numeric', month:'short'}) + ' ' + timeStr);
+
+            var qStartStr = cfg.quiet_start || '21:00';
+            var qEndStr = cfg.quiet_end || '09:00';
+            var qStartParts = qStartStr.split(':');
+            var qEndParts = qEndStr.split(':');
+            var qStartH = parseInt(qStartParts[0] || 21, 10);
+            var qStartM = parseInt(qStartParts[1] || 0, 10);
+            var qEndH = parseInt(qEndParts[0] || 9, 10);
+            var qEndM = parseInt(qEndParts[1] || 0, 10);
+
+            var isRed = false;
+            if (remHours <= 0) {
+                isRed = true;
+            } else {
+                var quietTonightStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), qStartH, qStartM, 0);
+                var quietTomorrowEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, qEndH, qEndM, 0);
+                var quietTodayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), qEndH, qEndM, 0);
+
+                if (cutoffTime <= quietTonightStart) {
+                    isRed = true;
+                } else if (cutoffTime >= quietTonightStart && cutoffTime <= quietTomorrowEnd) {
+                    isRed = (now >= quietTodayEnd);
+                } else {
+                    isRed = false;
+                }
+            }
+
+            return {
+                remHours: remHours,
+                remStr: remStr,
+                expiryLabel: expiryLabel,
+                isRed: isRed,
+                statusColor: isRed ? '#f85149' : '#2ecc71',
+                cutoffLimit: cutoffLimit
+            };
+        }
+
+        function renderPodCountdownWidget(cfg) {
+            cfg = cfg || {};
+            var pod = (scorecardData && scorecardData.device_health && scorecardData.device_health.pod) ? scorecardData.device_health.pod : null;
+            if (!pod || pod.age_hours === null) {
+                return '<div style="color:#8b949e;text-align:center;padding:12px;font-size:0.85rem;">No pod change recorded.</div>';
+            }
+
+            var status = computePodStatus(pod, cfg);
+
+            return '<div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;">' +
+                   '<div style="font-size:1.9rem;font-weight:800;color:' + status.statusColor + ';" id="dash-live-pod-rem">' + status.remStr + '</div>' +
+                   '<div style="font-size:0.72rem;color:#8b949e;font-weight:600;text-transform:uppercase;margin-top:2px;">To ' + status.cutoffLimit + 'h Cutoff</div>' +
+                   '<div style="font-size:0.75rem;font-weight:600;color:' + (status.isRed ? '#f85149' : '#c9d1d9') + ';margin-top:6px;" id="dash-live-pod-exp"><i class="fa-solid fa-bell" style="font-size:0.68rem;margin-right:4px;opacity:0.75;"></i>Expires: ' + escapeHtml(status.expiryLabel) + '</div>' +
+                   '</div>';
+        }
+
+        function renderSensorTimerWidget(cfg) {
+            cfg = cfg || {};
+            var sensor = (scorecardData && scorecardData.device_health && scorecardData.device_health.sensor) ? scorecardData.device_health.sensor : null;
+            var sensorName = cfg.sensor_name || 'Dexcom G6';
+            var sessionDays = parseInt(cfg.session_days || 10, 10);
+
+            if (!sensor || sensor.age_days === null) {
+                return '<div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;">' +
+                       '<div style="font-size:1.3rem;font-weight:700;color:#58a6ff;">' + escapeHtml(sensorName) + '</div>' +
+                       '<div style="font-size:0.75rem;color:#8b949e;margin-top:4px;">No insertion logged</div>' +
+                       '</div>';
+            }
+
+            var ageDays = (sensor.age_days !== undefined && sensor.age_days !== null) ? sensor.age_days : 0;
+            var remDays = Math.max(0.0, sessionDays - ageDays);
+            var remStr = '';
+            if (remDays <= 0) {
+                remStr = 'EXPIRED';
+            } else {
+                var d = Math.floor(remDays);
+                var h = Math.round((remDays - d) * 24);
+                remStr = (d > 0 ? (d + 'd ') : '') + h + 'h';
+            }
+
+            var isLow = remDays <= 1.0;
+            var statusColor = (remDays <= 0) ? '#f85149' : (isLow ? '#f1c40f' : '#2ecc71');
+            var expiryStr = sensor.expiry_label ? ('Expires: ' + sensor.expiry_label) : ('Age: ' + ageDays + ' days');
+
+            return '<div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;">' +
+                   '<div style="font-size:1.9rem;font-weight:800;color:' + statusColor + ';" id="dash-live-sensor-rem">' + remStr + '</div>' +
+                   '<div style="font-size:0.72rem;color:#8b949e;font-weight:600;text-transform:uppercase;margin-top:2px;">' + escapeHtml(sensorName) + ' (' + sessionDays + 'd)</div>' +
+                   '<div style="font-size:0.75rem;color:#c9d1d9;margin-top:6px;"><i class="fa-solid fa-clock" style="font-size:0.68rem;margin-right:4px;color:#58a6ff;"></i>' + escapeHtml(expiryStr) + '</div>' +
+                   '</div>';
+        }
+
+        function renderReservoirWidget(cfg) {
+            cfg = cfg || {};
+            var hw = (scorecardData && scorecardData.device_health && scorecardData.device_health.hardware) ? scorecardData.device_health.hardware : {};
+            var resVal = hw.reservoir;
+            var isFloor = hw.is_reservoir_floor;
+            var lowThresh = parseFloat(cfg.low_threshold || 50);
+
+            if (resVal === undefined || resVal === null) {
+                return '<div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;">' +
+                       '<div style="font-size:1.9rem;font-weight:700;color:#8b949e;">-- <span style="font-size:1.0rem;">U</span></div>' +
+                       '<div style="font-size:0.75rem;color:#8b949e;">No reservoir data</div>' +
+                       '</div>';
+            }
+
+            var num = parseFloat(resVal);
+            var isLow = !isNaN(num) && num <= lowThresh;
+            var displayStr = (isFloor || num <= 50) ? '&lt; 50' : Math.round(num);
+            var subDesc = isFloor ? 'Omnipod 50U floor' : 'Insulin Remaining';
+
+            return '<div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;">' +
+                   '<div style="font-size:1.9rem;font-weight:800;color:' + (isLow ? '#f85149' : '#58a6ff') + ';" id="dash-live-reservoir">' + displayStr + ' <span style="font-size:1.0rem;font-weight:600;">U</span></div>' +
+                   '<div style="font-size:0.72rem;color:#8b949e;font-weight:600;text-transform:uppercase;margin-top:2px;">' + subDesc + '</div>' +
+                   '<div style="font-size:0.72rem;color:#6e7681;margin-top:4px;">' + escapeHtml(hw.pump_status || 'Pump Connected') + '</div>' +
+                   '</div>';
+        }
+
+        function renderBatteryWidget(cfg) {
+            cfg = cfg || {};
+            var hw = (scorecardData && scorecardData.device_health && scorecardData.device_health.hardware) ? scorecardData.device_health.hardware : {};
+            var bat = hw.uploader_battery;
+            var lowThresh = parseInt(cfg.low_threshold || 20, 10);
+
+            if (bat === undefined || bat === null) {
+                return '<div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;">' +
+                       '<div style="font-size:1.9rem;font-weight:700;color:#8b949e;">-- %</div>' +
+                       '<div style="font-size:0.75rem;color:#8b949e;">No battery telemetry</div>' +
+                       '</div>';
+            }
+
+            var num = parseInt(bat, 10);
+            var isLow = num <= lowThresh;
+            var iconClass = 'fa-battery-full';
+            if (num <= 15) iconClass = 'fa-battery-empty';
+            else if (num <= 35) iconClass = 'fa-battery-quarter';
+            else if (num <= 65) iconClass = 'fa-battery-half';
+            else if (num <= 85) iconClass = 'fa-battery-three-quarters';
+
+            return '<div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;">' +
+                   '<div style="font-size:1.9rem;font-weight:800;color:' + (isLow ? '#f85149' : '#2ecc71') + ';" id="dash-live-battery">' + num + '<span style="font-size:1.0rem;font-weight:600;">%</span> <i class="fa-solid ' + iconClass + '" style="font-size:1.2rem;margin-left:4px;"></i></div>' +
+                   '<div style="font-size:0.72rem;color:#8b949e;font-weight:600;text-transform:uppercase;margin-top:2px;">Phone Uploader</div>' +
+                   '<div style="font-size:0.72rem;color:#58a6ff;margin-top:4px;"><i class="fa-solid fa-link" style="font-size:0.65rem;margin-right:4px;"></i>' + escapeHtml(hw.pump_status || 'Closed Loop') + '</div>' +
+                   '</div>';
+        }
+
+        function renderTddDosingWidget(cfg) {
+            cfg = cfg || {};
+            var dosing = (scorecardData && scorecardData.dosing) ? scorecardData.dosing : {};
+            var tdd = (dosing.tdd_today !== undefined && dosing.tdd_today !== null) ? dosing.tdd_today : (scorecardData.today ? scorecardData.today.tdd : '--');
+            var basalU = dosing.basal_today || 0;
+            var bolusU = dosing.bolus_today || 0;
+            var basalPct = (dosing.basal_pct !== undefined) ? dosing.basal_pct : 50;
+            var bolusPct = (dosing.bolus_pct !== undefined) ? dosing.bolus_pct : 50;
+            var tdd14 = (dosing.tdd_14d !== undefined && dosing.tdd_14d !== null) ? dosing.tdd_14d : '--';
+
+            return '<div style="display:flex;flex-direction:column;justify-content:center;height:100%;padding:4px 0;">' +
+                   '<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">' +
+                   '<div style="font-size:1.8rem;font-weight:800;color:#e6edf3;" id="dash-live-tdd">' + tdd + ' <span style="font-size:0.95rem;color:#8b949e;font-weight:600;">U Total</span></div>' +
+                   '<div style="font-size:0.75rem;color:#8b949e;">14d Avg: <strong style="color:#58a6ff;">' + tdd14 + ' U</strong></div>' +
+                   '</div>' +
+                   '<div style="width:100%;height:10px;background:rgba(255,255,255,0.06);border-radius:5px;overflow:hidden;display:flex;margin-bottom:6px;">' +
+                   '<div style="width:' + basalPct + '%;background:#58a6ff;height:100%;" title="Basal: ' + basalU + 'U (' + basalPct + '%)"></div>' +
+                   '<div style="width:' + bolusPct + '%;background:#f1c40f;height:100%;" title="Bolus: ' + bolusU + 'U (' + bolusPct + '%)"></div>' +
+                   '</div>' +
+                   '<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#8b949e;font-weight:600;">' +
+                   '<span><span style="color:#58a6ff;margin-right:4px;">●</span>Basal ' + basalPct + '% (' + basalU + 'U)</span>' +
+                   '<span><span style="color:#f1c40f;margin-right:4px;">●</span>Bolus ' + bolusPct + '% (' + bolusU + 'U)</span>' +
+                   '</div>' +
+                   '</div>';
+        }
+
+        function renderSmbActivityWidget(cfg) {
+            cfg = cfg || {};
+            var smb = (scorecardData && scorecardData.dosing && scorecardData.dosing.smb_count !== undefined) ? scorecardData.dosing : { smb_count: 0, smb_units: 0.0 };
+
+            return '<div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;">' +
+                   '<div style="font-size:1.9rem;font-weight:800;color:#58a6ff;" id="dash-live-smb-count">' + smb.smb_count + ' <span style="font-size:0.95rem;color:#8b949e;font-weight:600;">doses</span></div>' +
+                   '<div style="font-size:0.72rem;color:#8b949e;font-weight:600;text-transform:uppercase;margin-top:2px;">Micro-Boluses Today</div>' +
+                   '<div style="font-size:0.75rem;color:#c9d1d9;margin-top:6px;" id="dash-live-smb-units"><i class="fa-solid fa-syringe" style="font-size:0.68rem;margin-right:4px;color:#f1c40f;"></i>Total: ' + smb.smb_units + ' U</div>' +
+                   '</div>';
+        }
+
+        function renderAutosensWidget(cfg) {
+            cfg = cfg || {};
+            var hw = (scorecardData && scorecardData.device_health && scorecardData.device_health.hardware) ? scorecardData.device_health.hardware : {};
+            var ratio = hw.autosens_ratio;
+            if (ratio === undefined || ratio === null) {
+                return '<div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;">' +
+                       '<div style="font-size:1.9rem;font-weight:700;color:#8b949e;">--</div>' +
+                       '<div style="font-size:0.75rem;color:#8b949e;">Autosens inactive</div>' +
+                       '</div>';
+            }
+
+            var pct = Math.round(ratio * 100);
+            var tag = 'Normal (100%)';
+            var color = '#2ecc71';
+            if (pct > 105) {
+                tag = 'Resistant (' + pct + '%)';
+                color = '#f1c40f';
+            } else if (pct < 95) {
+                tag = 'Sensitive (' + pct + '%)';
+                color = '#58a6ff';
+            }
+
+            return '<div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;">' +
+                   '<div style="font-size:1.9rem;font-weight:800;color:' + color + ';">' + pct + '<span style="font-size:1.0rem;font-weight:600;">%</span></div>' +
+                   '<div style="font-size:0.72rem;color:#8b949e;font-weight:600;text-transform:uppercase;margin-top:2px;">AAPS Sensitivity</div>' +
+                   '<div style="font-size:0.75rem;font-weight:600;color:' + color + ';margin-top:6px;">' + tag + '</div>' +
+                   '</div>';
+        }
+
+        function renderGhostCurveWidget(cfg) {
+            cfg = cfg || {};
+            var gc = (scorecardData && scorecardData.ghost_curve) ? scorecardData.ghost_curve : { today_points: [], benchmark_medians: [] };
+            var todayPts = gc.today_points || [];
+            var baselineKey = cfg.reference_baseline || 'best_14d';
+            var bench = (gc[baselineKey] && gc[baselineKey].length > 0) ? gc[baselineKey] : (gc.benchmark_medians || []);
+
+            var legendLabels = {
+                'best_14d': '-- Best 14d Median',
+                'best_365d': '-- Best 365d Median',
+                'trailing_14d': '-- Trailing 14d Median',
+                'trailing_7d': '-- Trailing 7d Median',
+                'trailing_30d': '-- Trailing 30d Median'
+            };
+            var legendText = legendLabels[baselineKey] || '-- Ghost Baseline';
+
+            var w = 460;
+            var h = 170;
+            var padL = 36;
+            var padR = 14;
+            var padT = 20;
+            var padB = 25;
+            var plotW = w - padL - padR;
+            var plotH = h - padT - padB;
+
+            function scaleX(min) {
+                return padL + (min / 1440.0) * plotW;
+            }
+            function scaleY(sg) {
+                var clamped = Math.max(2.0, Math.min(16.0, sg));
+                return padT + ((16.0 - clamped) / 14.0) * plotH;
+            }
+
+            var y10 = scaleY(10.0);
+            var y39 = scaleY(3.9);
+            var bandH = y39 - y10;
+
+            var ghostPath = '';
+            if (bench.length > 0) {
+                bench.forEach(function(b, idx) {
+                    var x = scaleX((b.hour * 60) + 30);
+                    var y = scaleY(b.median_sg);
+                    ghostPath += (idx === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
+                });
+            }
+
+            var todayPath = '';
+            var lastPt = null;
+            if (todayPts.length > 0) {
+                todayPts.forEach(function(p, idx) {
+                    var x = scaleX(p.min);
+                    var y = scaleY(p.sg);
+                    todayPath += (idx === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
+                    lastPt = { x: x, y: y, sg: p.sg };
+                });
+            }
+
+            var pulseDot = '';
+            if (lastPt) {
+                pulseDot = '<circle cx="' + lastPt.x.toFixed(1) + '" cy="' + lastPt.y.toFixed(1) + '" r="4" fill="#2ecc71" stroke="#ffffff" stroke-width="1.5"/>' +
+                           '<circle cx="' + lastPt.x.toFixed(1) + '" cy="' + lastPt.y.toFixed(1) + '" r="7" fill="none" stroke="#2ecc71" opacity="0.6">' +
+                           '<animate attributeName="r" values="4;9;4" dur="2s" repeatCount="indefinite"/>' +
+                           '<animate attributeName="opacity" values="0.8;0;0.8" dur="2s" repeatCount="indefinite"/>' +
+                           '</circle>';
+            }
+
+            return '<div style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;">' +
+                   '<svg viewBox="0 0 ' + w + ' ' + h + '" width="100%" height="100%" preserveAspectRatio="none" style="overflow:visible;">' +
+                   '<rect x="' + padL + '" y="' + y10.toFixed(1) + '" width="' + plotW + '" height="' + bandH.toFixed(1) + '" fill="rgba(46, 204, 113, 0.08)" rx="2"/>' +
+                   '<line x1="' + padL + '" y1="' + y10.toFixed(1) + '" x2="' + (padL + plotW) + '" y2="' + y10.toFixed(1) + '" stroke="rgba(255,255,255,0.15)" stroke-dasharray="3,3" stroke-width="1"/>' +
+                   '<line x1="' + padL + '" y1="' + y39.toFixed(1) + '" x2="' + (padL + plotW) + '" y2="' + y39.toFixed(1) + '" stroke="rgba(255,255,255,0.15)" stroke-dasharray="3,3" stroke-width="1"/>' +
+                   '<text x="' + (padL - 4) + '" y="' + (y10 + 3).toFixed(1) + '" fill="#8b949e" font-size="9" text-anchor="end">10.0</text>' +
+                   '<text x="' + (padL - 4) + '" y="' + (y39 + 3).toFixed(1) + '" fill="#8b949e" font-size="9" text-anchor="end">3.9</text>' +
+                   (ghostPath ? '<path d="' + ghostPath + '" fill="none" stroke="rgba(88, 166, 255, 0.55)" stroke-width="2" stroke-dasharray="4,3"/>' : '') +
+                   (todayPath ? '<path d="' + todayPath + '" fill="none" stroke="#2ecc71" stroke-width="2.5"/>' : '') +
+                   pulseDot +
+                   '<text x="' + padL + '" y="' + (h - 6) + '" fill="#6e7681" font-size="9" text-anchor="start">00:00</text>' +
+                   '<text x="' + (padL + plotW * 0.25).toFixed(1) + '" y="' + (h - 6) + '" fill="#6e7681" font-size="9" text-anchor="middle">06:00</text>' +
+                   '<text x="' + (padL + plotW * 0.5).toFixed(1) + '" y="' + (h - 6) + '" fill="#6e7681" font-size="9" text-anchor="middle">12:00</text>' +
+                   '<text x="' + (padL + plotW * 0.75).toFixed(1) + '" y="' + (h - 6) + '" fill="#6e7681" font-size="9" text-anchor="middle">18:00</text>' +
+                   '<text x="' + (padL + plotW) + '" y="' + (h - 6) + '" fill="#6e7681" font-size="9" text-anchor="end">24:00</text>' +
+                   '<text x="' + (padL + plotW) + '" y="12" fill="#58a6ff" font-size="9" text-anchor="end">' + escapeHtml(legendText) + '</text>' +
+                   '<text x="' + (padL + plotW - 105) + '" y="12" fill="#2ecc71" font-size="9" text-anchor="end">— Today</text>' +
+                   '</svg>' +
+                   '</div>';
+        }
+
+        function renderPlaceholder(title, desc, icon) {
+            return '<div class="dash-placeholder-card">' +
+                   '<div class="dash-placeholder-icon"><i class="fa-solid ' + (icon || 'fa-cubes') + '"></i></div>' +
+                   '<div class="dash-placeholder-title">' + title + '</div>' +
+                   '<div class="dash-placeholder-desc">' + desc + '</div>' +
+                   '</div>';
+        }
+
+        function updateLiveTelemetryDOM() {
+            if (!scorecardData) return;
+            var tel = scorecardData.telemetry || {};
+
+            var bgEl = document.getElementById('dash-live-bg');
+            if (bgEl && tel.sg_mmol !== undefined && tel.sg_mmol !== null) {
+                var sgNum = parseFloat(tel.sg_mmol);
+                var sgText = !isNaN(sgNum) ? sgNum.toFixed(1) : '--';
+                var arrow = getTrendArrowGlyph(tel.direction);
+                var sgColor = '#e6edf3';
+                if (!isNaN(sgNum)) {
+                    if (sgNum < 3.9) sgColor = '#f85149';
+                    else if (sgNum <= 10.0) sgColor = '#2ecc71';
+                    else if (sgNum <= 13.9) sgColor = '#f1c40f';
+                    else sgColor = '#f85149';
+                }
+                bgEl.style.color = sgColor;
+                bgEl.innerHTML = sgText + ' <span style="font-size:1.4rem;">' + arrow + '</span>';
+            }
+
+            var deltaEl = document.getElementById('dash-live-delta');
+            if (deltaEl && tel.delta_mmol !== undefined && tel.delta_mmol !== null) {
+                var deltaNum = parseFloat(tel.delta_mmol);
+                if (!isNaN(deltaNum)) {
+                    var dStr = (deltaNum > 0 ? '+' : '') + deltaNum.toFixed(1) + ' mmol';
+                    deltaEl.textContent = dStr;
+                    deltaEl.className = 'scorecard-delta-badge ' + (deltaNum > 0 ? 'delta-positive' : 'delta-neutral');
+                }
+            }
+
+            var timeEl = document.getElementById('dash-live-time');
+            if (timeEl && tel.mins_ago !== undefined) {
+                timeEl.textContent = tel.is_stale ? 'Stale (' + tel.mins_ago + 'm ago)' : 'Synced ' + tel.mins_ago + 'm ago';
+            }
+
+            var iobEl = document.getElementById('dash-live-iob');
+            if (iobEl && tel.iob !== undefined) {
+                iobEl.innerHTML = parseFloat(tel.iob).toFixed(2) + ' <span style="font-size:0.9rem;">U</span>';
+            }
+
+            var cobEl = document.getElementById('dash-live-cob');
+            if (cobEl && tel.cob !== undefined) {
+                cobEl.innerHTML = Math.round(parseFloat(tel.cob)) + ' <span style="font-size:0.9rem;">g</span>';
+            }
+
+            // Live refresh of Phase 3 elements
+            if (scorecardData.device_health) {
+                var dh = scorecardData.device_health;
+                if (dh.pod) {
+                    var podEl = document.querySelector('.grid-stack-item[data-widget-type="pod_countdown_timer"]');
+                    var pCfg = (podEl && podEl._widgetConfig) ? podEl._widgetConfig : {};
+                    var status = computePodStatus(dh.pod, pCfg);
+                    var podRemEl = document.getElementById('dash-live-pod-rem');
+                    if (podRemEl) {
+                        podRemEl.textContent = status.remStr;
+                        podRemEl.style.color = status.statusColor;
+                    }
+                    var podExpEl = document.getElementById('dash-live-pod-exp');
+                    if (podExpEl) {
+                        podExpEl.innerHTML = '<i class="fa-solid fa-bell" style="font-size:0.68rem;margin-right:4px;opacity:0.75;"></i>Expires: ' + escapeHtml(status.expiryLabel);
+                        podExpEl.style.color = status.isRed ? '#f85149' : '#c9d1d9';
+                    }
+                }
+                if (dh.hardware) {
+                    var resEl = document.getElementById('dash-live-reservoir');
+                    if (resEl && dh.hardware.reservoir !== undefined) {
+                        var isFl = dh.hardware.is_reservoir_floor;
+                        var dS = (isFl || dh.hardware.reservoir <= 50) ? '< 50' : Math.round(dh.hardware.reservoir);
+                        resEl.innerHTML = dS + ' <span style="font-size:1.0rem;font-weight:600;">U</span>';
+                    }
+                    var batEl = document.getElementById('dash-live-battery');
+                    if (batEl && dh.hardware.uploader_battery !== undefined) {
+                        batEl.innerHTML = dh.hardware.uploader_battery + '<span style="font-size:1.0rem;font-weight:600;">%</span>';
+                    }
+                }
+            }
+        }
+
+        // =========================================================================
+        // Widget Definition Catalog (Spec v3)
+        // =========================================================================
+        var WIDGET_CATALOG = {
+            // Category A: Core Glycemic Scorecards & Distribution
+            'range_scorecard': {
+                name: 'Time in Range / Band', cat: 'Core Glycemic', icon: 'fa-chart-line',
+                desc: 'Configurable glycemic band percentage (TIR, TITR, TAR, TATR, Very High, TBR, Very Low) with rolling comparisons.',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                schema: [
+                    { key: 'metric', label: 'Target Range / Metric', type: 'select', options: [
+                        { val: 'tir', text: 'TIR: Standard In Range (3.9–10.0 mmol/L)' },
+                        { val: 'titr', text: 'TITR: Tight In Range (3.9–7.8 mmol/L)' },
+                        { val: 'tar', text: 'TAR: Time Above Range (> 10.0 mmol/L)' },
+                        { val: 'tatr', text: 'TATR: Time Above Tight Range (> 7.8 mmol/L)' },
+                        { val: 'vhigh', text: 'Very High: Severe Hyper (> 13.9 mmol/L)' },
+                        { val: 'tbr', text: 'TBR: Time Below Range (< 3.9 mmol/L)' },
+                        { val: 'vlow', text: 'Very Low: Severe Hypo (< 3.0 mmol/L)' }
+                    ], default: 'tir' },
+                    { key: 'rolling_window', label: 'Comparison Window', type: 'select', options: [
+                        { val: '7d', text: 'Last 7 Days (7d)' },
+                        { val: '14d', text: 'Last 14 Days (14d)' },
+                        { val: '30d', text: 'Last 30 Days (30d)' },
+                        { val: '90d', text: 'Last 90 Days (90d)' },
+                        { val: '365d', text: 'Last 365 Days (365d)' }
+                    ], default: '14d' },
+                    { key: 'benchmark_period', label: 'Benchmark Comparison', type: 'select', options: [
+                        { val: 'all_time', text: 'All-Time Best Period' },
+                        { val: '365d', text: 'Best Period (Last 365 Days)' }
+                    ], default: 'all_time' }
+                ],
+                render: function(cfg) {
+                    cfg = cfg || {};
+                    var m = cfg.metric || 'tir';
+                    var isHigher = (m === 'tir' || m === 'titr');
+                    return renderScorecardMetric(m, '%', isHigher, m, cfg);
+                }
+            },
+            'stacked_range_bar': {
+                name: 'Glycemic Range', cat: 'Core Glycemic', icon: 'fa-bars-progress',
+                desc: 'Dual horizontal stacked distribution bars with independent period and target range selections.',
+                w: 6, h: 4, minW: 4, minH: 3, maxW: 16, maxH: 8,
+                schema: [
+                    { key: 'range_type', label: 'Target Range', type: 'select', options: [
+                        { val: 'normal', text: 'Standard Range (3.9–10.0 mmol/L)' },
+                        { val: 'tight', text: 'Tight Range (3.9–7.8 mmol/L)' }
+                    ], default: 'normal' },
+                    { key: 'timeframe_1', label: 'Top Bar Period', type: 'select', options: [
+                        { val: 'today', text: 'Today (Live)' },
+                        { val: 'yesterday', text: 'Yesterday' },
+                        { val: '7d', text: 'Rolling 7 Days' },
+                        { val: '14d', text: 'Rolling 14 Days' },
+                        { val: '30d', text: 'Rolling 30 Days' },
+                        { val: '90d', text: 'Rolling 90 Days' },
+                        { val: '365d', text: 'Rolling 365 Days' }
+                    ], default: 'today' },
+                    { key: 'timeframe_2', label: 'Bottom Bar Period', type: 'select', options: [
+                        { val: 'today', text: 'Today (Live)' },
+                        { val: 'yesterday', text: 'Yesterday' },
+                        { val: '7d', text: 'Rolling 7 Days' },
+                        { val: '14d', text: 'Rolling 14 Days' },
+                        { val: '30d', text: 'Rolling 30 Days' },
+                        { val: '90d', text: 'Rolling 90 Days' },
+                        { val: '365d', text: 'Rolling 365 Days' }
+                    ], default: '14d' }
+                ],
+                render: renderStackedRangeBarWidget
+            },
+            'avg_bg_scorecard': {
+                name: 'Average Glucose', cat: 'Core Glycemic', icon: 'fa-calculator',
+                desc: 'Mean glucose in mmol/L with rolling comparisons and benchmarks.',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                schema: [
+                    { key: 'rolling_window', label: 'Comparison Window', type: 'select', options: [{val:'7d', text:'Last 7 Days (7d)'}, {val:'14d', text:'Last 14 Days (14d)'}, {val:'30d', text:'Last 30 Days (30d)'}, {val:'90d', text:'Last 90 Days (90d)'}, {val:'365d', text:'Last 365 Days (365d)'}], default: '14d' },
+                    { key: 'benchmark_period', label: 'Benchmark Comparison', type: 'select', options: [{val:'all_time', text:'All-Time Best Period'}, {val:'365d', text:'Best Period (Last 365 Days)'}], default: 'all_time' }
+                ],
+                render: function(cfg) { return renderScorecardMetric('mean_mmol', ' mmol/L', false, 'avg_bg', cfg); }
+            },
+            'gmi_scorecard': {
+                name: 'GMI (Est. HbA1c)', cat: 'Core Glycemic', icon: 'fa-percent',
+                desc: 'Estimated laboratory A1c calculated from continuous sensor mean.',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                schema: [
+                    { key: 'rolling_window', label: 'Comparison Window', type: 'select', options: [{val:'7d', text:'Last 7 Days (7d)'}, {val:'14d', text:'Last 14 Days (14d)'}, {val:'30d', text:'Last 30 Days (30d)'}, {val:'90d', text:'Last 90 Days (90d)'}, {val:'365d', text:'Last 365 Days (365d)'}], default: '14d' },
+                    { key: 'benchmark_period', label: 'Benchmark Comparison', type: 'select', options: [{val:'all_time', text:'All-Time Best Period'}, {val:'365d', text:'Best Period (Last 365 Days)'}], default: 'all_time' }
+                ],
+                render: function(cfg) { return renderScorecardMetric('gmi', '%', false, 'gmi', cfg); }
+            },
+            'cv_scorecard': {
+                name: 'Coefficient of Variation (CV)', cat: 'Core Glycemic', icon: 'fa-wave-square',
+                desc: 'Glucose stability metric (Target < 36.0%).',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                schema: [
+                    { key: 'rolling_window', label: 'Comparison Window', type: 'select', options: [{val:'7d', text:'Last 7 Days (7d)'}, {val:'14d', text:'Last 14 Days (14d)'}, {val:'30d', text:'Last 30 Days (30d)'}, {val:'90d', text:'Last 90 Days (90d)'}, {val:'365d', text:'Last 365 Days (365d)'}], default: '14d' },
+                    { key: 'benchmark_period', label: 'Benchmark Comparison', type: 'select', options: [{val:'all_time', text:'All-Time Best Period'}, {val:'365d', text:'Best Period (Last 365 Days)'}], default: 'all_time' }
+                ],
+                render: function(cfg) { return renderScorecardMetric('cv', '%', false, 'cv', cfg); }
+            },
+            'sd_scorecard': {
+                name: 'Standard Deviation (SD)', cat: 'Core Glycemic', icon: 'fa-chart-area',
+                desc: 'Absolute spread around the glucose mean in mmol/L.',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                schema: [
+                    { key: 'rolling_window', label: 'Comparison Window', type: 'select', options: [{val:'7d', text:'Last 7 Days (7d)'}, {val:'14d', text:'Last 14 Days (14d)'}, {val:'30d', text:'Last 30 Days (30d)'}, {val:'90d', text:'Last 90 Days (90d)'}, {val:'365d', text:'Last 365 Days (365d)'}], default: '14d' },
+                    { key: 'benchmark_period', label: 'Benchmark Comparison', type: 'select', options: [{val:'all_time', text:'All-Time Best Period'}, {val:'365d', text:'Best Period (Last 365 Days)'}], default: 'all_time' }
+                ],
+                render: function(cfg) { return renderScorecardMetric('sd_mmol', ' mmol/L', false, 'sd', cfg); }
+            },
+            'gri_scorecard': {
+                name: 'Glycemia Risk Index (GRI)', cat: 'Core Glycemic', icon: 'fa-shield-halved',
+                desc: 'Composite risk score balancing hypoglycemia and hyperglycemia (0–100).',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                schema: [
+                    { key: 'rolling_window', label: 'Comparison Window', type: 'select', options: [{val:'7d', text:'Last 7 Days (7d)'}, {val:'14d', text:'Last 14 Days (14d)'}, {val:'30d', text:'Last 30 Days (30d)'}, {val:'90d', text:'Last 90 Days (90d)'}, {val:'365d', text:'Last 365 Days (365d)'}], default: '14d' },
+                    { key: 'benchmark_period', label: 'Benchmark Comparison', type: 'select', options: [{val:'all_time', text:'All-Time Best Period'}, {val:'365d', text:'Best Period (Last 365 Days)'}], default: 'all_time' }
+                ],
+                render: function(cfg) { return renderScorecardMetric('gri', '', false, 'gri', cfg); }
+            },
+            'lbgi_scorecard': {
+                name: 'Low Blood Glucose Index (LBGI)', cat: 'Core Glycemic', icon: 'fa-down-long',
+                desc: 'Symmetric transformed risk score sensitive to hypoglycemia severity.',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                schema: [
+                    { key: 'rolling_window', label: 'Comparison Window', type: 'select', options: [{val:'7d', text:'Last 7 Days (7d)'}, {val:'14d', text:'Last 14 Days (14d)'}, {val:'30d', text:'Last 30 Days (30d)'}, {val:'90d', text:'Last 90 Days (90d)'}, {val:'365d', text:'Last 365 Days (365d)'}], default: '14d' },
+                    { key: 'benchmark_period', label: 'Benchmark Comparison', type: 'select', options: [{val:'all_time', text:'All-Time Best Period'}, {val:'365d', text:'Best Period (Last 365 Days)'}], default: 'all_time' }
+                ],
+                render: function(cfg) { return renderScorecardMetric('lbgi', '', false, 'lbgi', cfg); }
+            },
+            'hbgi_scorecard': {
+                name: 'High Blood Glucose Index (HBGI)', cat: 'Core Glycemic', icon: 'fa-up-long',
+                desc: 'Symmetric transformed risk score sensitive to hyperglycemia severity.',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                schema: [
+                    { key: 'rolling_window', label: 'Comparison Window', type: 'select', options: [{val:'7d', text:'Last 7 Days (7d)'}, {val:'14d', text:'Last 14 Days (14d)'}, {val:'30d', text:'Last 30 Days (30d)'}, {val:'90d', text:'Last 90 Days (90d)'}, {val:'365d', text:'Last 365 Days (365d)'}], default: '14d' },
+                    { key: 'benchmark_period', label: 'Benchmark Comparison', type: 'select', options: [{val:'all_time', text:'All-Time Best Period'}, {val:'365d', text:'Best Period (Last 365 Days)'}], default: 'all_time' }
+                ],
+                render: function(cfg) { return renderScorecardMetric('hbgi', '', false, 'hbgi', cfg); }
+            },
+            'gvi_scorecard': {
+                name: 'Glycemic Variability Index (GVI)', cat: 'Core Glycemic', icon: 'fa-water',
+                desc: 'Continuous curve length relative to ideal flat line (ideal = 1.0).',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                schema: [
+                    { key: 'rolling_window', label: 'Comparison Window', type: 'select', options: [{val:'7d', text:'Last 7 Days (7d)'}, {val:'14d', text:'Last 14 Days (14d)'}, {val:'30d', text:'Last 30 Days (30d)'}, {val:'90d', text:'Last 90 Days (90d)'}, {val:'365d', text:'Last 365 Days (365d)'}], default: '14d' },
+                    { key: 'benchmark_period', label: 'Benchmark Comparison', type: 'select', options: [{val:'all_time', text:'All-Time Best Period'}, {val:'365d', text:'Best Period (Last 365 Days)'}], default: 'all_time' }
+                ],
+                render: function(cfg) { return renderScorecardMetric('gvi', '', false, 'gvi', cfg); }
+            },
+            'mag_scorecard': {
+                name: 'Mean Absolute Glucose (MAG)', cat: 'Core Glycemic', icon: 'fa-chart-column',
+                desc: 'Rate-of-change velocity metric measuring glucose oscillation speed.',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                schema: [
+                    { key: 'rolling_window', label: 'Comparison Window', type: 'select', options: [{val:'7d', text:'Last 7 Days (7d)'}, {val:'14d', text:'Last 14 Days (14d)'}, {val:'30d', text:'Last 30 Days (30d)'}, {val:'90d', text:'Last 90 Days (90d)'}, {val:'365d', text:'Last 365 Days (365d)'}], default: '14d' },
+                    { key: 'benchmark_period', label: 'Benchmark Comparison', type: 'select', options: [{val:'all_time', text:'All-Time Best Period'}, {val:'365d', text:'Best Period (Last 365 Days)'}], default: 'all_time' }
+                ],
+                render: function(cfg) { return renderScorecardMetric('mag', '', false, 'mag', cfg); }
+            },
+            'hypo_free_streak': {
+                name: 'Days Free of Severe Hypo', cat: 'Core Glycemic', icon: 'fa-heart-circle-check',
+                desc: 'Streak counter tracking consecutive days with zero glucose < 3.0 mmol/L.',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                schema: [
+                    { key: 'hypo_threshold', label: 'Hypo Definition', type: 'select', options: [{val:'3.0', text:'< 3.0 mmol/L (Severe Hypo)'}, {val:'3.9', text:'< 3.9 mmol/L (Any Hypo)'}], default: '3.0' }
+                ],
+                render: renderHypoStreakWidget
+            },
+
+            // Legacy range aliases for backward compatibility
+            'tir_scorecard': { name: 'Time in Range (TIR)', cat: 'Core Glycemic', icon: 'fa-chart-line', desc: 'Standard 3.9–10.0 mmol/L range.', w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4, schema: [{ key: 'rolling_window', label: 'Comparison Window', type: 'select', options: [{val:'7d', text:'Last 7 Days'}, {val:'14d', text:'Last 14 Days'}, {val:'30d', text:'Last 30 Days'}, {val:'90d', text:'Last 90 Days'}, {val:'365d', text:'Last 365 Days'}], default: '14d' }, { key: 'benchmark_period', label: 'Benchmark Comparison', type: 'select', options: [{val:'all_time', text:'All-Time Best Period'}, {val:'365d', text:'Best Period (Last 365 Days)'}], default: 'all_time' }], render: function(cfg) { return renderScorecardMetric('tir', '%', true, 'tir', cfg); }, hiddenFromDrawer: true },
+            'titr_scorecard': { name: 'Time in Tight Range (TITR)', cat: 'Core Glycemic', icon: 'fa-bullseye', desc: 'Tight 3.9–7.8 mmol/L range.', w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4, schema: [{ key: 'rolling_window', label: 'Comparison Window', type: 'select', options: [{val:'7d', text:'Last 7 Days'}, {val:'14d', text:'Last 14 Days'}, {val:'30d', text:'Last 30 Days'}, {val:'90d', text:'Last 90 Days'}, {val:'365d', text:'Last 365 Days'}], default: '14d' }, { key: 'benchmark_period', label: 'Benchmark Comparison', type: 'select', options: [{val:'all_time', text:'All-Time Best Period'}, {val:'365d', text:'Best Period (Last 365 Days)'}], default: 'all_time' }], render: function(cfg) { return renderScorecardMetric('titr', '%', true, 'titr', cfg); }, hiddenFromDrawer: true },
+            'tar_scorecard': { name: 'Time Above Range (TAR)', cat: 'Core Glycemic', icon: 'fa-arrow-trend-up', desc: 'Time above target threshold.', w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4, schema: [{ key: 'rolling_window', label: 'Comparison Window', type: 'select', options: [{val:'7d', text:'Last 7 Days'}, {val:'14d', text:'Last 14 Days'}, {val:'30d', text:'Last 30 Days'}, {val:'90d', text:'Last 90 Days'}, {val:'365d', text:'Last 365 Days'}], default: '14d' }, { key: 'benchmark_period', label: 'Benchmark Comparison', type: 'select', options: [{val:'all_time', text:'All-Time Best Period'}, {val:'365d', text:'Best Period (Last 365 Days)'}], default: 'all_time' }], render: function(cfg) { return renderScorecardMetric('tar', '%', false, 'tar', cfg); }, hiddenFromDrawer: true },
+            'tatr_scorecard': { name: 'Time Above Tight Range (TATR)', cat: 'Core Glycemic', icon: 'fa-arrow-trend-up', desc: 'Time above 7.8 mmol/L.', w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4, schema: [{ key: 'rolling_window', label: 'Comparison Window', type: 'select', options: [{val:'7d', text:'Last 7 Days'}, {val:'14d', text:'Last 14 Days'}, {val:'30d', text:'Last 30 Days'}, {val:'90d', text:'Last 90 Days'}, {val:'365d', text:'Last 365 Days'}], default: '14d' }, { key: 'benchmark_period', label: 'Benchmark Comparison', type: 'select', options: [{val:'all_time', text:'All-Time Best Period'}, {val:'365d', text:'Best Period (Last 365 Days)'}], default: 'all_time' }], render: function(cfg) { return renderScorecardMetric('tatr', '%', false, 'tatr', cfg); }, hiddenFromDrawer: true },
+            'tbr_scorecard': { name: 'Time Below Range (TBR)', cat: 'Core Glycemic', icon: 'fa-arrow-trend-down', desc: 'Time below 3.9 mmol/L.', w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4, schema: [{ key: 'rolling_window', label: 'Comparison Window', type: 'select', options: [{val:'7d', text:'Last 7 Days'}, {val:'14d', text:'Last 14 Days'}, {val:'30d', text:'Last 30 Days'}, {val:'90d', text:'Last 90 Days'}, {val:'365d', text:'Last 365 Days'}], default: '14d' }, { key: 'benchmark_period', label: 'Benchmark Comparison', type: 'select', options: [{val:'all_time', text:'All-Time Best Period'}, {val:'365d', text:'Best Period (Last 365 Days)'}], default: 'all_time' }], render: function(cfg) { return renderScorecardMetric('tbr', '%', false, 'tbr', cfg); }, hiddenFromDrawer: true },
+
+            // Category B: Rolling-Week Triage Table
+            'triage_focus_table': {
+                name: 'Rolling-Week Triage Focus Table', cat: 'Core Glycemic', icon: 'fa-table',
+                desc: 'Compare core metrics across Today, Yesterday, 7d, 14d, 30d, and 90d rolling windows.',
+                w: 24, h: 5, minW: 12, minH: 4, maxW: 24, maxH: 8,
+                schema: [
+                    { key: 'sort_order', label: 'Sort Mode', type: 'select', options: [
+                        { val: 'fixed', text: 'Fixed Clinical Order' },
+                        { val: 'worst_first', text: 'Worst Delta First (Areas for Focus)' },
+                        { val: 'best_first', text: 'Best Delta First (Top Improvements)' }
+                    ], default: 'fixed' }
+                ],
+                render: renderTriageTableWidget
+            },
+
+            // Category C: Live Status & Telemetry
+            'current_bg_hero': {
+                name: 'Current Glucose & Trend', cat: 'Today & Live', icon: 'fa-bolt',
+                desc: 'Large live reading, trend arrow, delta (+/-), and minutes-ago freshness ticker.',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                render: renderCurrentBgHero
+            },
+            'iob_cob_stat': {
+                name: 'Active IOB & COB', cat: 'Today & Live', icon: 'fa-syringe',
+                desc: 'Real-time units of active insulin on board and grams of carbs on board.',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                render: renderIobCobWidget
+            },
+            'recent_notes_feed': {
+                name: 'Recent Diary Notes', cat: 'Clinical Diary', icon: 'fa-book-open',
+                desc: 'Last 3 clinical notes or meal entries with direct click to Diary Studio.',
+                w: 12, h: 3, minW: 6, minH: 2, maxW: 24, maxH: 5,
+                schema: [
+                    { key: 'max_items', label: 'Max Items', type: 'select', options: [{val:'3', text:'3 Notes'}, {val:'5', text:'5 Notes'}, {val:'8', text:'8 Notes'}], default: '3' }
+                ],
+                render: renderRecentNotesWidget
+            },
+
+            // Category D: Device & Sensor Health
+            'pod_countdown_timer': {
+                name: 'Pod Lifetime Countdown (80h)', cat: 'Device & Sensor', icon: 'fa-stopwatch',
+                desc: 'Countdown to maximum 80-hour Omnipod cutoff with quiet-hours warning.',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                schema: [
+                    { key: 'cutoff_hours', label: 'Cutoff Limit', type: 'select', options: [{val:'80', text:'80 Hours (Hard Cutoff)'}, {val:'72', text:'72 Hours (Nominal Limit)'}], default: '80' },
+                    { key: 'quiet_start', label: 'Quiet Hours Start', type: 'time', default: '21:00' },
+                    { key: 'quiet_end', label: 'Quiet Hours End', type: 'time', default: '09:00' }
+                ],
+                render: renderPodCountdownWidget
+            },
+            'cgm_sensor_timer': {
+                name: 'Sensor Expiry Timer', cat: 'Device & Sensor', icon: 'fa-clock',
+                desc: 'Countdown to CGM sensor expiration with warm-up alert.',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                schema: [
+                    { key: 'sensor_name', label: 'Sensor Model Name', type: 'select', options: [
+                        { val: 'Dexcom G6', text: 'Dexcom G6 (10 Days)' },
+                        { val: 'Dexcom G7', text: 'Dexcom G7 (10.5 Days)' },
+                        { val: 'FreeStyle Libre 3', text: 'FreeStyle Libre (14 Days)' },
+                        { val: 'Medtronic Guardian 4', text: 'Medtronic Guardian (7 Days)' },
+                        { val: 'Custom', text: 'Custom Duration' }
+                    ], default: 'Dexcom G6' },
+                    { key: 'session_days', label: 'Session Duration (Days)', type: 'number', default: 10, min: 1, max: 30 }
+                ],
+                render: renderSensorTimerWidget
+            },
+            'reservoir_monitor': {
+                name: 'Reservoir Remaining', cat: 'Device & Sensor', icon: 'fa-flask',
+                desc: 'Units remaining in pump reservoir with Omnipod <50U floor handling.',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                schema: [
+                    { key: 'floor_mode', label: 'Reservoir Type', type: 'select', options: [{val:'omnipod', text:'Omnipod (< 50U Floor)'}, {val:'linear', text:'Standard Linear (down to 0U)'}], default: 'omnipod' },
+                    { key: 'low_threshold', label: 'Low Alert Threshold (U)', type: 'number', default: 50, min: 10, max: 300, step: 5 }
+                ],
+                render: renderReservoirWidget
+            },
+            'device_battery_stat': {
+                name: 'Hardware Battery Status', cat: 'Device & Sensor', icon: 'fa-battery-three-quarters',
+                desc: 'Phone uploader battery and pump connection telemetry.',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                schema: [
+                    { key: 'low_threshold', label: 'Low Battery Alert (%)', type: 'number', default: 20, min: 5, max: 50, step: 5 }
+                ],
+                render: renderBatteryWidget
+            },
+
+            // Category E: Therapy Dosing & Clinical Curves
+            'tdd_dosing_stat': {
+                name: 'Insulin TDD & Basal:Bolus', cat: 'Clinical Deep Dive', icon: 'fa-chart-pie',
+                desc: 'Total daily dose breakdown with basal vs bolus split bar.',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                render: renderTddDosingWidget
+            },
+            'smb_activity_stat': {
+                name: 'Micro-Bolus (SMB) Activity', cat: 'Clinical Deep Dive', icon: 'fa-syringe',
+                desc: 'Count of automated micro-boluses and total SMB units delivered today.',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                render: renderSmbActivityWidget
+            },
+            'autosens_ratio_stat': {
+                name: 'Autosens Sensitivity Ratio', cat: 'Clinical Deep Dive', icon: 'fa-sliders',
+                desc: 'Live AAPS sensitivity ratio percentage and resistance indicator.',
+                w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+                render: renderAutosensWidget
+            },
+            'ghost_curve_overlay': {
+                name: 'Today vs Best-14d Ghost Curve', cat: 'Clinical Deep Dive', icon: 'fa-chart-area',
+                desc: 'Overlay today 24h continuous trace against selectable baseline median curves.',
+                w: 12, h: 4, minW: 8, minH: 3, maxW: 24, maxH: 6,
+                schema: [
+                    { key: 'reference_baseline', label: 'Ghost Reference', type: 'select', options: [
+                        { val: 'best_14d', text: 'All-Time Best 14d Median' },
+                        { val: 'best_365d', text: 'Best Period (Last 365 Days)' },
+                        { val: 'trailing_7d', text: 'Trailing 7 Days' },
+                        { val: 'trailing_14d', text: 'Trailing 14 Days' },
+                        { val: 'trailing_30d', text: 'Trailing 30 Days' }
+                    ], default: 'best_14d' }
+                ],
+                render: renderGhostCurveWidget
+            },
+            'meal_analysis_placeholder': {
+                name: 'Meal Analysis (Pending Project)', cat: 'Clinical Deep Dive', icon: 'fa-utensils',
+                desc: 'Dedicated slice & dice meal analysis page with postprandial curve sorting.',
+                w: 12, h: 3, minW: 6, minH: 2, maxW: 24, maxH: 5,
+                render: function(cfg) { return renderPlaceholder('Meal Analysis Tool', 'Dedicated slice &amp; dice meal analysis project with postprandial curve triage coming in next milestone.', 'fa-utensils'); }
+            },
+
+            // Category F: Layout & Headers
+            'custom_text_header': {
+                name: 'Custom Text / Header', cat: 'Layout & Headers', icon: 'fa-heading',
+                desc: 'Clean, frameless section title or note banner with customizable alignment.',
+                w: 24, h: 2, minW: 6, minH: 1, maxW: 24, maxH: 4,
+                schema: [
+                    { key: 'text', label: 'Heading / Text', type: 'text', default: 'Clinical Focus' },
+                    { key: 'align', label: 'Alignment', type: 'select', options: [
+                        { val: 'left', text: 'Left Aligned' },
+                        { val: 'center', text: 'Centered' },
+                        { val: 'right', text: 'Right Aligned' }
+                    ], default: 'left' },
+                    { key: 'size', label: 'Font Size', type: 'select', options: [
+                        { val: 'hero', text: 'Large Hero (1.8rem)' },
+                        { val: 'medium', text: 'Medium Title (1.3rem)' },
+                        { val: 'small', text: 'Small Label (1.0rem)' }
+                    ], default: 'hero' },
+                    { key: 'color', label: 'Text Color', type: 'select', options: [
+                        { val: 'white', text: 'White / Primary (#e6edf3)' },
+                        { val: 'muted', text: 'Muted Gray (#8b949e)' },
+                        { val: 'accent', text: 'Accent Blue (#58a6ff)' }
+                    ], default: 'white' }
+                ],
+                render: renderCustomTextHeaderWidget
+            }
+        };
+
+        // =========================================================================
+        // Kiosk Mode, Wake Lock & Home Assistant Sleep / Standby Control
+        // =========================================================================
+        function requestWakeLock() {
+            if ('wakeLock' in navigator && !wakeLock) {
+                navigator.wakeLock.request('screen')
+                    .then(function(lock) {
+                        wakeLock = lock;
+                        wakeLock.addEventListener('release', function() {
+                            wakeLock = null;
+                        });
+                    })
+                    .catch(function(err) {
+                        console.warn('Screen wakeLock request failed:', err);
+                    });
+            }
+        }
+
+        function releaseWakeLock() {
+            if (wakeLock) {
+                try {
+                    wakeLock.release().catch(function() {});
+                } catch(e) {}
+                wakeLock = null;
+            }
+        }
+
+        function setKioskMode(active) {
+            isKioskMode = !!active;
+            var icon = document.getElementById('kiosk-toggle-icon');
+            var btn = document.getElementById('btn-kiosk-toggle');
+            if (isKioskMode) {
+                document.body.classList.add('dash-kiosk-mode');
+                if (icon) {
+                    icon.classList.remove('fa-expand');
+                    icon.classList.add('fa-compress');
+                }
+                if (btn) btn.title = 'Exit Fullscreen Kiosk Mode';
+                requestWakeLock();
+            } else {
+                document.body.classList.remove('dash-kiosk-mode');
+                if (icon) {
+                    icon.classList.remove('fa-compress');
+                    icon.classList.add('fa-expand');
+                }
+                if (btn) btn.title = 'Enter Fullscreen Kiosk Mode';
+                releaseWakeLock();
+            }
+
+            if (window.history && window.history.replaceState) {
+                var url = new URL(window.location.href);
+                if (isKioskMode) {
+                    url.searchParams.set('kiosk', '1');
+                } else {
+                    url.searchParams.delete('kiosk');
+                    url.searchParams.delete('fullscreen');
+                }
+                window.history.replaceState(null, '', url.pathname + url.search);
+            }
+        }
+
+        function toggleKioskMode() {
+            setKioskMode(!isKioskMode);
+            if (isKioskMode) {
+                if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(function() {});
+                }
+            } else {
+                if (document.exitFullscreen && document.fullscreenElement) {
+                    document.exitFullscreen().catch(function() {});
+                }
+            }
+        }
+
+        function setDashboardSleep(sleep) {
+            var overlay = document.getElementById('dash-sleep-overlay');
+            if (!overlay) return;
+            if (sleep) {
+                overlay.classList.add('active');
+                releaseWakeLock();
+            } else {
+                overlay.classList.remove('active');
+                if (isKioskMode) {
+                    requestWakeLock();
+                }
+                pollTelemetry();
+            }
+        }
+
+        function wakeDashboardFromOverlay() {
+            setDashboardSleep(false);
+            fetch('/api/v1/dashboard/display', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ state: 'wake' })
+            }).catch(function() {});
+        }
+
+        function initKioskAndSlotFromUrl() {
+            var container = document.querySelector('.container.container-fluid');
+            var forcedSlot = null;
+            if (container) {
+                var attrSlot = container.getAttribute('data-initial-slot');
+                if (attrSlot && !isNaN(parseInt(attrSlot, 10))) {
+                    forcedSlot = parseInt(attrSlot, 10);
+                }
+                var attrKiosk = container.getAttribute('data-is-kiosk');
+                if (attrKiosk === '1') {
+                    setKioskMode(true);
+                }
+            }
+
+            var urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('kiosk') === '1' || urlParams.get('kiosk') === 'true' || urlParams.get('fullscreen') === '1') {
+                setKioskMode(true);
+            }
+            var paramSlot = urlParams.get('slot');
+            if (paramSlot && !isNaN(parseInt(paramSlot, 10))) {
+                forcedSlot = parseInt(paramSlot, 10);
+            }
+
+            return forcedSlot;
+        }
+
+        function refreshWidgetBodiesInPlace() {
+            if (!grid) return;
+            var items = document.querySelectorAll('.grid-stack-item');
+            if (!items || items.length === 0) return;
+            items.forEach(function(item) {
+                var wType = item.getAttribute('data-widget-type');
+                var c = item.querySelector('.grid-stack-item-content');
+                if (!wType && c) {
+                    wType = c.getAttribute('data-widget-type');
+                }
+                if (!wType) return;
+                var def = WIDGET_CATALOG[wType];
+                if (def && typeof def.render === 'function') {
+                    var body = item.querySelector('.widget-body');
+                    if (body) {
+                        var cfg = item._widgetConfig || (c ? c._widgetConfig : null);
+                        if (!cfg) {
+                            var cfgStr = item.getAttribute('data-widget-config') || (c ? c.getAttribute('data-widget-config') : '{}');
+                            try { cfg = JSON.parse(cfgStr); } catch(e) { cfg = {}; }
+                        }
+                        body.innerHTML = def.render(cfg);
+                    }
+                }
+            });
+            updateLiveTelemetryDOM();
+        }
+
+        function initSSE() {
+            if (!window.EventSource) return;
+            try {
+                if (sseSource) {
+                    sseSource.close();
+                    sseSource = null;
+                }
+                sseSource = new EventSource('/api/v1/dashboard/stream');
+                sseSource.addEventListener('scorecard', function(e) {
+                    try {
+                        var data = JSON.parse(e.data);
+                        if (data) {
+                            scorecardData = data;
+                            refreshWidgetBodiesInPlace();
+                        }
+                    } catch (err) {
+                        console.error('SSE scorecard parse error:', err);
+                    }
+                });
+                sseSource.addEventListener('display', function(e) {
+                    try {
+                        var data = JSON.parse(e.data);
+                        if (data && data.state) {
+                            if (data.state === 'sleep' || data.state === 'standby' || data.state === 'off') {
+                                setDashboardSleep(true);
+                            } else if (data.state === 'wake' || data.state === 'on') {
+                                setDashboardSleep(false);
+                            }
+                        }
+                    } catch (err) {
+                        console.error('SSE display parse error:', err);
+                    }
+                });
+                sseSource.onerror = function() {
+                    // Reconnection handled automatically by browser EventSource
+                };
+            } catch (err) {
+                console.warn('Failed to initialize SSE:', err);
+            }
+        }
+
+        // =========================================================================
+        // State & Gridstack Initialization
+        // =========================================================================
+        document.addEventListener('DOMContentLoaded', function () {
+            // 1. Initialize Gridstack (24 Columns for high-precision widget layout)
+            grid = GridStack.init({
+                column: 24,
+                cellHeight: 60,
+                margin: 12,
+                animate: true,
+                disableDrag: true,   // Read-only by default
+                disableResize: true, // Read-only by default
+                resizable: {
+                    handles: 'e, se, s, sw, w'
+                }
+            }, '#dashboard-grid');
+
+            // 2. Parse kiosk mode & direct slot parameter
+            var forcedSlot = initKioskAndSlotFromUrl();
+
+            // 3. Fetch slots, render tabs, and load active or forced layout
+            fetchDashboardSlots(true, forcedSlot);
+
+            // 4. Initialize SSE stream for live updates
+            initSSE();
+
+            // 5. Watchdog fallback polling (60s interval in case SSE drops)
+            setInterval(pollTelemetry, 60000);
+        });
+
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                if (isKioskMode) {
+                    requestWakeLock();
+                }
+                pollTelemetry();
+            }
+        });
+
+        function fetchDashboardSlots(initialLoad, forcedSlot) {
+            return fetch('/api/v1/dashboard/slots')
+                .then(function(r) { return r.json(); })
+                .then(function(slots) {
+                    slotsCache = slots || [];
+                    renderSlotTabs();
+                    if (initialLoad) {
+                        var slotToLoad = 1;
+                        if (forcedSlot && slotsCache.some(function(s) { return s.slot_number === forcedSlot; })) {
+                            slotToLoad = forcedSlot;
+                        } else {
+                            var activeSlot = slotsCache.find(function(s) { return s.is_active; });
+                            if (activeSlot) slotToLoad = activeSlot.slot_number;
+                        }
+                        loadDashboardSlot(slotToLoad);
+                    }
+                    return slotsCache;
+                })
+                .catch(function(err) {
+                    console.error("Failed to load dashboard slots:", err);
+                    if (initialLoad) loadDashboardSlot(forcedSlot || 1);
+                });
+        }
+
+        function renderSlotTabs() {
+            var container = document.getElementById('dash-slots-container');
+            if (!container) return;
+            container.innerHTML = '';
+            slotsCache.forEach(function(s) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'dash-slot-btn' + (s.slot_number === currentSlot ? ' active' : '');
+                btn.setAttribute('data-slot', s.slot_number);
+                btn.onclick = function() { switchDashboardSlot(s.slot_number); };
+                btn.innerHTML = '<span class="dash-slot-num">' + s.slot_number + '</span>' +
+                               '<span class="dash-slot-name">' + escapeHtml(s.name) + '</span>';
+                container.appendChild(btn);
+            });
+        }
+
+        // Switch active slot
+        function switchDashboardSlot(slotNum) {
+            if (slotNum === currentSlot && !isEditMode) return;
+            if (isEditMode) {
+                if (!confirm("You have unsaved changes in Edit Mode. Discard and switch slots?")) {
+                    return;
+                }
+                cancelEditMode();
+            }
+            loadDashboardSlot(slotNum);
+        }
+
+        function loadDashboardSlot(slotNum) {
+            currentSlot = slotNum;
+            if (window.history && window.history.replaceState) {
+                var newUrl = '/dashboard/' + slotNum + (isKioskMode ? '?kiosk=1' : '');
+                window.history.replaceState(null, '', newUrl);
+            }
+            // Update Tab UI
+            document.querySelectorAll('.dash-slot-btn').forEach(function(b) {
+                b.classList.toggle('active', parseInt(b.getAttribute('data-slot'), 10) === slotNum);
+            });
+
+            var fetchScorecardPromise = scorecardData ? Promise.resolve(scorecardData) :
+                fetch('/api/v1/dashboard/scorecard?_t=' + Date.now()).then(function(r) { return r.json(); }).then(function(d) { scorecardData = d; return d; });
+
+            // Fetch layout and scorecard in parallel (with cache buster)
+            Promise.all([
+                fetch('/api/v1/dashboard/layout?slot=' + slotNum + '&_t=' + Date.now()).then(function(r) { return r.json(); }),
+                fetchScorecardPromise
+            ])
+            .then(function(results) {
+                var layoutData = results[0];
+                currentLayoutData = layoutData;
+                var titleText = layoutData.name || ('Dashboard ' + slotNum);
+                document.getElementById('dash-title-display').textContent = titleText;
+                var titleInput = document.getElementById('dash-title-input');
+                if (titleInput) titleInput.value = titleText;
+                renderLayoutWidgets(layoutData.widgets || []);
+                updateLiveTelemetryDOM();
+            })
+            .catch(function(err) {
+                console.error("Failed to load dashboard layout:", err);
+            });
+        }
+
+        function pollTelemetry() {
+            fetch('/api/v1/dashboard/scorecard')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    scorecardData = data;
+                    refreshWidgetBodiesInPlace();
+                })
+                .catch(function(err) {
+                    console.error("Failed to poll telemetry:", err);
+                });
+        }
+
+        function renderLayoutWidgets(widgets) {
+            grid.removeAll();
+            var emptyState = document.getElementById('dash-empty-state');
+
+            if (!widgets || widgets.length === 0) {
+                emptyState.classList.add('show');
+                return;
+            }
+            emptyState.classList.remove('show');
+
+            // Seamless migration: If all widgets fit in 12 cols, scale coordinates to 24 cols
+            var is12ColLegacy = widgets.every(function(w) { return ((w.x || 0) + (w.w || 3)) <= 12; });
+            if (is12ColLegacy) {
+                widgets.forEach(function(w) {
+                    w.x = (w.x || 0) * 2;
+                    w.w = Math.min(24, (w.w || 3) * 2);
+                });
+            }
+
+            widgets.forEach(function(w) {
+                var def = WIDGET_CATALOG[w.widget_type];
+                if (!def && w.title) {
+                    for (var k in WIDGET_CATALOG) {
+                        if (WIDGET_CATALOG[k].name === w.title) {
+                            def = WIDGET_CATALOG[k];
+                            w.widget_type = k;
+                            break;
+                        }
+                    }
+                }
+                if (!def) {
+                    def = {
+                        name: w.title || w.widget_type,
+                        render: function() { return '<div style="color:#8b949e;padding:10px;">Widget: ' + w.widget_type + '</div>'; }
+                    };
+                }
+
+                var cfg = w.config || {};
+                var hasConfig = def.schema && def.schema.length > 0;
+                var configBtnHtml = hasConfig ? '<button type="button" class="widget-btn btn-settings" title="Configure widget" onclick="openWidgetConfig(this)"><i class="fa-solid fa-gear"></i></button>' : '';
+
+                // Dynamic title reflection for Range, Ghost Curve, and Hypo Streak widgets
+                var displayTitle = w.title || def.name;
+                var isRangeType = (w.widget_type === 'range_scorecard' || w.widget_type === 'tir_scorecard' || w.widget_type === 'titr_scorecard' || w.widget_type === 'tar_scorecard' || w.widget_type === 'tatr_scorecard' || w.widget_type === 'tbr_scorecard');
+                if (isRangeType) {
+                    var m = cfg.metric;
+                    if (!m) {
+                        if (w.widget_type === 'titr_scorecard') m = 'titr';
+                        else if (w.widget_type === 'tar_scorecard') m = (cfg.threshold === '7.8' ? 'tatr' : (cfg.threshold === '13.9' ? 'vhigh' : 'tar'));
+                        else if (w.widget_type === 'tatr_scorecard') m = 'tatr';
+                        else if (w.widget_type === 'tbr_scorecard') m = (cfg.threshold === '3.0' ? 'vlow' : 'tbr');
+                        else m = 'tir';
+                    }
+                    var rangeTitles = {
+                        'tir': 'Time in Range (TIR)',
+                        'titr': 'Time in Tight Range (TITR)',
+                        'tar': 'Time Above Range (TAR)',
+                        'tatr': 'Time Above Tight Range (TATR)',
+                        'vhigh': 'Time Very High (> 13.9)',
+                        'tbr': 'Time Below Range (TBR)',
+                        'vlow': 'Time Very Low (< 3.0)'
+                    };
+                    if (rangeTitles[m]) displayTitle = rangeTitles[m];
+                } else if (w.widget_type === 'ghost_curve_overlay') {
+                    var baselineTitles = {
+                        'best_14d': 'Today vs Best-14d Ghost Curve',
+                        'best_365d': 'Today vs Best-365d Ghost Curve',
+                        'trailing_7d': 'Today vs Trailing-7d Ghost Curve',
+                        'trailing_14d': 'Today vs Trailing-14d Ghost Curve',
+                        'trailing_30d': 'Today vs Trailing-30d Ghost Curve'
+                    };
+                    if (cfg.reference_baseline && baselineTitles[cfg.reference_baseline]) {
+                        displayTitle = baselineTitles[cfg.reference_baseline];
+                    }
+                } else if (w.widget_type === 'hypo_free_streak') {
+                    if (String(cfg.hypo_threshold) === '3.9') {
+                        displayTitle = 'Days Free of Hypo (< 3.9)';
+                    } else {
+                        displayTitle = 'Days Free of Severe Hypo (< 3.0)';
+                    }
+                } else if (w.widget_type === 'stacked_range_bar') {
+                    displayTitle = (cfg.range_type === 'tight') ? 'Glycemic Range (Tight 3.9–7.8)' : 'Glycemic Range (Standard 3.9–10.0)';
+                }
+
+                var contentHtml = 
+                    '<div class="widget-header">' +
+                    '<div class="widget-title"><i class="fa-solid ' + (def.icon || 'fa-chart-simple') + '"></i><span>' + displayTitle + '</span></div>' +
+                    '<div class="widget-controls">' +
+                    configBtnHtml +
+                    '<button type="button" class="widget-btn widget-btn-edit-only btn-remove" title="Remove widget" onclick="removeWidget(this)"><i class="fa-solid fa-xmark"></i></button>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="widget-body">' + def.render(cfg) + '</div>';
+
+                var widgetEl = grid.addWidget({
+                    x: w.x, y: w.y, w: w.w, h: w.h,
+                    minW: def.minW || 3, minH: def.minH || (w.widget_type === 'custom_text_header' ? 1 : 2),
+                    maxW: def.maxW || 24, maxH: def.maxH || 12,
+                    content: contentHtml
+                });
+                if (widgetEl) {
+                    widgetEl.setAttribute('data-widget-type', w.widget_type);
+                    widgetEl.setAttribute('data-widget-config', JSON.stringify(cfg));
+                    widgetEl._widgetConfig = cfg;
+                    var c = widgetEl.querySelector('.grid-stack-item-content');
+                    if (c) {
+                        c.setAttribute('data-widget-type', w.widget_type);
+                        c.setAttribute('data-widget-config', JSON.stringify(cfg));
+                        c._widgetConfig = cfg;
+                    }
+                }
+            });
+        }
+
+        // =========================================================================
+        // Edit Mode Mechanics
+        // =========================================================================
+        function toggleEditMode() {
+            if (isEditMode) {
+                saveActiveDashboardLayout();
+            } else {
+                enterEditMode();
+            }
+        }
+
+        function enterEditMode() {
+            isEditMode = true;
+            document.body.classList.add('dash-editing');
+            document.getElementById('dash-edit-banner').classList.add('active');
+            document.getElementById('btn-toggle-edit').style.display = 'none';
+
+            // Show title input for editing
+            var titleDisplay = document.getElementById('dash-title-display');
+            var titleInput = document.getElementById('dash-title-input');
+            if (titleDisplay && titleInput) {
+                titleInput.value = titleDisplay.textContent.trim();
+                titleDisplay.style.display = 'none';
+                titleInput.style.display = 'inline-block';
+            }
+
+            // Enable drag and resize
+            grid.enableMove(true);
+            grid.enableResize(true);
+        }
+
+        function cancelEditMode() {
+            isEditMode = false;
+            document.body.classList.remove('dash-editing');
+            document.getElementById('dash-edit-banner').classList.remove('active');
+            document.getElementById('btn-toggle-edit').style.display = 'inline-flex';
+            closeWidgetLibrary();
+
+            // Hide title input and restore title display
+            var titleDisplay = document.getElementById('dash-title-display');
+            var titleInput = document.getElementById('dash-title-input');
+            if (titleDisplay && titleInput) {
+                titleInput.style.display = 'none';
+                titleDisplay.style.display = 'inline-block';
+            }
+
+            // Disable drag/resize and reload saved state
+            grid.enableMove(false);
+            grid.enableResize(false);
+            loadDashboardSlot(currentSlot);
+        }
+
+        function saveActiveDashboardLayout(keepEditing) {
+            var saveBtn = document.querySelector('#dash-edit-banner .btn-primary');
+            var originalBtnHtml = saveBtn ? saveBtn.innerHTML : '<i class="fa-solid fa-floppy-disk"></i> Save Layout';
+            if (saveBtn && !keepEditing) {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+            }
+
+            var titleInput = document.getElementById('dash-title-input');
+            var newTitle = (titleInput && titleInput.value.trim()) ? titleInput.value.trim() : (document.getElementById('dash-title-display').textContent.trim() || 'Dashboard');
+
+            try {
+                var widgetPayload = [];
+                var container = grid.el || document.getElementById('dashboard-grid');
+                var items = container.querySelectorAll('.grid-stack-item');
+                
+                items.forEach(function(itemEl) {
+                    var type = itemEl.getAttribute('data-widget-type');
+                    var typeEl = itemEl.querySelector('.grid-stack-item-content');
+                    if (!type && typeEl) type = typeEl.getAttribute('data-widget-type');
+                    var titleEl = itemEl.querySelector('.widget-title span');
+                    var title = titleEl ? titleEl.textContent.trim() : '';
+
+                    if (!type || type === 'unknown') {
+                        for (var k in WIDGET_CATALOG) {
+                            if (WIDGET_CATALOG[k].name === title) {
+                                type = k;
+                                break;
+                            }
+                        }
+                    }
+                    if (!type) type = 'unknown';
+                    
+                    var node = itemEl.gridstackNode || {};
+                    var x = (node.x !== undefined) ? node.x : parseInt(itemEl.getAttribute('gs-x') || 0, 10);
+                    var y = (node.y !== undefined) ? node.y : parseInt(itemEl.getAttribute('gs-y') || 0, 10);
+                    var w = (node.w !== undefined) ? node.w : parseInt(itemEl.getAttribute('gs-w') || 4, 10);
+                    var h = (node.h !== undefined) ? node.h : parseInt(itemEl.getAttribute('gs-h') || 3, 10);
+
+                    var cfgObj = itemEl._widgetConfig || (typeEl ? typeEl._widgetConfig : null);
+                    if (!cfgObj) {
+                        var cfgStr = itemEl.getAttribute('data-widget-config') || (typeEl ? typeEl.getAttribute('data-widget-config') : null) || '{}';
+                        try { cfgObj = JSON.parse(cfgStr); } catch(e) { cfgObj = {}; }
+                    }
+
+                    widgetPayload.push({
+                        widget_type: type,
+                        title: title,
+                        x: x,
+                        y: y,
+                        w: w,
+                        h: h,
+                        config: cfgObj || {}
+                    });
+                });
+
+                return fetch('/api/v1/dashboard/layout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        slot_number: currentSlot,
+                        name: newTitle,
+                        widgets: widgetPayload
+                    })
+                })
+                .then(function(r) {
+                    if (!r.ok) throw new Error("HTTP error " + r.status);
+                    return r.json();
+                })
+                .then(function(data) {
+                    if (keepEditing) {
+                        var cachedSlot = slotsCache.find(function(s) { return s.slot_number === currentSlot; });
+                        if (cachedSlot) cachedSlot.name = newTitle;
+                        return;
+                    }
+
+                    isEditMode = false;
+                    document.body.classList.remove('dash-editing');
+                    document.getElementById('dash-edit-banner').classList.remove('active');
+                    document.getElementById('btn-toggle-edit').style.display = 'inline-flex';
+                    closeWidgetLibrary();
+
+                    // Restore title display
+                    var titleDisplay = document.getElementById('dash-title-display');
+                    if (titleDisplay && titleInput) {
+                        titleDisplay.textContent = newTitle;
+                        titleInput.style.display = 'none';
+                        titleDisplay.style.display = 'inline-block';
+                    }
+
+                    // Update slot title in local cache and re-render tabs
+                    var cachedSlot = slotsCache.find(function(s) { return s.slot_number === currentSlot; });
+                    if (cachedSlot) cachedSlot.name = newTitle;
+                    renderSlotTabs();
+
+                    grid.enableMove(false);
+                    grid.enableResize(false);
+                    loadDashboardSlot(currentSlot);
+                })
+                .catch(function(err) {
+                    console.error("Save layout failed:", err);
+                    if (!keepEditing) alert("Failed to save layout: " + err);
+                })
+                .finally(function() {
+                    if (saveBtn && !keepEditing) {
+                        saveBtn.disabled = false;
+                        saveBtn.innerHTML = originalBtnHtml;
+                    }
+                });
+            } catch (err) {
+                console.error("Layout preparation error:", err);
+                if (!keepEditing) alert("Error preparing layout for save: " + err);
+                if (saveBtn && !keepEditing) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = originalBtnHtml;
+                }
+            }
+        }
+
+        function removeWidget(btn) {
+            var itemEl = btn.closest('.grid-stack-item');
+            if (itemEl) {
+                grid.removeWidget(itemEl);
+                if (grid.engine.nodes.length === 0) {
+                    document.getElementById('dash-empty-state').classList.add('show');
+                }
+            }
+        }
+
+        // =========================================================================
+        // Widget Library Drawer
+        // =========================================================================
+        function openWidgetLibrary() {
+            var activeTypes = {};
+            var container = grid.el || document.getElementById('dashboard-grid');
+            if (container) {
+                container.querySelectorAll('.grid-stack-item').forEach(function(itemEl) {
+                    var typeEl = itemEl.querySelector('[data-widget-type]');
+                    var t = (typeEl ? typeEl.getAttribute('data-widget-type') : null) || itemEl.getAttribute('data-widget-type');
+                    if (!t || t === 'unknown') {
+                        var titleEl = itemEl.querySelector('.widget-title span');
+                        var title = titleEl ? titleEl.textContent.trim() : '';
+                        for (var k in WIDGET_CATALOG) {
+                            if (WIDGET_CATALOG[k].name === title) {
+                                t = k;
+                                break;
+                            }
+                        }
+                    }
+                    if (t) activeTypes[t] = (activeTypes[t] || 0) + 1;
+                });
+            }
+            populateWidgetLibrary(activeTypes);
+            document.getElementById('lib-drawer').classList.add('open');
+            document.getElementById('lib-backdrop').classList.add('open');
+        }
+
+        function closeWidgetLibrary() {
+            document.getElementById('lib-drawer').classList.remove('open');
+            document.getElementById('lib-backdrop').classList.remove('open');
+        }
+
+        function populateWidgetLibrary(activeTypes) {
+            activeTypes = activeTypes || {};
+            var container = document.getElementById('lib-items-list');
+            container.innerHTML = '';
+
+            var categories = {};
+            for (var key in WIDGET_CATALOG) {
+                var item = WIDGET_CATALOG[key];
+                if (item.hiddenFromDrawer) continue;
+                if (!categories[item.cat]) categories[item.cat] = [];
+                categories[item.cat].push({ key: key, def: item });
+            }
+
+            for (var catName in categories) {
+                var catTitle = document.createElement('div');
+                catTitle.className = 'lib-category-title';
+                catTitle.textContent = catName;
+                container.appendChild(catTitle);
+
+                categories[catName].forEach(function(entry) {
+                    var isOnDash = (activeTypes[entry.key] && activeTypes[entry.key] > 0);
+                    var card = document.createElement('div');
+                    card.className = 'lib-item-card' + (isOnDash ? ' is-on-dashboard' : '');
+                    
+                    var badgeHtml = isOnDash ? '<span class="lib-added-badge"><i class="fa-solid fa-check"></i> On Dashboard</span>' : '';
+
+                    card.innerHTML = 
+                        '<div class="lib-item-info">' +
+                        '<div class="lib-item-name">' + entry.def.name + badgeHtml + '</div>' +
+                        '<div class="lib-item-desc">' + entry.def.desc + '</div>' +
+                        '</div>' +
+                        '<button type="button" class="btn btn-secondary btn-sm" title="Add to dashboard" onclick="addWidgetToDashboard(\'' + entry.key + '\')"><i class="fa-solid fa-plus"></i></button>';
+                    container.appendChild(card);
+                });
+            }
+        }
+
+        function addWidgetToDashboard(typeKey) {
+            var def = WIDGET_CATALOG[typeKey];
+            if (!def) return;
+
+            document.getElementById('dash-empty-state').classList.remove('show');
+            if (!isEditMode) enterEditMode();
+
+            var cfg = {};
+            if (def.schema) {
+                def.schema.forEach(function(s) { cfg[s.key] = s.default; });
+            }
+            var hasConfig = def.schema && def.schema.length > 0;
+            var configBtnHtml = hasConfig ? '<button type="button" class="widget-btn btn-settings" title="Configure widget" onclick="openWidgetConfig(this)"><i class="fa-solid fa-gear"></i></button>' : '';
+
+            var displayTitle = def.name;
+            if (typeKey === 'range_scorecard') {
+                displayTitle = 'Time in Range (TIR)';
+            } else if (typeKey === 'tar_scorecard') {
+                if (cfg.threshold === '7.8') displayTitle = 'Time Above Tight Range (TATR)';
+                else if (cfg.threshold === '13.9') displayTitle = 'Time Very High (> 13.9)';
+                else displayTitle = 'Time Above Range (TAR)';
+            } else if (typeKey === 'stacked_range_bar') {
+                displayTitle = (cfg.range_type === 'tight') ? 'Glycemic Range (Tight 3.9–7.8)' : 'Glycemic Range (Standard 3.9–10.0)';
+            }
+
+            var contentHtml = 
+                '<div class="widget-header">' +
+                '<div class="widget-title"><i class="fa-solid ' + (def.icon || 'fa-chart-simple') + '"></i><span>' + displayTitle + '</span></div>' +
+                '<div class="widget-controls">' +
+                configBtnHtml +
+                '<button type="button" class="widget-btn widget-btn-edit-only btn-remove" title="Remove" onclick="removeWidget(this)"><i class="fa-solid fa-xmark"></i></button>' +
+                '</div>' +
+                '</div>' +
+                '<div class="widget-body">' + def.render(cfg) + '</div>';
+
+            var widgetEl = grid.addWidget({
+                w: def.w || 6, h: def.h || (typeKey === 'custom_text_header' ? 1 : 3),
+                minW: def.minW || 3, minH: def.minH || (typeKey === 'custom_text_header' ? 1 : 2),
+                maxW: def.maxW || 24, maxH: def.maxH || 12,
+                content: contentHtml
+            });
+            if (widgetEl) {
+                widgetEl.setAttribute('data-widget-type', typeKey);
+                widgetEl.setAttribute('data-widget-config', JSON.stringify(cfg));
+                widgetEl._widgetConfig = cfg;
+                var c = widgetEl.querySelector('.grid-stack-item-content');
+                if (c) {
+                    c.setAttribute('data-widget-type', typeKey);
+                    c.setAttribute('data-widget-config', JSON.stringify(cfg));
+                    c._widgetConfig = cfg;
+                }
+            }
+
+            closeWidgetLibrary();
+        }
+
+        function filterWidgetLibrary() {
+            var q = document.getElementById('lib-search').value.toLowerCase();
+            document.querySelectorAll('.lib-item-card').forEach(function(card) {
+                var text = card.textContent.toLowerCase();
+                card.style.display = text.indexOf(q) !== -1 ? 'flex' : 'none';
+            });
+        }
+
+        // =========================================================================
+        // Manage Dashboards Modal & Reordering Logic
+        // =========================================================================
+        function openManageSlotsModal() {
+            // Clone slotsCache for editing
+            workingSlots = JSON.parse(JSON.stringify(slotsCache));
+            renderSlotManagerList();
+            document.getElementById('manage-slots-backdrop').classList.add('open');
+            document.getElementById('manage-slots-modal').classList.add('open');
+        }
+
+        function closeManageSlotsModal() {
+            document.getElementById('manage-slots-backdrop').classList.remove('open');
+            document.getElementById('manage-slots-modal').classList.remove('open');
+        }
+
+        function updateWorkingSlotName(idx, val) {
+            if (workingSlots[idx]) {
+                workingSlots[idx].name = val;
+            }
+        }
+
+        function moveSlotUp(idx) {
+            if (idx <= 0 || idx >= workingSlots.length) return;
+            var tmp = workingSlots[idx];
+            workingSlots[idx] = workingSlots[idx - 1];
+            workingSlots[idx - 1] = tmp;
+            renderSlotManagerList();
+        }
+
+        function moveSlotDown(idx) {
+            if (idx < 0 || idx >= workingSlots.length - 1) return;
+            var tmp = workingSlots[idx];
+            workingSlots[idx] = workingSlots[idx + 1];
+            workingSlots[idx + 1] = tmp;
+            renderSlotManagerList();
+        }
+
+        function renderSlotManagerList() {
+            var container = document.getElementById('slot-manager-list');
+            if (!container) return;
+            container.innerHTML = '';
+
+            workingSlots.forEach(function(slot, idx) {
+                var row = document.createElement('div');
+                row.className = 'slot-row';
+                row.draggable = true;
+                row.setAttribute('data-index', idx);
+
+                var isFirst = (idx === 0);
+                var isLast = (idx === workingSlots.length - 1);
+                var isActive = (slot.slot_number === currentSlot);
+
+                row.innerHTML = 
+                    '<span class="slot-drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical"></i></span>' +
+                    '<div class="slot-move-btns">' +
+                    '<button type="button" class="btn-slot-move" title="Move Up" onclick="moveSlotUp(' + idx + ')" ' + (isFirst ? 'disabled style="opacity:0.3;cursor:default;"' : '') + '><i class="fa-solid fa-chevron-up"></i></button>' +
+                    '<button type="button" class="btn-slot-move" title="Move Down" onclick="moveSlotDown(' + idx + ')" ' + (isLast ? 'disabled style="opacity:0.3;cursor:default;"' : '') + '><i class="fa-solid fa-chevron-down"></i></button>' +
+                    '</div>' +
+                    '<span class="slot-num-badge">Slot ' + slot.slot_number + '</span>' +
+                    '<input type="text" class="slot-name-input" value="' + escapeHtml(slot.name) + '" maxlength="40" oninput="updateWorkingSlotName(' + idx + ', this.value)">' +
+                    (isActive ? '<span class="slot-active-pill">Active</span>' : '');
+
+                // Drag and Drop Event Listeners
+                row.addEventListener('dragstart', handleSlotDragStart);
+                row.addEventListener('dragover', handleSlotDragOver);
+                row.addEventListener('dragenter', handleSlotDragEnter);
+                row.addEventListener('dragleave', handleSlotDragLeave);
+                row.addEventListener('drop', handleSlotDrop);
+                row.addEventListener('dragend', handleSlotDragEnd);
+
+                container.appendChild(row);
+            });
+        }
+
+        function handleSlotDragStart(e) {
+            draggedSlotIndex = parseInt(this.getAttribute('data-index'), 10);
+            this.classList.add('dragging');
+            if (e.dataTransfer) {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', draggedSlotIndex);
+            }
+        }
+
+        function handleSlotDragOver(e) {
+            e.preventDefault();
+            if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handleSlotDragEnter(e) {
+            e.preventDefault();
+            this.classList.add('drag-over');
+        }
+
+        function handleSlotDragLeave() {
+            this.classList.remove('drag-over');
+        }
+
+        function handleSlotDrop(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+            var targetIndex = parseInt(this.getAttribute('data-index'), 10);
+            if (draggedSlotIndex !== null && !isNaN(targetIndex) && draggedSlotIndex !== targetIndex) {
+                var itemToMove = workingSlots.splice(draggedSlotIndex, 1)[0];
+                workingSlots.splice(targetIndex, 0, itemToMove);
+                renderSlotManagerList();
+            }
+        }
+
+        function handleSlotDragEnd() {
+            this.classList.remove('dragging');
+            document.querySelectorAll('.slot-row').forEach(function(r) {
+                r.classList.remove('drag-over');
+            });
+            draggedSlotIndex = null;
+        }
+
+        function saveSlotReorder() {
+            var saveBtn = document.getElementById('btn-save-slot-reorder');
+            var origHtml = saveBtn ? saveBtn.innerHTML : 'Save &amp; Apply';
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+            }
+
+            var slotsPayload = workingSlots.map(function(s, idx) {
+                return {
+                    slot_number: s.slot_number,
+                    display_order: idx + 1,
+                    name: s.name.trim() || ('Dashboard ' + s.slot_number)
+                };
+            });
+
+            fetch('/api/v1/dashboard/slots/reorder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ slots: slotsPayload })
+            })
+            .then(function(r) {
+                if (!r.ok) throw new Error("HTTP error " + r.status);
+                return r.json();
+            })
+            .then(function(data) {
+                slotsCache = data.slots || workingSlots;
+                renderSlotTabs();
+                var cur = slotsCache.find(function(s) { return s.slot_number === currentSlot; });
+                if (cur) {
+                    document.getElementById('dash-title-display').textContent = cur.name;
+                    var titleInput = document.getElementById('dash-title-input');
+                    if (titleInput) titleInput.value = cur.name;
+                }
+                closeManageSlotsModal();
+            })
+            .catch(function(err) {
+                console.error("Failed to reorder slots:", err);
+                alert("Failed to save dashboard order: " + err);
+            })
+            .finally(function() {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = origHtml;
+                }
+            });
+        }
+
+        // =========================================================================
+        // Widget Settings Modal & Parameterized Configuration
+        // =========================================================================
+        var activeConfigItemEl = null;
+
+        function openWidgetConfig(btn) {
+            var itemEl = btn.closest('.grid-stack-item');
+            var contentEl = btn.closest('.grid-stack-item-content') || itemEl;
+            if (!itemEl && !contentEl) return;
+            var wType = (itemEl ? itemEl.getAttribute('data-widget-type') : null) || (contentEl ? contentEl.getAttribute('data-widget-type') : null);
+            var def = WIDGET_CATALOG[wType];
+            if (!def || !def.schema || !def.schema.length) return;
+
+            activeConfigItemEl = itemEl || contentEl;
+            var currentCfg = (itemEl && itemEl._widgetConfig) || (contentEl && contentEl._widgetConfig);
+            if (!currentCfg) {
+                var cfgStr = (itemEl ? itemEl.getAttribute('data-widget-config') : null) || (contentEl ? contentEl.getAttribute('data-widget-config') : null) || '{}';
+                try { currentCfg = JSON.parse(cfgStr); } catch(e) { currentCfg = {}; }
+            }
+
+            document.getElementById('wset-title').textContent = (def.name || 'Widget') + ' Settings';
+            document.getElementById('wset-subtitle').textContent = def.desc || 'Configure parameters and thresholds';
+
+            var body = document.getElementById('wset-body');
+            body.innerHTML = '';
+
+            def.schema.forEach(function(field) {
+                var val = (currentCfg && currentCfg[field.key] !== undefined) ? currentCfg[field.key] : field.default;
+                var group = document.createElement('div');
+                group.style.display = 'flex';
+                group.style.flexDirection = 'column';
+                group.style.gap = '4px';
+
+                var label = document.createElement('label');
+                label.style.fontSize = '0.82rem';
+                label.style.fontWeight = '600';
+                label.style.color = '#c9d1d9';
+                label.textContent = field.label;
+                group.appendChild(label);
+
+                if (field.type === 'select') {
+                    var sel = document.createElement('select');
+                    sel.className = 'form-input';
+                    sel.id = 'wcfg-' + field.key;
+                    sel.style.width = '100%';
+                    (field.options || []).forEach(function(opt) {
+                        var optEl = document.createElement('option');
+                        optEl.value = opt.val;
+                        optEl.textContent = opt.text;
+                        if (String(opt.val) === String(val)) optEl.selected = true;
+                        sel.appendChild(optEl);
+                    });
+                    group.appendChild(sel);
+                } else if (field.type === 'time') {
+                    var inp = document.createElement('input');
+                    inp.type = 'time';
+                    inp.className = 'form-input';
+                    inp.id = 'wcfg-' + field.key;
+                    inp.value = (val !== undefined && val !== null) ? val : (field.default || '00:00');
+                    inp.style.width = '100%';
+                    group.appendChild(inp);
+                } else if (field.type === 'number') {
+                    var inp = document.createElement('input');
+                    inp.type = 'number';
+                    inp.className = 'form-input';
+                    inp.id = 'wcfg-' + field.key;
+                    if (field.min !== undefined) inp.min = field.min;
+                    if (field.max !== undefined) inp.max = field.max;
+                    if (field.step !== undefined) inp.step = field.step;
+                    inp.value = (val !== undefined && val !== null) ? val : (field.default || 0);
+                    inp.style.width = '100%';
+                    group.appendChild(inp);
+                } else {
+                    var inp = document.createElement('input');
+                    inp.type = 'text';
+                    inp.className = 'form-input';
+                    inp.id = 'wcfg-' + field.key;
+                    inp.value = (val !== undefined && val !== null) ? val : '';
+                    inp.style.width = '100%';
+                    group.appendChild(inp);
+                }
+                body.appendChild(group);
+            });
+
+            document.getElementById('widget-settings-backdrop').classList.add('open');
+            document.getElementById('widget-settings-modal').classList.add('open');
+        }
+
+        function closeWidgetConfig() {
+            document.getElementById('widget-settings-backdrop').classList.remove('open');
+            document.getElementById('widget-settings-modal').classList.remove('open');
+            activeConfigItemEl = null;
+        }
+
+        function saveWidgetConfig() {
+            if (!activeConfigItemEl) return;
+            var itemEl = activeConfigItemEl.classList.contains('grid-stack-item') ? activeConfigItemEl : activeConfigItemEl.closest('.grid-stack-item');
+            var wType = (itemEl ? itemEl.getAttribute('data-widget-type') : null) || activeConfigItemEl.getAttribute('data-widget-type');
+            var def = WIDGET_CATALOG[wType];
+            if (!def || !def.schema) {
+                closeWidgetConfig();
+                return;
+            }
+
+            var updatedCfg = {};
+            def.schema.forEach(function(field) {
+                var el = document.getElementById('wcfg-' + field.key);
+                if (el) {
+                    updatedCfg[field.key] = el.value;
+                }
+            });
+
+            var cfgJson = JSON.stringify(updatedCfg);
+            if (itemEl) {
+                itemEl._widgetConfig = updatedCfg;
+                itemEl.setAttribute('data-widget-config', cfgJson);
+            }
+            activeConfigItemEl._widgetConfig = updatedCfg;
+            activeConfigItemEl.setAttribute('data-widget-config', cfgJson);
+            var innerC = (itemEl || activeConfigItemEl).querySelector('.grid-stack-item-content');
+            if (innerC) {
+                innerC._widgetConfig = updatedCfg;
+                innerC.setAttribute('data-widget-config', cfgJson);
+            }
+
+            // Dynamic title reflection for Range, TAR, and Stacked Bar widgets
+            var targetEl = itemEl || activeConfigItemEl;
+            var titleSpan = targetEl.querySelector('.widget-title span');
+            if (titleSpan) {
+                if (wType === 'range_scorecard') {
+                    var rangeTitles = {
+                        'tir': 'Time in Range (TIR)',
+                        'titr': 'Time in Tight Range (TITR)',
+                        'tar': 'Time Above Range (TAR)',
+                        'tatr': 'Time Above Tight Range (TATR)',
+                        'vhigh': 'Time Very High (> 13.9)',
+                        'tbr': 'Time Below Range (TBR)',
+                        'vlow': 'Time Very Low (< 3.0)'
+                    };
+                    if (rangeTitles[updatedCfg.metric]) {
+                        titleSpan.textContent = rangeTitles[updatedCfg.metric];
+                    }
+                } else if (wType === 'tar_scorecard') {
+                    if (String(updatedCfg.threshold) === '7.8') {
+                        titleSpan.textContent = 'Time Above Tight Range (TATR)';
+                    } else if (String(updatedCfg.threshold) === '13.9') {
+                        titleSpan.textContent = 'Time Very High (> 13.9)';
+                    } else {
+                        titleSpan.textContent = 'Time Above Range (TAR)';
+                    }
+                } else if (wType === 'ghost_curve_overlay') {
+                    var baselineTitles = {
+                        'best_14d': 'Today vs Best-14d Ghost Curve',
+                        'best_365d': 'Today vs Best-365d Ghost Curve',
+                        'trailing_7d': 'Today vs Trailing-7d Ghost Curve',
+                        'trailing_14d': 'Today vs Trailing-14d Ghost Curve',
+                        'trailing_30d': 'Today vs Trailing-30d Ghost Curve'
+                    };
+                    if (baselineTitles[updatedCfg.reference_baseline]) {
+                        titleSpan.textContent = baselineTitles[updatedCfg.reference_baseline];
+                    }
+                } else if (wType === 'hypo_free_streak') {
+                    if (String(updatedCfg.hypo_threshold) === '3.9') {
+                        titleSpan.textContent = 'Days Free of Hypo (< 3.9)';
+                    } else {
+                        titleSpan.textContent = 'Days Free of Severe Hypo (< 3.0)';
+                    }
+                } else if (wType === 'stacked_range_bar') {
+                    titleSpan.textContent = (updatedCfg.range_type === 'tight') ? 'Glycemic Range (Tight 3.9–7.8)' : 'Glycemic Range (Standard 3.9–10.0)';
+                }
+            }
+
+            // Re-render widget body with new config immediately
+            var bodyEl = targetEl.querySelector('.widget-body');
+            if (bodyEl && def.render) {
+                bodyEl.innerHTML = def.render(updatedCfg);
+            }
+
+            closeWidgetConfig();
+
+            // Persist layout with updated configs immediately while keeping edit mode open
+            saveActiveDashboardLayout(true);
+        }
+    </script>
+</body>
+</html>

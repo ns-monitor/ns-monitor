@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carpet Plot - ns-monitor</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        .carpet-page-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            margin-bottom: var(--space-6);
+        }
+        .carpet-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 1600px;
+            max-width: 100%;
+            margin-bottom: var(--space-3);
+            padding: var(--space-2) var(--space-4);
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            box-sizing: border-box;
+            flex-wrap: wrap;
+            gap: var(--space-3);
+        }
+        .carpet-stat-pill {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .carpet-stat-pill strong {
+            color: var(--text-color);
+        }
+        .carpet-chart-outer {
+            width: 1600px;
+            max-width: 100%;
+            display: flex;
+            justify-content: center;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: var(--space-4) 0;
+            box-sizing: border-box;
+            overflow-x: auto;
+        }
+        #carpet-chart {
+            width: 1600px;
+            min-width: 1600px;
+            height: 3180px;
+        }
+        .carpet-loading-overlay {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-6);
+            color: var(--text-secondary);
+            gap: var(--space-3);
+            min-height: 400px;
+        }
+        .carpet-spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: carpet-spin 0.8s linear infinite;
+        }
+        @keyframes carpet-spin {
+            to { transform: rotate(360deg); }
+        }
+        .density-btn.active, .year-btn.active {
+            background: var(--accent);
+            color: var(--accent-foreground);
+            border-color: var(--accent);
+        }
+    </style>
+</head>
+<body>
+    {% include "sidebar.html" %}
+
+    <div class="container full-width">
+        <header class="page-header" style="margin-bottom: var(--space-4);">
+            <div>
+                <h1 class="panel-h1">carpet plot (diurnal raster / dense temporal heatmap)</h1>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">
+                    All-time continuous glucose raster &bull; 24-hour diurnal scale &bull; 1 pixel per minute (5 pixels per reading)
+                </div>
+            </div>
+        </header>
+
+        <div class="carpet-page-wrapper">
+            <div class="carpet-toolbar" id="carpet-toolbar">
+                <div style="display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap;">
+                    <div class="carpet-stat-pill" id="stat-days">
+                        <span>Timeline:</span> <strong id="stat-range-text">Loading...</strong>
+                    </div>
+                    <div class="carpet-stat-pill" id="stat-readings">
+                        <span>Total Days:</span> <strong id="stat-days-count">--</strong>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;">
+                    <!-- Jump to year -->
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <span style="font-size: 0.8rem; color: var(--text-secondary); margin-right: 4px;">Year:</span>
+                        <div class="btn-group" id="year-btn-group"></div>
+                    </div>
+
+                    <!-- Density toggle -->
+                    <div style="display: flex; align-items: center; gap: 4px; margin-left: var(--space-2);">
+                        <span style="font-size: 0.8rem; color: var(--text-secondary); margin-right: 4px;">Density:</span>
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-secondary btn-sm density-btn" data-density="1" id="btn-density-1">1px</button>
+                            <button type="button" class="btn btn-secondary btn-sm density-btn active" data-density="2" id="btn-density-2">2px</button>
+                            <button type="button" class="btn btn-secondary btn-sm density-btn" data-density="3" id="btn-density-3">3px</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="carpet-chart-outer">
+                <div id="carpet-loading" class="carpet-loading-overlay">
+                    <div class="carpet-spinner"></div>
+                    <div>Loading raster data for all time...</div>
+                </div>
+                <div id="carpet-chart" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            let chartInstance = null;
+            let loadedDays = [];
+            let loadedMatrix = [];
+            let currentDensity = 2; // default 2px per day
+            const NAN_COLOR = '#1a1f26'; // 15% dark charcoal grey for NaN and weekly divider
+
+            // Format category X-axis slots (288 slots: 00:00 to 23:55)
+            const xCategories = [];
+            for (let i = 0; i < 288; i++) {
+                const totalMins = i * 5;
+                const hh = String(Math.floor(totalMins / 60)).padStart(2, '0');
+                const mm = String(totalMins % 60).padStart(2, '0');
+                xCategories.push(hh + ':' + mm);
+            }
+
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+            async function loadCarpetPlot() {
+                try {
+                    const resp = await fetch('/api/carpet_plot');
+                    if (!resp.ok) {
+                        throw new Error('HTTP ' + resp.status + ': ' + resp.statusText);
+                    }
+                    const payload = await resp.json();
+                    loadedDays = payload.days || [];
+                    loadedMatrix = payload.matrix || [];
+
+                    if (loadedDays.length === 0) {
+                        document.getElementById('carpet-loading').innerHTML = '<div>No CGM data found.</div>';
+                        return;
+                    }
+
+                    // Update header toolbar stats
+                    const minDate = loadedDays[0];
+                    const maxDate = loadedDays[loadedDays.length - 1];
+                    document.getElementById('stat-range-text').textContent = minDate + ' to ' + maxDate;
+                    document.getElementById('stat-days-count').textContent = loadedDays.length.toLocaleString() + ' days';
+
+                    buildYearButtons(loadedDays);
+                    renderRaster();
+                } catch (err) {
+                    console.error('Failed to load carpet plot data:', err);
+                    document.getElementById('carpet-loading').innerHTML = '<div style="color: var(--danger);">Failed to load carpet plot: ' + err.message + '</div>';
+                }
+            }
+
+            function buildYearButtons(days) {
+                const years = new Set();
+                days.forEach(function(d) {
+                    years.add(d.slice(0, 4));
+                });
+                const sortedYears = Array.from(years).sort();
+                const container = document.getElementById('year-btn-group');
+                container.innerHTML = '';
+
+                sortedYears.forEach(function(yr) {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'btn btn-secondary btn-sm year-btn';
+                    btn.textContent = yr;
+                    btn.addEventListener('click', function() {
+                        jumpToYear(yr);
+                    });
+                    container.appendChild(btn);
+                });
+            }
+
+            function jumpToYear(yr) {
+                const idx = loadedDays.findIndex(function(d) {
+                    return d.startsWith(yr);
+                });
+                if (idx !== -1) {
+                    // Calculate pixel offset from top
+                    const yOffset = idx * currentDensity + 80;
+                    const chartElem = document.getElementById('carpet-chart');
+                    const targetScroll = chartElem.getBoundingClientRect().top + window.pageYOffset + yOffset - 120;
+                    window.scrollTo({
+                        top: targetScroll,
+                        behavior: 'smooth'
+                    });
+                }
+            }
+
+            function renderRaster() {
+                const loadingElem = document.getElementById('carpet-loading');
+                const chartElem = document.getElementById('carpet-chart');
+                loadingElem.style.display = 'none';
+                chartElem.style.display = 'block';
+
+                const totalDays = loadedDays.length;
+                const gridHeight = totalDays * currentDensity;
+                const totalChartHeight = gridHeight + 130; // 70px top, 60px bottom
+                chartElem.style.height = totalChartHeight + 'px';
+
+                if (!chartInstance) {
+                    chartInstance = echarts.init(chartElem, null, { renderer: 'canvas' });
+                } else {
+                    chartInstance.resize({ height: totalChartHeight });
+                }
+
+                // Flatten matrix for heatmap series [x, y, value]
+                // Only push non-null values; missing slots naturally reveal the grid's neutral NaN background color
+                const flatData = [];
+                for (let y = 0; y < totalDays; y++) {
+                    const row = loadedMatrix[y];
+                    if (!row) continue;
+                    for (let x = 0; x < 288; x++) {
+                        const val = row[x];
+                        if (val !== null && val !== undefined) {
+                            flatData.push([x, y, val]);
+                        }
+                    }
+                }
+
+                // Year boundaries map for quick lookup
+                const firstDayOfMonthIndices = new Set();
+                for (let i = 0; i < totalDays; i++) {
+                    const dayStr = loadedDays[i];
+                    if (dayStr.slice(8, 10) === '01') {
+                        firstDayOfMonthIndices.add(i);
+                    }
+                }
+                // Ensure the very first day has a tick if far enough from next
+                if (totalDays > 0) {
+                    firstDayOfMonthIndices.add(0);
+                }
+
+                // Build 1-pixel Sunday-Monday weekly divider line overlays (z: 50 so they sit cleanly on top of the heatmap)
+                const dividerElements = [];
+                for (let i = 0; i < totalDays - 1; i++) {
+                    const d1 = new Date(loadedDays[i] + 'T00:00:00');
+                    const d2 = new Date(loadedDays[i + 1] + 'T00:00:00');
+                    if (d1.getDay() === 0 && d2.getDay() === 1) {
+                        const ySeam = Math.round(65 + (i + 1) * currentDensity);
+                        dividerElements.push({
+                            type: 'line',
+                            silent: true,
+                            z: 50,
+                            shape: {
+                                x1: 80,
+                                y1: ySeam,
+                                x2: 1520,
+                                y2: ySeam
+                            },
+                            style: {
+                                stroke: NAN_COLOR, // coloured the same as NaN CGM values
+                                lineWidth: 1
+                            }
+                        });
+                    }
+                }
+
+                const option = {
+                    backgroundColor: 'transparent',
+                    animation: false,
+                    graphic: dividerElements,
+                    tooltip: {
+                        position: 'top',
+                        confine: true,
+                        backgroundColor: 'rgba(22, 27, 34, 0.95)',
+                        borderColor: '#30363d',
+                        textStyle: { color: '#e6edf3', fontSize: 12 },
+                        formatter: function(params) {
+                            const x = params.value[0];
+                            const y = params.value[1];
+                            const val = params.value[2];
+                            const dateStr = loadedDays[y];
+                            const d = new Date(dateStr + 'T00:00:00');
+                            const dayName = dayNames[d.getDay()];
+                            const timeStr = xCategories[x];
+                            return '<div style="font-weight: 600; margin-bottom: 2px;">' + dayName + ' ' + dateStr + ' ' + timeStr + '</div>' +
+                                   '<div style="display: flex; align-items: center; gap: 8px;">' +
+                                   '<span>Glucose:</span> <strong style="font-size: 1.1em;">' + val.toFixed(1) + ' mmol/L</strong>' +
+                                   '</div>';
+                        }
+                    },
+                    visualMap: {
+                        type: 'piecewise',
+                        orient: 'horizontal',
+                        left: 'center',
+                        top: 15,
+                        itemWidth: 16,
+                        itemHeight: 14,
+                        itemGap: 16,
+                        textStyle: {
+                            color: '#8b949e',
+                            fontSize: 12
+                        },
+                        pieces: [
+                            { lt: 3.0, label: 'Severe Hypo (<3.0)', color: '#8e24aa' },
+                            { gte: 3.0, lte: 3.8, label: 'Mild Hypo (3.0–3.8)', color: '#ef4444' },
+                            { gt: 3.8, lte: 10.0, label: 'In Range (3.9–10.0)', color: '#1e3a2f' },
+                            { gt: 10.0, lt: 14.0, label: 'Elevated (10.1–13.9)', color: '#f59e0b' },
+                            { gte: 14.0, label: 'Severe Hyper (≥14.0)', color: '#facc15' },
+                            { value: -999, label: 'Missing Data (NaN)', color: NAN_COLOR }
+                        ],
+                        outOfRange: {
+                            color: NAN_COLOR
+                        }
+                    },
+                    grid: {
+                        left: 80,
+                        width: 1440, // exactly 1,440 pixels wide (1 px/minute, 5 px/reading)
+                        top: 65,
+                        height: gridHeight,
+                        backgroundColor: NAN_COLOR, // neutral 15% dark charcoal grey for gaps and sensor warm-ups
+                        show: true,
+                        borderColor: '#30363d',
+                        borderWidth: 1
+                    },
+                    xAxis: [
+                        {
+                            type: 'category',
+                            data: xCategories,
+                            position: 'top',
+                            splitArea: { show: false },
+                            axisLine: {
+                                lineStyle: { color: '#30363d' }
+                            },
+                            axisTick: {
+                                show: true,
+                                interval: function(index) {
+                                    // Every 2 hours (24 slots = 2 hours)
+                                    return index % 24 === 0 || index === 287;
+                                },
+                                lineStyle: { color: '#8b949e' }
+                            },
+                            axisLabel: {
+                                interval: function(index) {
+                                    return index % 24 === 0;
+                                },
+                                formatter: function(value) {
+                                    return value;
+                                },
+                                color: '#8b949e',
+                                fontSize: 11
+                            },
+                            splitLine: {
+                                show: true,
+                                interval: function(index) {
+                                    // Subtle hourly vertical column guides
+                                    return index % 12 === 0;
+                                },
+                                lineStyle: {
+                                    color: 'rgba(255, 255, 255, 0.04)',
+                                    width: 1,
+                                    type: 'solid'
+                                }
+                            }
+                        },
+                        {
+                            type: 'category',
+                            data: xCategories,
+                            position: 'bottom',
+                            splitArea: { show: false },
+                            axisLine: {
+                                lineStyle: { color: '#30363d' }
+                            },
+                            axisTick: {
+                                show: true,
+                                interval: function(index) {
+                                    return index % 24 === 0 || index === 287;
+                                },
+                                lineStyle: { color: '#8b949e' }
+                            },
+                            axisLabel: {
+                                interval: function(index) {
+                                    return index % 24 === 0;
+                                },
+                                formatter: function(value) {
+                                    return value;
+                                },
+                                color: '#8b949e',
+                                fontSize: 11
+                            },
+                            splitLine: {
+                                show: false
+                            }
+                        }
+                    ],
+                    yAxis: {
+                        type: 'category',
+                        data: loadedDays,
+                        inverse: true, // Chronological top-to-bottom: 2022 at top, 2026 at bottom
+                        splitArea: { show: false },
+                        axisLine: {
+                            lineStyle: { color: '#30363d' }
+                        },
+                        axisTick: {
+                            show: true,
+                            interval: function(index) {
+                                return firstDayOfMonthIndices.has(index);
+                            },
+                            lineStyle: { color: '#8b949e' }
+                        },
+                        axisLabel: {
+                            interval: function(index) {
+                                return firstDayOfMonthIndices.has(index);
+                            },
+                            formatter: function(value) {
+                                // 'YYYY-MM-DD' -> 'mmm yy' (e.g. 'Jul 22')
+                                const parts = value.split('-');
+                                const yr = parts[0].slice(2);
+                                const mIdx = parseInt(parts[1], 10) - 1;
+                                return monthNames[mIdx] + ' ' + yr;
+                            },
+                            color: '#8b949e',
+                            fontSize: 11
+                        },
+                        splitLine: {
+                            show: false
+                        }
+                    },
+                    series: [{
+                        name: 'CGM',
+                        type: 'heatmap',
+                        data: flatData,
+                        progressive: 0, // Single-pass crisp canvas raster
+                        progressiveThreshold: 1000000,
+                        itemStyle: {
+                            borderWidth: 0
+                        }
+                    }]
+                };
+
+                chartInstance.setOption(option, true);
+            }
+
+            // Density switcher event listeners
+            [1, 2, 3].forEach(function(d) {
+                const btn = document.getElementById('btn-density-' + d);
+                btn.addEventListener('click', function() {
+                    if (currentDensity === d) return;
+                    currentDensity = d;
+                    document.querySelectorAll('.density-btn').forEach(function(b) {
+                        b.classList.toggle('active', b.getAttribute('data-density') === String(d));
+                    });
+                    renderRaster();
+                });
+            });
+
+            // Initialize on DOMContentLoaded
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', loadCarpetPlot);
+            } else {
+                loadCarpetPlot();
+            }
+        })();
+    </script>
+</body>
+</html>

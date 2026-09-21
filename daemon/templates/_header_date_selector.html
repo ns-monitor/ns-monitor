@@ -1,0 +1,107 @@
+<!-- _header_date_selector.html - Unified sticky header date selector popover -->
+<div class="date-picker-wrap" data-earliest-date="{{ earliest_cgm_date or '' }}"{% if date_state_namespace %} data-date-state-namespace="{{ date_state_namespace }}"{% endif %}>
+    <div class="date-picker-trigger-group">
+        <button type="button" class="trigger-step-btn" onclick="nsShiftPeriod(-1)" title="Previous period">&lsaquo;</button>
+        <button type="button" class="date-picker-trigger" id="date-picker-trigger" onclick="toggleDatePopover(event)">
+            <i class="fa-solid fa-calendar-days"></i>
+            <span id="trigger-range-text">&nbsp;</span>
+            <span class="trigger-compare-text" id="trigger-compare-text"></span>
+        </button>
+        <button type="button" class="trigger-step-btn" onclick="nsShiftPeriod(1)" title="Next period">&rsaquo;</button>
+    </div>
+
+    <div class="date-popover" id="date-popover" style="display: none;">
+        <div class="date-popover-section">
+            <div class="date-popover-title">Primary Range</div>
+
+            <div class="popover-controls-row" style="margin-bottom: var(--space-3);">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="include-today" onchange="nsOnIncludeTodayChange()"> Include Today
+                </label>
+                <select class="form-select" id="date-preset" onchange="nsOnPresetChange()">
+                    {% if long_term_presets %}
+                    <option value="365">Last 1 Year</option>
+                    <option value="730">Last 2 Years</option>
+                    <option value="1095">Last 3 Years</option>
+                    <option value="1825">Last 5 Years</option>
+                    <option value="" disabled>──────────────</option>
+                    <option value="all_time">All Time</option>
+                    {% else %}
+                    <option value="today">Today</option>
+                    <option value="yesterday">Yesterday</option>
+                    <option value="" disabled>──────────────</option>
+                    <option value="3">Last 3 Days</option>
+                    <option value="7">Last 7 Days</option>
+                    <option value="14">Last 14 Days</option>
+                    <option value="30">Last 30 Days</option>
+                    <option value="60">Last 60 Days</option>
+                    <option value="90">Last 90 Days</option>
+                    <option value="180">Last 180 Days</option>
+                    <option value="" disabled>──────────────</option>
+                    <option value="prev_1m">Previous Month</option>
+                    <option value="prev_3m">Previous 3 Months</option>
+                    <option value="prev_6m">Previous 6 Months</option>
+                    <option value="prev_12m">Previous 12 Months</option>
+                    <option value="" disabled>──────────────</option>
+                    <option value="all_time">All of Time</option>
+                    {% endif %}
+                </select>
+            </div>
+
+            <div class="date-pill" style="margin-bottom: 0;">
+                <button type="button" class="step-btn" onclick="nsShiftPeriod(-1)">&lsaquo;</button>
+                <div class="date-input-group">
+                    <input type="date" id="start_date" class="pill-date-input" value="{{ start_date }}" max="{{ today_local }}" onchange="nsSyncInputs()">
+                    <span class="date-separator">to</span>
+                    <input type="date" id="end_date" class="pill-date-input" value="{{ end_date }}" max="{{ today_local }}" onchange="nsSyncInputs()">
+                </div>
+                <button type="button" class="step-btn" onclick="nsShiftPeriod(1)">&rsaquo;</button>
+            </div>
+        </div>
+
+        {% if has_compare %}
+        <div class="date-popover-section compare-section">
+            <div class="popover-controls-row" style="margin-bottom: var(--space-3);">
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <label class="checkbox-label" style="margin: 0;">
+                        <input type="checkbox" id="compare-toggle" onchange="nsOnCompareToggleChange()"> Compare to
+                    </label>
+                    <span class="tooltip tooltip-icon">?
+                        <span class="tooltiptext">Ticking this overrides the default comparison behaviour -- normally each panel compares your Primary Range to the period immediately before it, matched in length. With this on, you can pick a completely different comparison period, of any length and dates. Note not every display on this page uses a comparison; some show current-period data only.</span>
+                    </span>
+                </div>
+                <select class="form-select" id="date-preset-lastperiod" onchange="nsOnPresetChangeLastPeriod()">
+                    <option value="">Custom Range...</option>
+                    <option value="1">1 Day</option>
+                    <option value="2">2 Days</option>
+                    <option value="3">3 Days</option>
+                    <option value="7">7 Days</option>
+                    <option value="14">14 Days</option>
+                    <option value="30">30 Days</option>
+                    <option value="60">60 Days</option>
+                    <option value="90">90 Days</option>
+                    <option value="180">180 Days</option>
+                    <option value="" disabled>──────────────</option>
+                    <option value="prev_1m">1 Month</option>
+                    <option value="prev_3m">3 Months</option>
+                    <option value="prev_6m">6 Months</option>
+                    <option value="prev_12m">12 Months</option>
+                </select>
+            </div>
+
+            <!-- Comparison details: always visible (disabled when Compare to is unticked) -->
+            <div id="compare-details">
+                <div class="date-pill" id="compare-date-pill" style="margin-bottom: 0;">
+                    <button type="button" class="step-btn" id="step-btn-prev-lp" onclick="nsShiftPeriodLastPeriod(-1)">&lsaquo;</button>
+                    <div class="date-input-group">
+                        <input type="date" id="start_date-lastperiod" class="pill-date-input" onchange="nsSyncInputsLastPeriod()">
+                        <span class="date-separator">to</span>
+                        <input type="date" id="end_date-lastperiod" class="pill-date-input" onchange="nsSyncInputsLastPeriod()">
+                    </div>
+                    <button type="button" class="step-btn" id="step-btn-next-lp" onclick="nsShiftPeriodLastPeriod(1)">&rsaquo;</button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>

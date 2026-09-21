@@ -1,0 +1,3173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar — ns-monitor</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .cal-stepper {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .cal-month-label {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-color);
+            min-width: 170px;
+            text-align: center;
+            display: inline-block;
+        }
+
+        .cal-month-label-btn {
+            background: none;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            padding: 4px 10px;
+            transition: border-color 0.15s ease, background 0.15s ease;
+        }
+
+        .cal-month-label-btn:hover {
+            border-color: var(--border-color);
+            background: var(--surface-hover);
+        }
+
+        .pill-date-input {
+            background: var(--surface-inset);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-color);
+            font-size: 0.85rem;
+            padding: 4px 8px;
+        }
+
+        .cal-controls-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--space-4);
+            flex-wrap: wrap;
+            gap: var(--space-3);
+        }
+
+        .cal-presets {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+        }
+
+        .cal-preset-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .cal-status-msg {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            min-height: 1.2em;
+        }
+
+        .cal-card {
+            padding: var(--space-4);
+        }
+
+        .cal-weekdays-row {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: var(--space-2);
+            text-align: center;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: var(--space-2);
+            padding-bottom: var(--space-2);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .cal-days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: var(--space-2);
+            max-height: 560px;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            scroll-behavior: auto;
+            outline: none;
+            /* iPad touch pass (3 Sep 2026): swipe scroll already works here
+               natively (plain overflow-y: auto, confirmed on-device) -- this
+               is a defensive legacy addition only, no behaviour change
+               expected on current iPadOS. See
+               docs/analysis/ipad-touch-support-plan.md Phase D. */
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Hourglass cursor while a buffer-fill fetch is in flight.
+           .cal-cell has its own cursor:pointer, so we need to override
+           it on child elements too. */
+        .cal-days-grid.is-loading,
+        .cal-days-grid.is-loading .cal-cell {
+            cursor: wait;
+        }
+
+        .cal-cell {
+            min-height: 86px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: var(--space-2);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+            user-select: none;
+            position: relative;
+        }
+
+        .cal-cell:hover {
+            border-color: var(--border-color-strong);
+            background: var(--surface-hover);
+            transform: translateY(-1px);
+        }
+
+        .cal-cell-today {
+            border-color: var(--accent) !important;
+            box-shadow: inset 0 0 0 1px var(--accent);
+        }
+
+        .cal-cell-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .cal-day-num {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 10px;
+            padding: 1px 4px;
+        }
+        .cal-day-num:hover {
+            background: var(--surface-inset);
+        }
+
+        .cal-cell-today .cal-day-num {
+            color: var(--accent);
+        }
+
+        .cal-cell-body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-grow: 1;
+            padding: var(--space-1) 0;
+        }
+
+        .cal-cell-val {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-color);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .cal-val-muted {
+            opacity: 0.35;
+            font-size: 1rem;
+            font-weight: 400;
+        }
+
+        .cal-val-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+        }
+
+        .cal-val-miss {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .cal-cell-match {
+            background: color-mix(in srgb, var(--success) 20%, var(--card-bg));
+            border-color: var(--success);
+        }
+
+        .cal-cell-match:hover {
+            background: color-mix(in srgb, var(--success) 28%, var(--card-bg));
+            border-color: var(--success);
+        }
+
+        /* 9-Grid Position Slots */
+        .cal-slot-tc { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); z-index: 2; pointer-events: none; }
+        .cal-slot-tr { position: absolute; top: 4px; right: 6px; z-index: 2; pointer-events: none; }
+        .cal-slot-ml { position: absolute; top: 50%; left: 6px; transform: translateY(-50%); z-index: 2; pointer-events: none; }
+        .cal-slot-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2; pointer-events: none; }
+        .cal-slot-mr { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); z-index: 2; pointer-events: none; }
+        .cal-slot-bl { position: absolute; bottom: 4px; left: 6px; z-index: 2; pointer-events: none; }
+        .cal-slot-bc { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); z-index: 2; pointer-events: none; }
+        .cal-slot-br { position: absolute; bottom: 4px; right: 6px; z-index: 2; pointer-events: none; }
+
+        /* Corner Badges */
+        .cal-corner-badge {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            pointer-events: none;
+            z-index: 2;
+        }
+        .cal-badge-tr {
+            top: 0; right: 0;
+            border-width: 0 18px 18px 0;
+            border-color: transparent var(--b-color, var(--accent)) transparent transparent;
+            border-top-right-radius: 5px;
+        }
+        .cal-badge-tl {
+            top: 0; left: 0;
+            border-width: 18px 18px 0 0;
+            border-color: var(--b-color, var(--accent)) transparent transparent transparent;
+            border-top-left-radius: 5px;
+        }
+        .cal-badge-br {
+            bottom: 0; right: 0;
+            border-width: 0 0 18px 18px;
+            border-color: transparent transparent var(--b-color, var(--accent)) transparent;
+            border-bottom-right-radius: 5px;
+        }
+        .cal-badge-bl {
+            bottom: 0; left: 0;
+            border-width: 18px 0 0 18px;
+            border-color: transparent transparent transparent var(--b-color, var(--accent));
+            border-bottom-left-radius: 5px;
+        }
+
+        /* Edge Tabs (Semi-circles) */
+        .cal-tab-top {
+            position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+            width: 14px; height: 7px; border-radius: 0 0 7px 7px;
+            pointer-events: none; z-index: 2;
+        }
+        .cal-tab-bottom {
+            position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+            width: 14px; height: 7px; border-radius: 7px 7px 0 0;
+            pointer-events: none; z-index: 2;
+        }
+        .cal-tab-left {
+            position: absolute; top: 50%; left: 0; transform: translateY(-50%);
+            width: 7px; height: 14px; border-radius: 0 7px 7px 0;
+            pointer-events: none; z-index: 2;
+        }
+        .cal-tab-right {
+            position: absolute; top: 50%; right: 0; transform: translateY(-50%);
+            width: 7px; height: 14px; border-radius: 7px 0 0 7px;
+            pointer-events: none; z-index: 2;
+        }
+
+        /* Shapes */
+        .cal-shape-circle {
+            display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+            vertical-align: middle;
+        }
+        .cal-shape-square {
+            display: inline-block; width: 9px; height: 9px;
+            vertical-align: middle;
+        }
+        .cal-shape-triangle {
+            display: inline-block; width: 0; height: 0;
+            border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 9px solid;
+            vertical-align: middle;
+        }
+
+        .cal-num-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 17px;
+            height: 17px;
+            padding: 0 4px;
+            border-radius: 9px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            line-height: 1;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            box-sizing: border-box;
+        }
+        .cal-custom-text {
+            display: inline-flex;
+            align-items: center;
+            font-weight: 700;
+            font-size: 0.82rem;
+            line-height: 1;
+        }
+
+        /* BG Sparkline overlay (31 Aug 2026) -- front layer, painted on top
+           of fill/badge/body content by DOM order (see buildSparklineSvg()/
+           buildDayCell() in the script below). Absolutely positioned over
+           the whole cell (.cal-cell already has position:relative);
+           pointer-events:none so it never blocks the cell's click-to-drill-
+           into-Trace behaviour. preserveAspectRatio="none" on the <svg>
+           itself stretches the sparkline to the cell's actual aspect
+           ratio -- not fixed here. */
+        .cal-sparkline {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* Month-boundary accent border (31 Aug 2026): cleanly marks the
+           boundary between adjacent months without breaking the uniform
+           7-column week grid or adding spacer rows/blank padding cells. */
+        .cal-boundary-top {
+            border-top: 2px solid var(--text-color) !important;
+        }
+        .cal-boundary-bottom {
+            border-bottom: 2px solid var(--text-color) !important;
+        }
+        .cal-boundary-left {
+            border-left: 2px solid var(--text-color) !important;
+        }
+        .cal-day-month-start {
+            font-weight: 800;
+            color: var(--text-color) !important;
+            letter-spacing: 0.3px;
+        }
+
+        .cal-status-icon-wrap {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .cal-status-icon-wrap i {
+            font-size: 1.4rem;
+        }
+
+        .cal-status-icon-wrap span {
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .cal-cell-nodata {
+            opacity: 0.45;
+            background: var(--surface-inset);
+            border-style: dashed;
+        }
+
+        .cal-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: var(--space-4);
+            padding-top: var(--space-3);
+            border-top: 1px solid var(--border-color);
+            font-size: 0.85rem;
+        }
+
+        .cal-legend {
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+        }
+
+        .cal-legend-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            color: var(--text-secondary);
+        }
+
+        .cal-swatch {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            border: 1px solid var(--border-color);
+            display: inline-block;
+        }
+
+        .cal-swatch-match {
+            background: color-mix(in srgb, var(--success) 20%, var(--card-bg));
+            border-color: var(--success);
+        }
+
+        .cal-swatch-nodata {
+            background: var(--surface-inset);
+            border-style: dashed;
+            opacity: 0.45;
+        }
+
+        .cal-drill-hint {
+            font-style: italic;
+        }
+
+        @media (max-width: 900px) {
+            .cal-cell {
+                min-height: 72px;
+            }
+            .cal-cell-val {
+                font-size: 0.95rem;
+            }
+        }
+
+        /* Overlay settings popover -- searchable multi-select list
+           (Phase A, 31 Aug 2026). Page-local since this shape is
+           Calendar-specific; the modal/color-palette CSS ported in
+           alongside it further down IS shared with targets.html (copied,
+           not yet centralised -- see AGENTS.md note on that duplication). */
+        .overlay-list-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .overlay-list-container {
+            max-height: 220px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--surface-inset);
+        }
+
+        .overlay-list-empty {
+            padding: 14px 10px;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.85em;
+        }
+
+        .overlay-list-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .overlay-list-row:last-child {
+            border-bottom: none;
+        }
+
+        .overlay-list-row-main {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+            flex: 1 1 auto;
+            cursor: pointer;
+        }
+
+        .overlay-list-label {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--text-color);
+            font-size: 0.88em;
+        }
+
+        .overlay-list-type {
+            font-size: 0.68em;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+
+        .overlay-list-actions-icons {
+            display: flex;
+            gap: 2px;
+            flex-shrink: 0;
+        }
+        .overlay-list-actions-icons .panel-icon-btn {
+            width: 24px;
+            height: 24px;
+            font-size: 0.78em;
+        }
+
+        .cal-legend-item-secondary {
+            opacity: 0.55;
+            font-style: italic;
+        }
+
+        /* Filter create/edit modal + deletion-guard modal -- ported from
+           targets.html's Smart Filters tab (Phase A, 31 Aug 2026). Same
+           duplication note as targets.html itself: page-local because
+           targets.html's own copy is page-local too, not yet centralised
+           into ns-shared.css. */
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .modal-backdrop.active {
+            display: flex;
+        }
+        .modal-box {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color-strong);
+            border-radius: 8px;
+            width: 100%;
+            max-width: 860px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 12px 36px rgba(0,0,0,0.6);
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-color);
+            margin: 0;
+        }
+        .modal-body {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .modal-footer {
+            padding: 14px 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        /* Unify font-size across the whole Smart Filter form (31 Aug 2026,
+           Harry's steer -- match "Add Modifier"'s size everywhere except
+           the modal title, which lives in .modal-header, outside this
+           scope). .form-input/.form-select use font-size: inherit, so
+           Filter Name/Description/Display Defaults fields pick this up
+           automatically; ns-shared.css's sentence classes / form-label-minor /
+           char-counter classes are set to the same 0.82rem explicitly
+           since they don't inherit. Scoped to #filter-modal-backdrop only
+           -- does not touch #target-modal-backdrop (Daily Goals) or any
+           other page's .modal-body. */
+        #filter-modal-backdrop .modal-body {
+            font-size: 0.82rem;
+        }
+
+        .color-palette-options {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 6px;
+        }
+        .color-palette-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+        .color-palette-btn:hover {
+            transform: scale(1.15);
+        }
+        .color-palette-btn.selected {
+            border-color: #ffffff;
+            box-shadow: 0 0 0 2px var(--accent);
+        }
+    </style>
+</head>
+<body>
+    {% include "sidebar.html" %}
+
+    <div class="container container-fluid">
+        <header class="page-header">
+            <div class="panel-header-left">
+                <h1 class="panel-h1">Calendar</h1>
+            </div>
+            <div class="panel-header-right">
+                <div class="cal-stepper">
+                    <button type="button" class="btn btn-secondary" id="cal-prev-btn" title="Previous Month">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <div class="settings-menu-container">
+                        <button type="button" id="cal-month-label" class="cal-month-label cal-month-label-btn" title="Jump to month"></button>
+                        <div class="settings-popover" id="cal-month-popover" onclick="event.stopPropagation()">
+                            <div class="settings-popover-title">Jump to Month</div>
+                            <div class="settings-row">
+                                <label for="cal-month-input">Month</label>
+                                <input type="month" id="cal-month-input" class="pill-date-input">
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary" id="cal-next-btn" title="Next Month">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="cal-today-btn" title="Current Month">
+                        Today
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Tab Context Menu (Right Click on any View Tab) -->
+        <div class="tab-context-menu" id="tab-context-menu" onclick="event.stopPropagation()">
+            <div class="tab-context-header" id="tab-context-header">View Options</div>
+            <div class="tab-context-item" id="ctx-update" onclick="onContextUpdate()">
+                <i class="fa-solid fa-floppy-disk"></i> Update with current setup
+            </div>
+            <div class="tab-context-item" id="ctx-duplicate" onclick="onContextDuplicate()">
+                <i class="fa-solid fa-copy"></i> Duplicate as new view...
+            </div>
+            <div class="tab-context-item" id="ctx-rename" onclick="onContextRename()">
+                <i class="fa-solid fa-pen-to-square"></i> Rename view...
+            </div>
+            <div class="tab-context-item danger" id="ctx-delete" onclick="onContextDelete()">
+                <i class="fa-solid fa-trash"></i> Delete view
+            </div>
+        </div>
+
+        <main>
+            <div class="card cal-card print-break-avoid" id="cal-panel">
+                <div class="panel-header">
+                    <div class="panel-header-left">
+                        <h2 class="panel-h2" style="border: none; margin: 0; padding: 0;"><span id="cal-chart-title-text">Calendar</span></h2>
+                    </div>
+                    <div class="panel-header-right">
+                        <span id="cal-date-range" class="text-muted">Loading...</span>
+                        <div id="cal-status-msg" class="cal-status-msg"></div>
+                        <div class="header-action-buttons">
+                            <div class="view-pill-container">
+                                <button type="button" class="view-pill-btn" id="view-pill-btn" onclick="toggleViewDropdown(event)" title="Switch or manage views">
+                                    <span id="active-view-label">Select View</span>
+                                    <i class="fa-solid fa-chevron-down" style="margin-left: 6px; font-size: 0.75em; opacity: 0.7;"></i>
+                                </button>
+                                <div class="view-dropdown-popover" id="view-dropdown-popover" onclick="event.stopPropagation()">
+                                    <div class="view-list" id="all-views-list"></div>
+                                    <div class="view-save-section">
+                                        <div id="view-save-prompt-row">
+                                            <button type="button" class="btn-save-view" onclick="showSaveViewInput()">
+                                                <i class="fa-solid fa-plus"></i> Save Current View...
+                                            </button>
+                                        </div>
+                                        <div id="view-save-input-row" style="display: none;" class="view-save-input-row">
+                                            <input type="text" id="new-view-name" placeholder="View name..." maxlength="25" onkeydown="if(event.key==='Enter') saveCurrentView(); if(event.key==='Escape') cancelSaveView();" />
+                                            <button type="button" class="btn-confirm-save" onclick="saveCurrentView()">Save</button>
+                                            <button type="button" class="btn-cancel-save" onclick="cancelSaveView()"><i class="fa-solid fa-xmark"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" class="panel-icon-btn" id="cal-print-btn" onclick="printCalPanel()" title="Print Calendar">
+                                <i class="fa-solid fa-print"></i>
+                            </button>
+                            <div class="settings-menu-container">
+                                <button type="button" class="panel-icon-btn" id="cal-settings-btn" onclick="toggleCalSettings(event)" title="Overlay settings">
+                                    <i class="fa-solid fa-gear"></i>
+                                </button>
+                                <div class="settings-popover" id="cal-settings-popover" onclick="event.stopPropagation()" style="min-width: 340px;">
+                                    <div class="settings-popover-title">Overlays</div>
+                                    <div class="settings-row">
+                                        <input type="text" id="cal-overlay-search" class="form-input form-input-full" placeholder="Search overlays...">
+                                    </div>
+                                    <div class="overlay-list-actions">
+                                        <label class="overlay-list-toggle-all-label">
+                                            <input type="checkbox" id="cal-overlay-toggle-all" class="overlay-list-checkbox overlay-list-toggle-all">
+                                            <span>Select all</span>
+                                        </label>
+                                        <a href="/settings?tab=filters" class="btn-link">Calendar Overlays &rsaquo;</a>
+                                    </div>
+                                    <div class="overlay-list-container" id="cal-overlay-list"></div>
+                                    <div style="margin-top: 10px;">
+                                        <button type="button" class="btn btn-primary" id="cal-overlay-create-btn" style="width: 100%;">
+                                            <i class="fa-solid fa-plus"></i> New Overlay
+                                        </button>
+                                    </div>
+                                    <div class="settings-note">Multiple checked overlays all render together -- fill/badge/icon draw in whatever order they're active, so it's on you to avoid clashing combinations. No placement/z-slot control yet (see STATUS.md).</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cal-weekdays-row">
+                    <div>Mon</div>
+                    <div>Tue</div>
+                    <div>Wed</div>
+                    <div>Thu</div>
+                    <div>Fri</div>
+                    <div>Sat</div>
+                    <div>Sun</div>
+                </div>
+                <div id="cal-days-grid" class="cal-days-grid">
+                    <!-- Days dynamically rendered here -->
+                </div>
+                <div class="cal-footer">
+                    <div class="cal-legend" id="cal-legend">
+                        <!-- Legend dynamically populated -->
+                    </div>
+                    <div class="cal-drill-hint text-muted">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Click any day to open Trace
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- CUSTOM OVERLAY AUTHORING MODAL -->
+    <div id="filter-modal-backdrop" class="modal-backdrop">
+        <div class="modal-box" style="max-width: 1040px; width: 75vw;">
+            <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <h3 class="modal-title" id="filter-modal-title">New Custom Overlay</h3>
+                </div>
+                <button type="button" class="btn btn-secondary" id="filter-modal-close" style="padding: 4px 8px;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row-split" style="margin-bottom: 18px; align-items: stretch;">
+                    <div class="form-group" style="flex: 0 0 250px; display: flex; flex-direction: column;">
+                        <label for="filter-name-input" class="form-label-minor">Overlay Name</label>
+                        <input type="text" id="filter-name-input" class="form-input form-input-full form-input-sm" placeholder="e.g. Weekend Hypo Risk" maxlength="30" required>
+                        <div class="char-counter" id="filter-name-counter">0 / 30</div>
+                        <div style="margin-top: 10px;">
+                            <label class="form-label-minor" style="margin-bottom: 4px;">Applies to</label>
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <label class="checkbox-label"><input type="checkbox" id="filter-applies-calendar" onchange="updateAppliesVisibility()" checked> Calendar</label>
+                                <div>
+                                    <label class="checkbox-label"><input type="checkbox" id="filter-applies-patterns" onchange="updateAppliesVisibility()"> Patterns</label>
+                                    <div id="patterns-applies-hint" style="display: none; font-size: 0.72rem; color: var(--text-secondary); margin-left: 20px;">Filters 24h AGP composite percentiles via "Only on:"</div>
+                                </div>
+                                <div>
+                                    <label class="checkbox-label"><input type="checkbox" id="filter-applies-trends" onchange="updateAppliesVisibility()"> Trends</label>
+                                    <div id="trends-applies-hint" style="display: none; font-size: 0.72rem; color: var(--text-secondary); margin-left: 20px;">Flags matching dates along trend timeline</div>
+                                </div>
+                                <div>
+                                    <label class="checkbox-label"><input type="checkbox" id="filter-applies-trace" onchange="updateAppliesVisibility()"> Trace</label>
+                                    <div id="trace-applies-hint" style="display: none; font-size: 0.72rem; color: var(--text-secondary); margin-left: 20px;">Pins event marker on 24h timeline canvas</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group" style="flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0;">
+                        <label for="filter-notes-input" class="form-label-minor">Description <span style="font-weight: 400; opacity: 0.75;">(optional)</span></label>
+                        <textarea id="filter-notes-input" class="form-input form-input-full form-input-sm" placeholder="What this overlay is for -- the name just needs to be recognisable, this is where the detail goes" maxlength="200" style="resize: vertical; flex: 1 1 auto; min-height: 100px;"></textarea>
+                        <div class="char-counter" id="filter-notes-counter">0 / 200</div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 6px;">
+                    <div id="filter-builder-container"></div>
+                </div>
+
+                <div id="calendar-display-section" style="margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <label style="font-weight: 600; font-size: 0.85rem; color: var(--text-color); margin-bottom: 0;">
+                            <i class="fa-solid fa-calendar-days"></i> Calendar Cell Appearance
+                        </label>
+                        <span style="font-size: 0.78rem; color: var(--text-secondary);">Configures visual badge, icon, and position for Calendar day cells</span>
+                    </div>
+                    <div style="display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap;">
+                        <!-- 0. Frequency: Show on -->
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <label class="form-label-minor" style="margin-bottom: 0;">Show on</label>
+                            <select id="filter-display-frequency" class="sentence-select" style="min-width: 155px;">
+                                <option value="matching" selected>Only on matching days</option>
+                                <option value="always">Every day</option>
+                            </select>
+                        </div>
+
+                        <!-- 1. Type -->
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <label class="form-label-minor" style="margin-bottom: 0;">Type</label>
+                            <div id="filter-type-select-wrap">
+                                <select id="filter-display-type" class="sentence-select" style="min-width: 140px;">
+                                    <option value="badge" selected>Badge</option>
+                                    <option value="fill">Cell Fill Tint</option>
+                                    <option value="circle">Circle ●</option>
+                                    <option value="square">Square ■</option>
+                                    <option value="triangle">Triangle ▲</option>
+                                    <option value="tick">Tick ✓</option>
+                                    <option value="cross">Cross ✕</option>
+                                    <option value="value">Value (Number)</option>
+                                    <option value="num_badge">Number Badge [3]</option>
+                                    <option value="custom_text">Custom Text</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- 1b. Value Metric selector (Only if Type == 'value' or 'num_badge') -->
+                        <div id="filter-val-metric-wrap" style="display: none; flex-direction: column; gap: 4px;">
+                            <label class="form-label-minor" style="margin-bottom: 0;">Value to display</label>
+                            <select id="filter-val-metric-select" class="sentence-select" style="min-width: 130px;">
+                            </select>
+                        </div>
+
+                        <!-- 1c. Custom Text Input (Only if Type == 'custom_text') -->
+                        <div id="filter-custom-text-wrap" style="display: none; flex-direction: column; gap: 4px;">
+                            <label class="form-label-minor" style="margin-bottom: 0;">Text / Template</label>
+                            <input type="text" id="filter-custom-text-input" class="sentence-input" placeholder="e.g. P, POD, TIR #%" maxlength="20" style="width: 130px;">
+                        </div>
+
+                        <!-- 2. Location -->
+                        <div id="filter-location-wrap" style="display: flex; flex-direction: column; gap: 4px;">
+                            <label class="form-label-minor" style="margin-bottom: 0;">Location</label>
+                            <select id="filter-display-location" class="sentence-select" style="min-width: 140px;">
+                                <option value="top-left">Top-Left</option>
+                                <option value="top-center">Top-Center</option>
+                                <option value="top-right" selected>Top-Right</option>
+                                <option value="mid-left">Mid-Left</option>
+                                <option value="center">Center</option>
+                                <option value="mid-right">Mid-Right</option>
+                                <option value="bottom-left">Bottom-Left</option>
+                                <option value="bottom-center">Bottom-Center</option>
+                                <option value="bottom-right">Bottom-Right</option>
+                            </select>
+                            <div id="location-fill-indicator" style="display: none; font-size: 0.82rem; color: var(--text-secondary); padding: 5px 0;">
+                                (Entire Cell)
+                            </div>
+                        </div>
+
+                        <!-- 3. Color -->
+                        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1 1 200px;">
+                            <label class="form-label-minor" style="margin-bottom: 0;">Colour</label>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="text" id="filter-color-hex" class="sentence-input" value="#e74c3c" style="width: 85px;">
+                                <div class="color-palette-options" id="filter-color-palette" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="filter-modal-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="filter-modal-save">Save Custom Overlay</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BLOCKING VIEWS / DELETION GUARD MODAL -- ported from targets.html -->
+    <div id="guard-modal-backdrop" class="modal-backdrop">
+        <div class="modal-box" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title" style="color: var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> Cannot Delete</h3>
+                <button type="button" class="btn btn-secondary" id="guard-modal-close" style="padding: 4px 8px;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="guard-modal-msg" style="margin: 0; color: var(--text-color);">
+                    This item cannot be deleted because it is actively referenced by saved views.
+                </p>
+                <div style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">Referenced in Views:</div>
+                <ul id="guard-modal-views-list" style="margin: 0; padding-left: 20px; color: var(--text-color); font-size: 0.9rem;"></ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="guard-modal-ok">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Day Note Popup: free-text notes (user + synced AAPS), Weight, HbA1c.
+         See docs/analysis/notes-weight-hba1c-implementation-plan.md (v3). -->
+    <div id="note-modal-backdrop" class="modal-backdrop">
+        <div class="modal-box" style="max-width: 640px;">
+            <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between;">
+                <h3 class="modal-title" id="note-modal-title">Notes</h3>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div style="position:relative;">
+                        <button type="button" class="btn btn-primary" id="note-add-entry-btn">+ Add Entry <i class="fa-solid fa-caret-down"></i></button>
+                        <div class="settings-popover" id="note-add-entry-popover" onclick="event.stopPropagation()" style="right:0; left:auto; min-width:180px;">
+                            <div class="overlay-list-row" data-add-type="user" style="cursor:pointer;">📝 Free Text Note</div>
+                            <div class="overlay-list-row" data-add-type="weight" style="cursor:pointer;">⚖️ Weight Record</div>
+                            <div class="overlay-list-row" data-add-type="hba1c" style="cursor:pointer;">🩸 HbA1c Record</div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary" id="note-modal-close" style="padding: 4px 8px;">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body" id="note-modal-body">
+                <div class="note-modal-empty-state" id="note-modal-empty">
+                    <i class="fa-regular fa-note-sticky"></i>
+                    No notes or records for this day.<br>Click &ldquo;+ Add Entry&rdquo; above to create one.
+                </div>
+                <div id="note-panel-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete confirmation, reuses the guard-modal shape but a separate
+         backdrop id since guard-modal-backdrop is targets/filters-specific
+         and its OK button has different wiring already. -->
+    <div id="note-delete-modal-backdrop" class="modal-backdrop">
+        <div class="modal-box" style="max-width: 420px;">
+            <div class="modal-header">
+                <h3 class="modal-title" style="color: var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> Delete Entry</h3>
+            </div>
+            <div class="modal-body">
+                <p id="note-delete-modal-msg" style="margin:0; color: var(--text-color);">Delete this entry? This cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="note-delete-cancel">Cancel</button>
+                <button type="button" class="btn btn-danger" id="note-delete-confirm">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/ns-filter-builder.js"></script>
+    <script src="/static/js/ns-orchestrator.js"></script>
+    <script src="/static/js/registries/calendar.js"></script>
+    <script src="/static/js/ns-view-manager.js"></script>
+    <script>
+        (function () {
+            'use strict';
+
+            // Filter authoring state, ported from targets.html's Smart
+            // Filters tab (Phase A, 31 Aug 2026). Registry entries built in
+            // setupDynamicOverlays() carry just enough for the popover list
+            // and grid rendering (label, encoding, color) -- filtersList
+            // carries the full row (notes, filter_tree, display_defaults)
+            // that the edit modal actually needs.
+            var metricsCatalog = {};
+            var filtersList = [];
+            var targetsList = [];
+            var editingFilterId = null;
+            var filterBuilderInstance = null;
+            var PRESET_COLORS = [
+                '#2ecc71', '#e74c3c', '#f39c12', '#3498db', '#9b59b6', '#1abc9c', '#e67e22', '#34495e'
+            ];
+
+            var TODAY_LOCAL = '{{ today_local }}' || new Date().toISOString().slice(0, 10);
+            var todayParts = TODAY_LOCAL.split('-');
+            var todayYear = parseInt(todayParts[0], 10);
+            var todayMonth = parseInt(todayParts[1], 10);
+            var todayDay = parseInt(todayParts[2], 10);
+
+            // Multi-select overlay state (Phase A, 31 Aug 2026). Falls back to
+            // the old single-value key if the new array key isn't present yet.
+            var savedActiveOverlayIds = [];
+            try {
+                var rawActiveIds = localStorage.getItem('ns_calendar_overlay_active_ids');
+                if (rawActiveIds) savedActiveOverlayIds = JSON.parse(rawActiveIds);
+            } catch (e) {}
+            if (!Array.isArray(savedActiveOverlayIds)) {
+                savedActiveOverlayIds = [];
+            }
+
+            var state = {
+                year: todayYear,
+                month: todayMonth,
+                presetId: savedActiveOverlayIds[0] || null,
+                activeOverlayIds: savedActiveOverlayIds,
+                loading: false,
+                data: null
+            };
+
+            var DEFAULT_CALENDAR_VIEWS = [
+                {
+                    id: 'view_default_sparkline',
+                    name: 'BG Sparkline',
+                    payload: { presetId: 'bg_sparkline', activeOverlayIds: ['bg_sparkline'] }
+                }
+            ];
+
+            var MONTH_NAMES = [
+                'January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'
+            ];
+
+            function padZero(num) {
+                return num < 10 ? '0' + num : '' + num;
+            }
+
+            function formatDateStr(y, m, d) {
+                return y + '-' + padZero(m) + '-' + padZero(d);
+            }
+
+            function findPresetById(id) {
+                var list = window.CALENDAR_REGISTRY || [];
+                for (var i = 0; i < list.length; i++) {
+                    if (list[i].id === id) return list[i];
+                }
+                return null;
+            }
+
+            function getActiveOverlayIds() {
+                return state.activeOverlayIds || [];
+            }
+
+            function updateControlsUI() {
+                var labelEl = document.getElementById('cal-month-label');
+                if (labelEl) {
+                    labelEl.textContent = MONTH_NAMES[state.month - 1] + ' ' + state.year;
+                }
+
+                var rangeEl = document.getElementById('cal-date-range');
+                if (rangeEl) {
+                    var lastDay = new Date(state.year, state.month, 0).getDate();
+                    var mName = MONTH_NAMES[state.month - 1].slice(0, 3);
+                    rangeEl.textContent = '1 ' + mName + ' ' + state.year + ' \u2013 ' + lastDay + ' ' + mName + ' ' + state.year;
+                }
+
+                updateLegendUI();
+            }
+
+            function printCalPanel() {
+                window.print();
+            }
+
+            // Names/labels on user-authored Targets and Filters are free text
+            // (see Phase 0, 31 Aug 2026 -- daemon/main.py's _validate_filter_name
+            // caps length but never blocks characters, so escaping on render is
+            // the actual control). Anything reaching innerHTML in this function
+            // must go through escapeHtml() first, no exceptions.
+            function escapeHtml(s) {
+                if (!s) return '';
+                return String(s)
+                    .split('&').join('&amp;')
+                    .split('<').join('&lt;')
+                    .split('>').join('&gt;')
+                    .split('"').join('&quot;');
+            }
+
+            // Same reasoning for colour values that get concatenated into an
+            // inline style attribute below -- the backend now locks
+            // display_defaults.color to a strict 6-digit hex on save, but this
+            // is the belt-and-suspenders check against anything written before
+            // that validation existed, or any built-in CSS var reference.
+            function isSafeColorValue(c) {
+                return typeof c === 'string' &&
+                    (/^#[0-9a-fA-F]{6}$/.test(c) || /^var\(--[a-zA-Z0-9-]+\)$/.test(c));
+            }
+
+            function safeSwatchColor(preset) {
+                var c = preset.color || 'var(--success)';
+                return isSafeColorValue(c) ? c : 'var(--success)';
+            }
+
+            function legendItemForPreset(preset) {
+                var swatchColor = safeSwatchColor(preset);
+                var label = escapeHtml(preset.label);
+                var enc = preset.encoding || (preset.overlayKind === 'value' ? 'value' : 'badge');
+
+                var iconHtml = '';
+                if (enc === 'fill') {
+                    iconHtml = '<span class="cal-swatch" style="background: color-mix(in srgb, ' + swatchColor + ' 25%, var(--card-bg)); border-color: ' + swatchColor + ';"></span>';
+                } else if (enc === 'badge') {
+                    iconHtml = '<span class="cal-swatch" style="position:relative; overflow:hidden; border-color: ' + swatchColor + ';"><span class="cal-corner-badge" style="border-top-color:' + swatchColor + '; border-right-color:' + swatchColor + '; border-width: 0 10px 10px 0;"></span></span>';
+                } else if (enc === 'circle') {
+                    iconHtml = '<span class="cal-shape-circle" style="background:' + swatchColor + '; margin-right:6px;"></span>';
+                } else if (enc === 'square') {
+                    iconHtml = '<span class="cal-shape-square" style="background:' + swatchColor + '; margin-right:6px;"></span>';
+                } else if (enc === 'triangle') {
+                    iconHtml = '<span class="cal-shape-triangle" style="border-bottom-color:' + swatchColor + '; margin-right:6px;"></span>';
+                } else if (enc === 'tick') {
+                    iconHtml = '<i class="fa-solid fa-check" style="color:' + swatchColor + '; font-size: 13px; margin-right:6px;"></i>';
+                } else if (enc === 'cross') {
+                    iconHtml = '<i class="fa-solid fa-xmark" style="color:' + swatchColor + '; font-size: 13px; margin-right:6px;"></i>';
+                } else if (enc === 'sparkline') {
+                    iconHtml = '<span style="display:inline-block; width:16px; height:2px; background:' + swatchColor + '; vertical-align:middle; margin-right:6px;"></span>';
+                } else if (enc === 'num_badge') {
+                    iconHtml = '<span class="cal-num-badge" style="background:' + swatchColor + '; color:#fff; font-size:10px; min-width:14px; height:14px; margin-right:6px;">#</span>';
+                } else if (enc === 'custom_text') {
+                    var txt = preset.customText || 'Text';
+                    iconHtml = '<span style="font-weight:700; color:' + swatchColor + '; margin-right:6px; font-size:11px;">' + escapeHtml(txt) + '</span>';
+                } else {
+                    iconHtml = '<span style="font-weight:700; color:' + swatchColor + '; margin-right:6px; font-size:11px;">123</span>';
+                }
+
+                return '<div class="cal-legend-item">' + iconHtml + '<span style="color:' + swatchColor + ';">' + label + '</span></div>';
+            }
+
+            function updateLegendUI() {
+                var legendEl = document.getElementById('cal-legend');
+                if (!legendEl) return;
+
+                var ids = getActiveOverlayIds();
+                if (!ids || !ids.length) {
+                    legendEl.innerHTML = '';
+                    return;
+                }
+
+                var rows = [];
+                ids.forEach(function (id) {
+                    var preset = findPresetById(id);
+                    if (!preset) return;
+                    rows.push(legendItemForPreset(preset));
+                });
+
+                legendEl.innerHTML = rows.join('');
+            }
+
+            function setStatus(msg) {
+                var el = document.getElementById('cal-status-msg');
+                if (el) el.textContent = msg;
+            }
+
+            // ---- Continuous scroll engine (30 Aug 2026) -------------------
+            // Replaces the old "redraw one month, refetch on every nav click"
+            // model. #cal-days-grid is now a single continuously-growing
+            // 7-column grid of day cells only (no month-padding cells --
+            // every child is a real date; weeks are always appended/
+            // prepended as complete Mon-Sun 7-cell chunks so column
+            // alignment never drifts), inside a fixed-height scrollable
+            // viewport (see .cal-days-grid CSS).
+            //
+            // Data separation (per Harry 30 Aug, extended 31 Aug for
+            // simultaneous multi-overlay rendering): overlayCache is keyed
+            // by overlay id, each slot holding just that overlay's values
+            // for the buffered range -- cheap, one number or one boolean
+            // per day. Every currently-active overlay gets fetched and
+            // cached independently (fetchOverlayRange fires one request per
+            // active id, Promise.all'd together); a full cache reset +
+            // refetch-of-everything-active on any toggle is still the
+            // simple behaviour for now (matches the pre-existing
+            // refreshBufferForNewPreset() pattern) -- not optimised to skip
+            // re-fetching overlays that were already active and cached.
+            // When sparklines or other heavier per-cell metrics land later,
+            // each still gets its OWN cache slot and its OWN range-scoped
+            // fetch, triggered only when that overlay is actually active
+            // for the currently-buffered dates -- never a blanket
+            // fetch-everything pull regardless of what's displayed. Same
+            // separation already used elsewhere on the site (AGP's
+            // decoupled fetch/render).
+            // Continuous ISO-week grid with stepped month-boundary borders
+            // (31 Aug 2026): weeks flow continuously without divider rows or
+            // blank padding cells, preserving uniform row pitch and stable
+            // coordinates. Month boundaries are visually demarcated by stepped
+            // border lines (.cal-boundary-top / .cal-boundary-left) and Day 1
+            // month badges. Destructive sliding-window buffer trimming during
+            // scroll is eliminated, preventing browser scroll clamping and jump
+            // bugs. Far jumps (month picker, prev/next) re-anchor cleanly.
+            var WEEKS_PER_FETCH = 6;
+            var EDGE_TRIGGER_ROWS = 2;
+
+            var scroll = {
+                bufferStartMonday: null,
+                bufferEndMonday: null,
+                loading: false,
+                rowPitch: null
+            };
+
+            // Keyed by overlay id: { <id>: { values: {}, matchSet: null, series: null } }.
+            var overlayCache = {};
+
+            function getOverlayCacheSlot(id) {
+                if (!overlayCache[id]) overlayCache[id] = { values: {}, matchSet: null, series: null };
+                return overlayCache[id];
+            }
+
+            function addDaysStr(dateStr, n) {
+                var parts = dateStr.split('-').map(Number);
+                var dt = new Date(parts[0], parts[1] - 1, parts[2] + n);
+                return formatDateStr(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+            }
+
+            function mondayOf(dateStr) {
+                var parts = dateStr.split('-').map(Number);
+                var dt = new Date(parts[0], parts[1] - 1, parts[2]);
+                var dow = (dt.getDay() + 6) % 7;
+                dt.setDate(dt.getDate() - dow);
+                return formatDateStr(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+            }
+
+            function mondayIndexOfDate(year, month, day) {
+                return (new Date(year, month - 1, day).getDay() + 6) % 7;
+            }
+
+            function formatDisplayDate(dateStr) {
+                var parts = dateStr.split('-').map(Number);
+                return parts[2] + ' ' + MONTH_NAMES[parts[1] - 1].slice(0, 3) + ' ' + parts[0];
+            }
+
+            function getRowPitch() {
+                var gridEl = document.getElementById('cal-days-grid');
+                if (!gridEl || !gridEl.children.length) return 94;
+                var sample = gridEl.children[0];
+                if (!sample) return 94;
+                var cs = window.getComputedStyle(gridEl);
+                var gap = parseFloat(cs.rowGap || cs.gap || '8') || 8;
+                return sample.getBoundingClientRect().height + gap;
+            }
+
+            // Fetches one overlay's data for the range into its own cache slot.
+            function fetchOneOverlayRange(preset, startStr, endStr) {
+                var promise;
+                if (preset.provider.method === 'POST') {
+                    var body = {
+                        filter: (preset.provider.body && preset.provider.body.filter) || {},
+                        dateRange: { start: startStr, end: endStr }
+                    };
+                    promise = window.NSOrchestrator.fetchPost(preset.provider, body);
+                    var needsVal = (preset.encoding === 'value' || preset.encoding === 'num_badge' || (preset.encoding === 'custom_text' && preset.customText && preset.customText.indexOf('#') !== -1)) && preset.valueMetric;
+                    if (needsVal) {
+                        var valProvider = {
+                            endpoint: '/api/v1/calendar/metric_values',
+                            method: 'GET',
+                            params: { metric: preset.valueMetric, window: 'single_day' }
+                        };
+                        return Promise.all([
+                            promise,
+                            window.NSOrchestrator.fetch(valProvider, { start: startStr, end: endStr }).catch(function (err) {
+                                console.warn('Metric value fetch failed for overlay ' + preset.id, err);
+                                return { values: {} };
+                            })
+                        ]).then(function(results) {
+                            var data = results[0];
+                            var valData = results[1] || { values: {} };
+                            var cache = getOverlayCacheSlot(preset.id);
+                            var list = (data && data.matchingDates) || [];
+                            if (!cache.matchSet) cache.matchSet = {};
+                            list.forEach(function (dd) { cache.matchSet[dd] = true; });
+                            var values = (valData && valData.values) || {};
+                            if (!cache.values) cache.values = {};
+                            Object.keys(values).forEach(function (dd) { cache.values[dd] = values[dd]; });
+                        });
+                    }
+                } else {
+                    promise = window.NSOrchestrator.fetch(preset.provider, { start: startStr, end: endStr });
+                }
+
+                return promise.then(function (data) {
+                    var cache = getOverlayCacheSlot(preset.id);
+                    if (preset.dataKey === 'matchingDates') {
+                        var list = (data && data.matchingDates) || [];
+                        if (!cache.matchSet) cache.matchSet = {};
+                        list.forEach(function (dd) { cache.matchSet[dd] = true; });
+                    } else if (preset.encoding === 'sparkline') {
+                        var perDay = (data && data[preset.dataKey]) || {};
+                        if (!cache.series) cache.series = {};
+                        Object.keys(perDay).forEach(function (dd) { cache.series[dd] = perDay[dd]; });
+                    } else {
+                        var values = (data && data[preset.dataKey]) || {};
+                        if (!cache.values) cache.values = {};
+                        Object.keys(values).forEach(function (dd) { cache.values[dd] = values[dd]; });
+                    }
+                });
+            }
+
+            // Dates with at least one clinical_notes row, for the note pill.
+            // Independent of the overlay system entirely (notes aren't an
+            // overlay preset) -- fetched in parallel with overlays below so
+            // every call site that already refreshes the overlay buffer gets
+            // pill data for free, no per-call-site changes needed.
+            var noteDatesSet = {};
+
+            function fetchNoteDatesRange(startStr, endStr) {
+                return fetch('/api/v1/notes/range?start=' + startStr + '&end=' + endStr)
+                    .then(function (r) { return r.ok ? r.json() : []; })
+                    .then(function (dates) {
+                        (dates || []).forEach(function (d) { noteDatesSet[d] = true; });
+                    })
+                    .catch(function (err) { console.warn('Failed to fetch note dates', err); });
+            }
+
+            function fetchOverlayRange(startStr, endStr) {
+                var notesPromise = fetchNoteDatesRange(startStr, endStr);
+                var ids = getActiveOverlayIds();
+                if (!ids || !ids.length) return notesPromise;
+                var presets = ids.map(findPresetById).filter(Boolean);
+                if (!presets.length) return notesPromise;
+                return Promise.all([notesPromise].concat(presets.map(function (preset) {
+                    return fetchOneOverlayRange(preset, startStr, endStr).catch(function(err) {
+                        console.error('Failed to fetch overlay ' + preset.id, err);
+                    });
+                })));
+            }
+
+            // Hand-rolled SVG sparkline, not an ECharts instance per cell
+            // (per docs/analysis/calendar-cell-content-model.md -- 35-42
+            // real chart instances for the visible buffer would be heavy).
+            // points: [[minute_of_day, bg], ...], already time-ordered.
+            // First pass (31 Aug 2026, Harry's steer): linear axis,
+            // hardcoded yMin/yMax from the registry entry (2-15 mmol/L) --
+            // values outside that range clamp to the axis edge rather than
+            // being excluded, so the line stays continuous through a real
+            // high/low instead of breaking. viewBox is arbitrary units
+            // (100x40) stretched to the cell's actual aspect ratio via
+            // preserveAspectRatio="none"; vector-effect keeps the stroke
+            // width visually constant regardless of that stretch.
+            function buildSparklineSvg(points, preset) {
+                if (!points || !points.length) return '';
+                var yMin = preset.yAxisMin != null ? preset.yAxisMin : 2;
+                var yMax = preset.yAxisMax != null ? preset.yAxisMax : 15;
+                var w = 100, h = 40;
+
+                function yFor(bg) {
+                    var clamped = Math.max(yMin, Math.min(yMax, bg));
+                    return h - ((clamped - yMin) / (yMax - yMin)) * h;
+                }
+
+                // Reference bands (31 Aug 2026, Harry's steer) -- drawn
+                // first so the BG line paints on top of them. Both
+                // deliberately light/low-opacity; overlapping each other or
+                // another active overlay's fill where they intersect is
+                // explicitly acceptable, not a bug to solve for.
+                var bandsHtml = '';
+                // In-range BG band (3.9-7.8 mmol/L), clamped to the axis
+                // bounds so it degrades gracefully if yMin/yMax is ever
+                // narrower than the band itself.
+                var rangeLo = Math.max(yMin, 3.9), rangeHi = Math.min(yMax, 7.8);
+                if (rangeHi > rangeLo) {
+                    var bandY = yFor(rangeHi), bandH = yFor(rangeLo) - yFor(rangeHi);
+                    bandsHtml += '<rect x="0" y="' + bandY.toFixed(1) + '" width="' + w + '" height="' + bandH.toFixed(1) + '" fill="rgba(46,204,113,0.16)"></rect>';
+                }
+                // Daytime band (06:00-18:00)
+                var dayX = (360 / 1440) * w, dayW = ((1080 - 360) / 1440) * w;
+                bandsHtml += '<rect x="' + dayX.toFixed(1) + '" y="0" width="' + dayW.toFixed(1) + '" height="' + h + '" fill="rgba(52,152,219,0.14)"></rect>';
+
+                var coords = points.map(function (p) {
+                    var x = (p[0] / 1440) * w;
+                    return x.toFixed(1) + ',' + yFor(p[1]).toFixed(1);
+                }).join(' ');
+                var strokeColor = isSafeColorValue(preset.color) ? preset.color : 'var(--accent)';
+                return '<svg class="cal-sparkline" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+                    bandsHtml +
+                    '<polyline points="' + coords + '" fill="none" stroke="' + strokeColor + '" stroke-width="1.5" vector-effect="non-scaling-stroke"></polyline>' +
+                    '</svg>';
+            }
+
+            // Simultaneous multi-overlay rendering (31 Aug 2026, Harry's
+            // steer): every currently-active overlay contributes its own
+            // content, not just the first. Deliberately simple z-order/
+            // collision handling, no slot system (the anchor/slot mechanism
+            // in docs/analysis/calendar-cell-content-model.md is still not
+            // built) -- fill-color is the one "back" layer (last active
+            // fill-type overlay to match wins the cell's actual background,
+            // simple overwrite), corner-badge is a second single fixed-
+            // position slot (same overwrite rule), and everything else
+            // (status-icon/raw-number/match-pill) just accumulates into the
+            // body area in whatever order the overlays happen to be active
+            // -- it's on the user to avoid a combination that clashes, per
+            // the design doc's "no per-cell content budget" philosophy.
+            // Sparkline (front layer, on top of fill) is built.
+            function renderBadgeHtml(loc, col) {
+                if (loc === 'top-left') {
+                    return '<span class="cal-corner-badge cal-badge-tl" style="border-top-color:' + col + '; border-left-color:' + col + ';"></span>';
+                }
+                if (loc === 'top-right') {
+                    return '<span class="cal-corner-badge cal-badge-tr" style="border-top-color:' + col + '; border-right-color:' + col + ';"></span>';
+                }
+                if (loc === 'bottom-left') {
+                    return '<span class="cal-corner-badge cal-badge-bl" style="border-bottom-color:' + col + '; border-left-color:' + col + ';"></span>';
+                }
+                if (loc === 'bottom-right') {
+                    return '<span class="cal-corner-badge cal-badge-br" style="border-bottom-color:' + col + '; border-right-color:' + col + ';"></span>';
+                }
+                if (loc === 'top-center') {
+                    return '<span class="cal-tab-top" style="background:' + col + ';"></span>';
+                }
+                if (loc === 'bottom-center') {
+                    return '<span class="cal-tab-bottom" style="background:' + col + ';"></span>';
+                }
+                if (loc === 'mid-left') {
+                    return '<span class="cal-tab-left" style="background:' + col + ';"></span>';
+                }
+                if (loc === 'mid-right') {
+                    return '<span class="cal-tab-right" style="background:' + col + ';"></span>';
+                }
+                return '<span class="cal-shape-circle" style="background:' + col + ';"></span>';
+            }
+
+            function formatMetricValue(metricKey, val) {
+                if (val === undefined || val === null) return '';
+                if (metricKey === 'tir' || metricKey === 'titr' || metricKey === 'tar' || metricKey === 'tbr' || metricKey === 'cv') {
+                    return Math.round(val) + '%';
+                }
+                if (metricKey === 'avg_bg' || metricKey === 'gmi') {
+                    return Number(val).toFixed(1);
+                }
+                if (metricKey === 'tdd' || metricKey === 'carbs') {
+                    return Math.round(val);
+                }
+                return String(val);
+            }
+
+            function buildDayCell(dateStr) {
+                var ids = getActiveOverlayIds();
+                var isToday = (dateStr === TODAY_LOCAL);
+                var isFutureOrMissing = (dateStr > TODAY_LOCAL);
+                var dateParts = dateStr.split('-').map(Number);
+                var y = dateParts[0], m = dateParts[1], d = dateParts[2];
+
+                var cell = document.createElement('div');
+                cell.className = 'cal-cell' + (isToday ? ' cal-cell-today' : '');
+                cell.setAttribute('data-date', dateStr);
+                cell.setAttribute('data-month-key', dateStr.slice(0, 7));
+
+                // Stepped month-boundary styling:
+                var firstDow = mondayIndexOfDate(y, m, 1);
+                if (d <= (7 - firstDow)) {
+                    cell.classList.add('cal-boundary-top');
+                    if (d === 1 && firstDow > 0) {
+                        cell.classList.add('cal-boundary-left');
+                    }
+                }
+
+                // Trailing days bottom boundary:
+                var numDays = new Date(y, m, 0).getDate();
+                var lastDow = mondayIndexOfDate(y, m, numDays);
+                if (lastDow < 6 && d > (numDays - lastDow - 1)) {
+                    cell.classList.add('cal-boundary-bottom');
+                }
+
+                var bgFillColor = null;
+                var sparklineHtml = '';
+                var slots = {
+                    'top-left': [],
+                    'top-center': [],
+                    'top-right': [],
+                    'mid-left': [],
+                    'center': [],
+                    'mid-right': [],
+                    'bottom-left': [],
+                    'bottom-center': [],
+                    'bottom-right': []
+                };
+                var anyContent = false;
+
+                if (ids && ids.length) {
+                    ids.forEach(function (id) {
+                        var preset = findPresetById(id);
+                        if (!preset) return;
+                        var cache = getOverlayCacheSlot(id);
+
+                        if (preset.encoding === 'sparkline') {
+                            var seriesForDay = cache.series && cache.series[dateStr];
+                            if (seriesForDay && seriesForDay.length) {
+                                sparklineHtml = buildSparklineSvg(seriesForDay, preset);
+                                anyContent = true;
+                            }
+                            return;
+                        }
+
+                        if (preset.overlayKind === 'value' || preset.dataKey === 'values') {
+                            var rawVal = cache.values && cache.values[dateStr];
+                            if (rawVal !== undefined && rawVal !== null) {
+                                anyContent = true;
+                                var formatted = formatMetricValue(preset.metricKey, rawVal);
+                                var loc = preset.location || 'center';
+                                if (!slots[loc]) loc = 'center';
+                                slots[loc].push('<span class="cal-cell-val" style="color: ' + preset.color + '; font-size: 0.95rem; font-weight: 700;">' + formatted + '</span>');
+                            }
+                            return;
+                        }
+
+                        // Filter overlay
+                        var isMatch = (preset.showFrequency === 'always') || !!(cache.matchSet && cache.matchSet[dateStr]);
+                        if (!isMatch) return;
+
+                        anyContent = true;
+                        var col = preset.color || '#e74c3c';
+                        var enc = preset.encoding || 'badge';
+                        var loc = preset.location || (enc === 'badge' ? 'top-right' : 'center');
+                        if (!slots[loc]) loc = 'center';
+
+                        if (enc === 'fill') {
+                            bgFillColor = col;
+                        } else if (enc === 'badge') {
+                            slots[loc].push(renderBadgeHtml(loc, col));
+                        } else if (enc === 'circle') {
+                            slots[loc].push('<span class="cal-shape-circle" style="background:' + col + ';"></span>');
+                        } else if (enc === 'square') {
+                            slots[loc].push('<span class="cal-shape-square" style="background:' + col + ';"></span>');
+                        } else if (enc === 'triangle') {
+                            slots[loc].push('<span class="cal-shape-triangle" style="border-bottom-color:' + col + ';"></span>');
+                        } else if (enc === 'tick') {
+                            slots[loc].push('<i class="fa-solid fa-check" style="color:' + col + '; font-size: 13px;"></i>');
+                        } else if (enc === 'cross') {
+                            slots[loc].push('<i class="fa-solid fa-xmark" style="color:' + col + '; font-size: 13px;"></i>');
+                        } else if (enc === 'num_badge') {
+                            var val = cache.values && cache.values[dateStr];
+                            var countText = (val !== undefined && val !== null) ? Math.round(val) : '1';
+                            slots[loc].push('<span class="cal-num-badge" style="background:' + col + '; color:#fff;">' + countText + '</span>');
+                        } else if (enc === 'custom_text') {
+                            var txt = preset.customText || 'Text';
+                            if (txt.indexOf('#') !== -1) {
+                                var val = cache.values && cache.values[dateStr];
+                                var valFormatted = (val !== undefined && val !== null) ? formatMetricValue(preset.valueMetric, val) : '';
+                                txt = txt.replace(/#(\.#)?%?/, valFormatted);
+                            }
+                            slots[loc].push('<span class="cal-custom-text" style="color:' + col + ';">' + escapeHtml(txt) + '</span>');
+                        } else if (enc === 'value') {
+                            var val = cache.values && cache.values[dateStr];
+                            if (val !== undefined && val !== null) {
+                                var formatted = formatMetricValue(preset.valueMetric || preset.metricKey, val);
+                                slots[loc].push('<span class="cal-cell-val" style="color: ' + col + '; font-size: 0.95rem; font-weight: 700;">' + formatted + '</span>');
+                            }
+                        }
+                    });
+                }
+
+                if (bgFillColor) {
+                    cell.style.background = 'color-mix(in srgb, ' + bgFillColor + ' 20%, var(--card-bg))';
+                    cell.style.borderColor = bgFillColor;
+                }
+
+                var dayLabelText = (d === 1) ? ('1 ' + MONTH_NAMES[m - 1].slice(0, 3)) : d;
+                var dayNumClass = (d === 1) ? 'cal-day-num cal-day-month-start' : 'cal-day-num';
+                var tlContent = slots['top-left'].join('');
+                // The day number itself is always clickable to open the Day
+                // Note Popup (empty-state if the day has no notes yet -- "Add
+                // Entry" lives inside the popup, so this is the only entry
+                // point needed for a day with zero existing notes).
+                // event.stopPropagation() is required, not decorative: the
+                // whole .cal-cell below already navigates to /trace on click
+                // (see cell.addEventListener near the end of this function).
+                // Without it, clicking the day number would open the popup
+                // AND navigate away in the same click. The cal-day-pill class
+                // is purely a visual "this day has notes" indicator -- it does
+                // not gate whether the number is clickable.
+                var pillClass = noteDatesSet[dateStr] ? ' cal-day-pill' : '';
+                var pillTitle = noteDatesSet[dateStr] ? (' title="View notes for ' + dateStr + '"') : '';
+                var dayNumHtml = '<span class="' + dayNumClass + pillClass + '"' + pillTitle + ' onclick="event.stopPropagation(); openDayNotePopup(\'' + dateStr + '\');">' + dayLabelText + '</span>';
+                var headerHtml = '<div class="cal-cell-header"><div style="display:flex; align-items:center;">' + dayNumHtml + (tlContent ? ('<span class="cal-slot-tl" style="margin-left:4px; display:inline-flex; align-items:center;">' + tlContent + '</span>') : '') + '</div></div>';
+
+                var slotHtml = '';
+                if (slots['top-center'].length) slotHtml += '<div class="cal-slot-tc">' + slots['top-center'].join('') + '</div>';
+                if (slots['top-right'].length) slotHtml += '<div class="cal-slot-tr">' + slots['top-right'].join('') + '</div>';
+                if (slots['mid-left'].length) slotHtml += '<div class="cal-slot-ml">' + slots['mid-left'].join('') + '</div>';
+                if (slots['center'].length) slotHtml += '<div class="cal-slot-center">' + slots['center'].join('') + '</div>';
+                if (slots['mid-right'].length) slotHtml += '<div class="cal-slot-mr">' + slots['mid-right'].join('') + '</div>';
+                if (slots['bottom-left'].length) slotHtml += '<div class="cal-slot-bl">' + slots['bottom-left'].join('') + '</div>';
+                if (slots['bottom-center'].length) slotHtml += '<div class="cal-slot-bc">' + slots['bottom-center'].join('') + '</div>';
+                if (slots['bottom-right'].length) slotHtml += '<div class="cal-slot-br">' + slots['bottom-right'].join('') + '</div>';
+
+                // If overlays are active but no content matched, show missing data dash if past
+                if (ids && ids.length && !anyContent) {
+                    if (isFutureOrMissing) {
+                        cell.classList.add('cal-cell-nodata');
+                        slotHtml += '<div class="cal-slot-center"><span class="cal-cell-val cal-val-muted">--</span></div>';
+                    } else {
+                        slotHtml += '<div class="cal-slot-center"><span class="cal-val-miss">\u2014</span></div>';
+                    }
+                }
+
+                cell.innerHTML = headerHtml + slotHtml + sparklineHtml;
+                cell.addEventListener('click', function () {
+                    window.location.href = '/trace?date=' + dateStr;
+                });
+                return cell;
+            }
+
+            function appendWeeks(fromMondayStr, count) {
+                var gridEl = document.getElementById('cal-days-grid');
+                var cur = fromMondayStr;
+                var frag = document.createDocumentFragment();
+                for (var w = 0; w < count; w++) {
+                    for (var d = 0; d < 7; d++) {
+                        var ds = addDaysStr(cur, d);
+                        frag.appendChild(buildDayCell(ds));
+                    }
+                    cur = addDaysStr(cur, 7);
+                }
+                gridEl.appendChild(frag);
+                scroll.bufferEndMonday = addDaysStr(cur, -7);
+                scroll.rowPitch = null;
+            }
+
+            function prependWeeks(fromMondayStr, count) {
+                var gridEl = document.getElementById('cal-days-grid');
+                var heightBefore = gridEl.scrollHeight;
+                var scrollBefore = gridEl.scrollTop;
+                var firstChild = gridEl.firstChild;
+                var cur = fromMondayStr;
+                var frag = document.createDocumentFragment();
+                for (var w = 0; w < count; w++) {
+                    for (var d = 0; d < 7; d++) {
+                        var ds = addDaysStr(cur, d);
+                        frag.appendChild(buildDayCell(ds));
+                    }
+                    cur = addDaysStr(cur, 7);
+                }
+                gridEl.insertBefore(frag, firstChild);
+                scroll.bufferStartMonday = fromMondayStr;
+                gridEl.scrollTop = scrollBefore + (gridEl.scrollHeight - heightBefore);
+                scroll.rowPitch = null;
+            }
+
+            function setLoadingIndicator(on) {
+                var gridEl = document.getElementById('cal-days-grid');
+                if (!gridEl) return;
+                if (on) {
+                    gridEl.classList.add('is-loading');
+                    setStatus('\u231b Loading…');
+                } else {
+                    gridEl.classList.remove('is-loading');
+                    setStatus('');
+                }
+            }
+
+            function extendBottom() {
+                if (scroll.loading) return Promise.resolve();
+                scroll.loading = true;
+                setLoadingIndicator(true);
+                var count = WEEKS_PER_FETCH;
+                var newStartMon = addDaysStr(scroll.bufferEndMonday, 7);
+                var endSun = addDaysStr(newStartMon, count * 7 - 1);
+                return fetchOverlayRange(newStartMon, endSun).then(function () {
+                    appendWeeks(newStartMon, count);
+                    scroll.loading = false;
+                    setLoadingIndicator(false);
+                }).catch(function () {
+                    scroll.loading = false;
+                    setLoadingIndicator(false);
+                });
+            }
+
+            function extendTop() {
+                if (scroll.loading) return Promise.resolve();
+                scroll.loading = true;
+                setLoadingIndicator(true);
+                var count = WEEKS_PER_FETCH;
+                var newStartMon = addDaysStr(scroll.bufferStartMonday, -count * 7);
+                var endSun = addDaysStr(scroll.bufferStartMonday, -1);
+                return fetchOverlayRange(newStartMon, endSun).then(function () {
+                    prependWeeks(newStartMon, count);
+                    scroll.loading = false;
+                    setLoadingIndicator(false);
+                }).catch(function () {
+                    scroll.loading = false;
+                    setLoadingIndicator(false);
+                });
+            }
+
+            function syncHeaderToScroll() {
+                var gridEl = document.getElementById('cal-days-grid');
+                if (!gridEl || !gridEl.children.length) return;
+
+                var viewTop = gridEl.scrollTop;
+                var viewBottom = viewTop + gridEl.clientHeight;
+                var gridRect = gridEl.getBoundingClientRect();
+                var counts = {};
+                var firstCell = null, lastCell = null;
+
+                for (var i = 0; i < gridEl.children.length; i++) {
+                    var cell = gridEl.children[i];
+                    var ds = cell.getAttribute('data-date');
+                    if (!ds) continue;
+                    var cellRect = cell.getBoundingClientRect();
+                    var top    = cellRect.top    - gridRect.top + gridEl.scrollTop;
+                    var bottom = cellRect.bottom - gridRect.top + gridEl.scrollTop;
+                    if (bottom < viewTop || top > viewBottom) continue;
+                    if (!firstCell) firstCell = cell;
+                    lastCell = cell;
+                    var key = ds.slice(0, 7); // 'YYYY-MM'
+                    counts[key] = (counts[key] || 0) + 1;
+                }
+
+                var bestKey = null, bestCount = -1;
+                Object.keys(counts).forEach(function (k) {
+                    if (counts[k] > bestCount) { bestCount = counts[k]; bestKey = k; }
+                });
+
+                if (bestKey) {
+                    var kp = bestKey.split('-').map(Number);
+                    if (state.year !== kp[0] || state.month !== kp[1]) {
+                        state.year = kp[0];
+                        state.month = kp[1];
+                        var labelEl = document.getElementById('cal-month-label');
+                        if (labelEl) labelEl.textContent = MONTH_NAMES[state.month - 1] + ' ' + state.year;
+                    }
+                }
+
+                var rangeEl = document.getElementById('cal-date-range');
+                if (rangeEl && firstCell && lastCell) {
+                    var topDate = firstCell.getAttribute('data-date');
+                    var bottomDate = lastCell.getAttribute('data-date');
+                    rangeEl.textContent = formatDisplayDate(topDate) + ' \u2013 ' + formatDisplayDate(bottomDate);
+                }
+            }
+
+            function onGridScroll() {
+                var gridEl = document.getElementById('cal-days-grid');
+                if (!gridEl) return;
+
+                var pitch = scroll.rowPitch || getRowPitch();
+                var edgePx = EDGE_TRIGGER_ROWS * pitch;
+
+                if (gridEl.scrollTop < edgePx) {
+                    extendTop();
+                } else if ((gridEl.scrollHeight - gridEl.clientHeight - gridEl.scrollTop) < edgePx) {
+                    extendBottom();
+                }
+
+                syncHeaderToScroll();
+            }
+
+            var scrollTicking = false;
+            function handleScrollEvent() {
+                if (scrollTicking) return;
+                scrollTicking = true;
+                requestAnimationFrame(function () {
+                    onGridScroll();
+                    scrollTicking = false;
+                });
+            }
+
+            function reanchorGrid(year, month) {
+                var gridEl = document.getElementById('cal-days-grid');
+                if (!gridEl) return;
+                setLoadingIndicator(true);
+                scroll.loading = true;
+
+                var firstOfMonth = formatDateStr(year, month, 1);
+                var anchorMonday = mondayOf(firstOfMonth);
+                var startMon = addDaysStr(anchorMonday, -4 * 7); // 4 weeks before
+                var totalWeeks = 16; // ~4 months buffer around target
+                var endMon = addDaysStr(startMon, (totalWeeks - 1) * 7);
+                var endSun = addDaysStr(endMon, 6);
+
+                fetchOverlayRange(startMon, endSun).then(function () {
+                    gridEl.innerHTML = '';
+                    var frag = document.createDocumentFragment();
+                    var cur = startMon;
+                    for (var w = 0; w < totalWeeks; w++) {
+                        for (var d = 0; d < 7; d++) {
+                            var ds = addDaysStr(cur, d);
+                            frag.appendChild(buildDayCell(ds));
+                        }
+                        cur = addDaysStr(cur, 7);
+                    }
+                    gridEl.appendChild(frag);
+                    scroll.bufferStartMonday = startMon;
+                    scroll.bufferEndMonday = endMon;
+                    scroll.loading = false;
+                    setLoadingIndicator(false);
+
+                    var target = gridEl.querySelector('[data-date="' + firstOfMonth + '"]');
+                    if (target) {
+                        var targetTop = target.getBoundingClientRect().top
+                                      - gridEl.getBoundingClientRect().top
+                                      + gridEl.scrollTop;
+                        gridEl.scrollTo({ top: targetTop, behavior: 'auto' });
+                    }
+                    syncHeaderToScroll();
+                }).catch(function () {
+                    scroll.loading = false;
+                    setLoadingIndicator(false);
+                });
+            }
+
+            function scrollToMonth(year, month) {
+                var targetDateStr = formatDateStr(year, month, 1);
+                var gridEl = document.getElementById('cal-days-grid');
+                if (!gridEl) return;
+
+                var target = gridEl.querySelector('[data-date="' + targetDateStr + '"]');
+                if (target) {
+                    var targetTop = target.getBoundingClientRect().top
+                                  - gridEl.getBoundingClientRect().top
+                                  + gridEl.scrollTop;
+                    gridEl.scrollTo({ top: targetTop, behavior: 'smooth' });
+                    return;
+                }
+
+                // If target month is not currently in the buffer, re-anchor cleanly directly at target!
+                reanchorGrid(year, month);
+            }
+
+            function refreshBufferForNewPreset() {
+                if (!scroll.bufferStartMonday || !scroll.bufferEndMonday) return;
+                overlayCache = {};
+                setStatus('Fetching data...');
+                var endSun = addDaysStr(scroll.bufferEndMonday, 6);
+                fetchOverlayRange(scroll.bufferStartMonday, endSun).then(function () {
+                    setStatus('');
+                    rerenderBufferInPlace();
+                });
+            }
+
+            function rerenderBufferInPlace() {
+                var gridEl = document.getElementById('cal-days-grid');
+                var cells = Array.prototype.slice.call(gridEl.children);
+                var scrollTopBefore = gridEl.scrollTop;
+                cells.forEach(function (cell) {
+                    if (!cell.hasAttribute('data-date')) return;
+                    var dateStr = cell.getAttribute('data-date');
+                    gridEl.replaceChild(buildDayCell(dateStr), cell);
+                });
+                gridEl.scrollTop = scrollTopBefore;
+            }
+
+            function initialLoad() {
+                var firstOfMonth = formatDateStr(todayYear, todayMonth, 1);
+                var anchorMonday = mondayOf(firstOfMonth);
+                var startMon = addDaysStr(anchorMonday, -4 * 7);
+                var totalWeeks = 16;
+                var endMon = addDaysStr(startMon, (totalWeeks - 1) * 7);
+                var endSun = addDaysStr(endMon, 6);
+
+                setStatus('Fetching data...');
+                fetchOverlayRange(startMon, endSun).then(function () {
+                    var gridEl = document.getElementById('cal-days-grid');
+                    gridEl.innerHTML = '';
+                    var frag = document.createDocumentFragment();
+                    var cur = startMon;
+                    for (var w = 0; w < totalWeeks; w++) {
+                        for (var d = 0; d < 7; d++) {
+                            var ds = addDaysStr(cur, d);
+                            frag.appendChild(buildDayCell(ds));
+                        }
+                        cur = addDaysStr(cur, 7);
+                    }
+                    gridEl.appendChild(frag);
+                    scroll.bufferStartMonday = startMon;
+                    scroll.bufferEndMonday = endMon;
+                    setStatus('');
+                    scroll.rowPitch = getRowPitch();
+
+                    var target = gridEl.querySelector('[data-date="' + TODAY_LOCAL + '"]') ||
+                                 gridEl.querySelector('[data-date="' + firstOfMonth + '"]');
+                    if (target) {
+                        var targetTop = target.getBoundingClientRect().top
+                                      - gridEl.getBoundingClientRect().top
+                                      + gridEl.scrollTop;
+                        gridEl.scrollTo({ top: targetTop, behavior: 'auto' });
+                    }
+                    syncHeaderToScroll();
+                });
+            }
+
+            // Wheel damping (per Harry, 30 Aug): native momentum scroll can't
+            // be throttled after the fact once the browser owns it, so wheel
+            // deltas are intercepted and applied manually at a damped rate
+            // instead -- same 0.25x-style damping factor already established
+            // on Trends' Y-axis wheel handling, applied here to vertical
+            // week-scroll instead of axis bounds.
+            var WHEEL_DAMPING = 0.25;
+            function setupWheelAndKeyboard() {
+                var gridEl = document.getElementById('cal-days-grid');
+                if (!gridEl) return;
+
+                gridEl.addEventListener('wheel', function (e) {
+                    e.preventDefault();
+                    gridEl.scrollTop += e.deltaY * WHEEL_DAMPING;
+                    handleScrollEvent();
+                }, { passive: false });
+
+                // Hover-gated rather than requiring an explicit click-to-
+                // focus: keys should work as soon as the mouse is over the
+                // grid, matching how the wheel handler above already behaves.
+                // Listening on document (not the grid element) but gating on
+                // hover state still avoids fighting with typing in the
+                // month-jump input or any other field elsewhere on the page --
+                // you're not hovering the grid while typing in those.
+                var gridHovered = false;
+                gridEl.addEventListener('mouseenter', function () { gridHovered = true; });
+                gridEl.addEventListener('mouseleave', function () { gridHovered = false; });
+
+                document.addEventListener('keydown', function (e) {
+                    if (!gridHovered) return;
+                    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        var pitch = scroll.rowPitch || getRowPitch();
+                        gridEl.scrollBy({ top: (e.key === 'ArrowDown' ? pitch : -pitch), behavior: 'smooth' });
+                        setTimeout(handleScrollEvent, 200);
+                    } else if (e.key === 'PageDown' || e.key === 'PageUp') {
+                        e.preventDefault();
+                        var dir = (e.key === 'PageDown') ? 1 : -1;
+                        var m = state.month + dir, y = state.year;
+                        if (m > 12) { m = 1; y++; }
+                        if (m < 1) { m = 12; y--; }
+                        state.year = y; state.month = m;
+                        updateControlsUI();
+                        scrollToMonth(y, m);
+                    }
+                });
+
+                gridEl.addEventListener('scroll', handleScrollEvent);
+            }
+
+            function toggleMonthPicker(event) {
+                if (event) event.stopPropagation();
+                var popover = document.getElementById('cal-month-popover');
+                var input = document.getElementById('cal-month-input');
+                if (!popover || !input) return;
+                input.value = state.year + '-' + padZero(state.month);
+                popover.classList.toggle('active');
+                if (popover.classList.contains('active')) {
+                    input.focus();
+                }
+            }
+
+            // Settings gear next to the view pill -- currently just houses the
+            // single-select Active Overlay dropdown (moved here 30 Aug 2026 from
+            // its own row above the card, to match Patterns/Trends/Trace's panel
+            // header shape). Wired into NSViews.init() via settingsBtnId/
+            // settingsPopoverId so the view manager can close it on its own
+            // popover-management passes; the toggle + outside-click-to-close here
+            // mirrors agp.html's toggleAgpSettings, not something NSViews provides
+            // generically.
+            function toggleCalSettings(event) {
+                if (event) event.stopPropagation();
+                var popover = document.getElementById('cal-settings-popover');
+                if (popover) popover.classList.toggle('active');
+            }
+
+            document.addEventListener('click', function (e) {
+                var popover = document.getElementById('cal-settings-popover');
+                var btn = document.getElementById('cal-settings-btn');
+                if (popover && popover.classList.contains('active')) {
+                    if (!popover.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+                        popover.classList.remove('active');
+                    }
+                }
+            });
+
+            function handleMonthPickerChange() {
+                var input = document.getElementById('cal-month-input');
+                var popover = document.getElementById('cal-month-popover');
+                if (!input || !input.value) return;
+
+                var parts = input.value.split('-');
+                var y = parseInt(parts[0], 10);
+                var m = parseInt(parts[1], 10);
+                if (isNaN(y) || isNaN(m) || m < 1 || m > 12) return;
+
+                state.year = y;
+                state.month = m;
+                if (popover) popover.classList.remove('active');
+                updateControlsUI();
+                scrollToMonth(y, m);
+            }
+
+            // Sets the full checked-overlay set. ids[0] becomes the primary
+            // (grid-painting) overlay -- see the note on `state` above.
+            // opts.skipRefetch is used when restoring a saved view's own
+            // month range at the same time (avoids a double fetch).
+            function setActiveOverlayIds(ids, opts) {
+                if (!Array.isArray(ids)) ids = [];
+                state.activeOverlayIds = ids.slice();
+                state.presetId = ids[0] || null;
+                try {
+                    localStorage.setItem('ns_calendar_overlay_active_ids', JSON.stringify(state.activeOverlayIds));
+                    if (state.presetId) {
+                        localStorage.setItem('ns_calendar_overlay_preset', state.presetId);
+                    } else {
+                        localStorage.removeItem('ns_calendar_overlay_preset');
+                    }
+                } catch (e) {}
+                renderOverlayList();
+                updateControlsUI();
+                if (!(opts && opts.skipRefetch)) {
+                    refreshBufferForNewPreset();
+                }
+            }
+
+            function setOverlayPreset(presetId) {
+                setActiveOverlayIds(presetId ? [presetId] : []);
+            }
+
+            function toggleOverlayId(id) {
+                var ids = getActiveOverlayIds().slice();
+                var idx = ids.indexOf(id);
+                if (idx === -1) {
+                    ids.push(id);
+                } else {
+                    ids.splice(idx, 1);
+                }
+                setActiveOverlayIds(ids);
+            }
+
+            function selectAllOverlays() {
+                var ids = (window.CALENDAR_REGISTRY || []).map(function (it) { return it.id; });
+                setActiveOverlayIds(ids);
+            }
+
+            function deselectAllOverlays() {
+                setActiveOverlayIds([]);
+            }
+
+            function getCurrentCalendarState() {
+                var ids = getActiveOverlayIds();
+                var stateObj = { presetId: ids[0] || null, activeOverlayIds: ids.slice() };
+                var filterRefs = [];
+                ids.forEach(function (id) {
+                    if (id.indexOf('filter_') === 0) {
+                        var fid = parseInt(id.replace('filter_', ''), 10);
+                        if (!isNaN(fid)) filterRefs.push(fid);
+                    }
+                });
+                if (filterRefs.length) stateObj.filterRefs = filterRefs;
+                return stateObj;
+            }
+
+            function applyCalendarView(view, meta) {
+                if (!view) return;
+                var ids = view.activeOverlayIds || (view.payload && view.payload.activeOverlayIds);
+                if (!ids) {
+                    var pId = view.presetId || (view.payload && view.payload.presetId);
+                    ids = pId ? [pId] : [];
+                }
+                var isBoot = meta && meta.isInitialBoot;
+                setActiveOverlayIds(ids, { skipRefetch: isBoot });
+            }
+
+            var BUILTIN_OVERLAY_IDS = ['bg_sparkline'];
+
+            function extractClauseMetrics(tree) {
+                var metrics = [];
+                if (!tree) return metrics;
+                if (tree.metric && metrics.indexOf(tree.metric) === -1) {
+                    metrics.push(tree.metric);
+                }
+                if (tree.clauses && Array.isArray(tree.clauses)) {
+                    tree.clauses.forEach(function(cl) {
+                        var sub = extractClauseMetrics(cl);
+                        sub.forEach(function(m) {
+                            if (metrics.indexOf(m) === -1) metrics.push(m);
+                        });
+                    });
+                }
+                return metrics;
+            }
+
+            function setupDynamicOverlays() {
+                return fetch('/api/v1/filters').then(function (r) { return r.json(); }).catch(function () { return []; })
+                .then(function (allFilters) {
+                    filtersList = (Array.isArray(allFilters) ? allFilters : []).filter(function (f) {
+                        return (f.applies_to || ['calendar']).indexOf('calendar') !== -1;
+                    });
+
+                    window.CALENDAR_REGISTRY = (window.CALENDAR_REGISTRY || []).filter(function (it) {
+                        return BUILTIN_OVERLAY_IDS.indexOf(it.id) !== -1;
+                    });
+
+                    filtersList.forEach(function (f) {
+                        var defs = f.display_defaults || {};
+                        var dtype = defs.type || defs.style || 'badge';
+                        if (dtype === 'fill-color') dtype = 'fill';
+                        if (dtype === 'corner-badge') dtype = 'badge';
+                        if (dtype === 'status-icon') dtype = 'tick';
+                        if (dtype === 'number') dtype = 'value';
+
+                        var loc = defs.location || (dtype === 'fill' ? 'center' : (dtype === 'badge' ? 'top-right' : 'center'));
+                        var col = defs.color || '#e74c3c';
+                        var showFreq = defs.show_frequency || 'matching';
+
+                        var entry = {
+                            id: 'filter_' + f.id,
+                            label: f.name,
+                            filterId: f.id,
+                            overlayKind: 'filter',
+                            renderFamily: 'panel',
+                            xAxisUnit: 'calendar_date',
+                            provider: {
+                                endpoint: '/api/v1/filters/evaluate',
+                                method: 'POST',
+                                body: { filter: f.filter_tree }
+                            },
+                            dataKey: 'matchingDates',
+                            renderType: 'calendar-cell',
+                            encoding: dtype,
+                            location: loc,
+                            color: col,
+                            showFrequency: showFreq
+                        };
+
+                        var needsMetricVal = (dtype === 'value' || dtype === 'num_badge' || (dtype === 'custom_text' && defs.custom_text && defs.custom_text.indexOf('#') !== -1));
+                        if (needsMetricVal) {
+                            var vMetric = defs.value_metric;
+                            if (!vMetric) {
+                                var extracted = extractClauseMetrics(f.filter_tree);
+                                vMetric = extracted[0] || 'tir';
+                            }
+                            entry.valueMetric = vMetric;
+                        }
+                        if (dtype === 'custom_text') {
+                            entry.customText = defs.custom_text || '';
+                        }
+
+                        if (showFreq === 'always') {
+                            if (dtype === 'value') {
+                                entry.provider = {
+                                    endpoint: '/api/v1/calendar/metric_values',
+                                    method: 'GET',
+                                    params: { metric: entry.valueMetric || 'tir', window: 'single_day' }
+                                };
+                                entry.dataKey = 'values';
+                            }
+                        }
+
+                        window.CALENDAR_REGISTRY.push(entry);
+                    });
+
+                    renderOverlayList();
+                });
+            }
+
+            function overlayTypeLabel(id) {
+                if (BUILTIN_OVERLAY_IDS.indexOf(id) !== -1) return 'Built-in';
+                return 'Custom';
+            }
+
+            function filterIdFromRegistryId(id) {
+                if (id.indexOf('filter_') !== 0) return null;
+                var n = parseInt(id.replace('filter_', ''), 10);
+                return isNaN(n) ? null : n;
+            }
+
+            // Searchable, alphabetically-sorted, multi-select list -- the
+            // Settings popover shape settled 31 Aug 2026 (see STATUS.md /
+            // docs/analysis/calendar-cell-content-model.md). Only Filter
+            // rows get edit/duplicate/delete here; Targets stay managed on
+            // their own Daily Goals tab (unaffected by this work) and are
+            // toggle-only from Calendar, same as a built-in.
+            function renderOverlayList() {
+                var listEl = document.getElementById('cal-overlay-list');
+                if (!listEl) return;
+
+                var searchInput = document.getElementById('cal-overlay-search');
+                var term = ((searchInput && searchInput.value) || '').trim().toLowerCase();
+
+                var items = (window.CALENDAR_REGISTRY || []).slice();
+                items.sort(function (a, b) {
+                    return (a.label || '').localeCompare(b.label || '');
+                });
+                if (term) {
+                    items = items.filter(function (it) {
+                        return (it.label || '').toLowerCase().indexOf(term) !== -1;
+                    });
+                }
+
+                if (!items.length) {
+                    listEl.innerHTML = '<div class="overlay-list-empty">No overlays match &ldquo;' + escapeHtml(term) + '&rdquo;</div>';
+                    return;
+                }
+
+                var activeIds = getActiveOverlayIds();
+                var html = '';
+                items.forEach(function (it) {
+                    var checked = activeIds.indexOf(it.id) !== -1;
+                    var fId = filterIdFromRegistryId(it.id);
+                    html += '<div class="overlay-list-row">' +
+                        '<label class="overlay-list-row-main">' +
+                            '<input type="checkbox" class="overlay-list-checkbox" data-overlay-id="' + escapeHtml(it.id) + '"' + (checked ? ' checked' : '') + '>' +
+                            '<span class="overlay-list-label">' + escapeHtml(it.label) + '</span>' +
+                            '<span class="overlay-list-type">' + overlayTypeLabel(it.id) + '</span>' +
+                        '</label>';
+                    if (fId !== null) {
+                        html += '<span class="overlay-list-actions-icons">' +
+                            '<button type="button" class="panel-icon-btn overlay-edit-btn" data-filter-id="' + fId + '" title="Edit"><i class="fa-solid fa-pen"></i></button>' +
+                            '<button type="button" class="panel-icon-btn overlay-duplicate-btn" data-filter-id="' + fId + '" title="Duplicate"><i class="fa-solid fa-copy"></i></button>' +
+                            '<button type="button" class="panel-icon-btn overlay-delete-btn" data-filter-id="' + fId + '" title="Delete"><i class="fa-solid fa-trash"></i></button>' +
+                        '</span>';
+                    }
+                    html += '</div>';
+                });
+                listEl.innerHTML = html;
+
+                var toggleAllEl = document.getElementById('cal-overlay-toggle-all');
+                if (toggleAllEl) {
+                    var totalCount = (window.CALENDAR_REGISTRY || []).length;
+                    var activeCount = activeIds.length;
+                    if (activeCount === totalCount && totalCount > 0) {
+                        toggleAllEl.checked = true;
+                        toggleAllEl.classList.remove('is-partial');
+                    } else if (activeCount > 0) {
+                        toggleAllEl.checked = true;
+                        toggleAllEl.classList.add('is-partial');
+                    } else {
+                        toggleAllEl.checked = false;
+                        toggleAllEl.classList.remove('is-partial');
+                    }
+                }
+
+                var checkboxes = listEl.querySelectorAll('.overlay-list-checkbox');
+                for (var i = 0; i < checkboxes.length; i++) {
+                    checkboxes[i].addEventListener('change', function () {
+                        toggleOverlayId(this.getAttribute('data-overlay-id'));
+                        if (window.NSViews) window.NSViews.markViewDirty();
+                    });
+                }
+                var editBtns = listEl.querySelectorAll('.overlay-edit-btn');
+                for (var j = 0; j < editBtns.length; j++) {
+                    editBtns[j].addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        openFilterModal(parseInt(this.getAttribute('data-filter-id'), 10));
+                    });
+                }
+                var dupBtns = listEl.querySelectorAll('.overlay-duplicate-btn');
+                for (var k = 0; k < dupBtns.length; k++) {
+                    dupBtns[k].addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        duplicateFilter(parseInt(this.getAttribute('data-filter-id'), 10));
+                    });
+                }
+                var delBtns = listEl.querySelectorAll('.overlay-delete-btn');
+                for (var m = 0; m < delBtns.length; m++) {
+                    delBtns[m].addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        deleteFilter(parseInt(this.getAttribute('data-filter-id'), 10));
+                    });
+                }
+            }
+
+            // --- FILTER AUTHORING MODAL -- ported from targets.html's Smart
+            // Filters tab (Phase A, 31 Aug 2026). Behaviour identical to
+            // the source; only the post-save/duplicate/delete refresh
+            // differs (setupDynamicOverlays() + list re-render instead of
+            // a table re-render, since Calendar has no table).
+            function updateFilterNameCounter() {
+                var nameInput = document.getElementById('filter-name-input');
+                var counter = document.getElementById('filter-name-counter');
+                if (!nameInput || !counter) return;
+                var len = nameInput.value.length;
+                counter.textContent = len + ' / 30';
+                counter.classList.toggle('char-counter--over', len >= 30);
+            }
+
+            function renderColorPalette(containerId, inputId, defaultColor) {
+                var container = document.getElementById(containerId);
+                var input = document.getElementById(inputId);
+                if (!container || !input) return;
+                container.innerHTML = '';
+
+                PRESET_COLORS.forEach(function (color) {
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'color-palette-btn' + (color.toLowerCase() === defaultColor.toLowerCase() ? ' selected' : '');
+                    btn.style.backgroundColor = color;
+                    btn.title = color;
+                    btn.addEventListener('click', function () {
+                        input.value = color;
+                        var all = container.querySelectorAll('.color-palette-btn');
+                        all.forEach(function (b) { b.classList.remove('selected'); });
+                        btn.classList.add('selected');
+                    });
+                    container.appendChild(btn);
+                });
+
+                input.addEventListener('input', function () {
+                    var val = input.value.trim().toLowerCase();
+                    var all = container.querySelectorAll('.color-palette-btn');
+                    all.forEach(function (b) {
+                        if (b.title.toLowerCase() === val) b.classList.add('selected');
+                        else b.classList.remove('selected');
+                    });
+                });
+            }
+
+            function updateFilterNotesCounter() {
+                var notesInput = document.getElementById('filter-notes-input');
+                var counter = document.getElementById('filter-notes-counter');
+                if (!notesInput || !counter) return;
+                var len = notesInput.value.length;
+                counter.textContent = len + ' / 200';
+                counter.classList.toggle('char-counter--over', len >= 200);
+            }
+            window.updateFilterNotesCounter = updateFilterNotesCounter;
+
+            function updateFilterValMetricOptions(selectedMetric) {
+                var select = document.getElementById('filter-val-metric-select');
+                if (!select) return;
+                select.innerHTML = '';
+                var tree = filterBuilderInstance ? filterBuilderInstance.getFilter() : null;
+                var metrics = extractClauseMetrics(tree);
+                if (!metrics.length) metrics = ['tir'];
+                metrics.forEach(function(mKey) {
+                    var mCfg = metricsCatalog[mKey] || { label: mKey };
+                    var opt = document.createElement('option');
+                    opt.value = mKey;
+                    opt.textContent = mCfg.label || mKey;
+                    if (mKey === selectedMetric) opt.selected = true;
+                    select.appendChild(opt);
+                });
+            }
+
+            function onOverlayDisplayTypeChange() {
+                var typeSelect = document.getElementById('filter-display-type');
+                var locSelect = document.getElementById('filter-display-location');
+                var locFillInd = document.getElementById('location-fill-indicator');
+                var valMetricWrap = document.getElementById('filter-val-metric-wrap');
+                var customTextWrap = document.getElementById('filter-custom-text-wrap');
+                if (!typeSelect) return;
+
+                var t = typeSelect.value;
+                if (t === 'fill') {
+                    if (locSelect) locSelect.style.display = 'none';
+                    if (locFillInd) locFillInd.style.display = 'block';
+                    if (valMetricWrap) valMetricWrap.style.display = 'none';
+                    if (customTextWrap) customTextWrap.style.display = 'none';
+                } else if (t === 'value' || t === 'num_badge') {
+                    if (locSelect) locSelect.style.display = 'block';
+                    if (locFillInd) locFillInd.style.display = 'none';
+                    if (valMetricWrap) {
+                        valMetricWrap.style.display = 'flex';
+                        updateFilterValMetricOptions();
+                    }
+                    if (customTextWrap) customTextWrap.style.display = 'none';
+                } else if (t === 'custom_text') {
+                    if (locSelect) locSelect.style.display = 'block';
+                    if (locFillInd) locFillInd.style.display = 'none';
+                    if (valMetricWrap) {
+                        valMetricWrap.style.display = 'flex';
+                        updateFilterValMetricOptions();
+                    }
+                    if (customTextWrap) customTextWrap.style.display = 'flex';
+                } else {
+                    if (locSelect) locSelect.style.display = 'block';
+                    if (locFillInd) locFillInd.style.display = 'none';
+                    if (valMetricWrap) valMetricWrap.style.display = 'none';
+                    if (customTextWrap) customTextWrap.style.display = 'none';
+                }
+            }
+            window.onOverlayDisplayTypeChange = onOverlayDisplayTypeChange;
+
+            window.setOverlayKind = function() {};
+
+            function openFilterModal(filterId) {
+                editingFilterId = filterId || null;
+                var modal = document.getElementById('filter-modal-backdrop');
+                var title = document.getElementById('filter-modal-title');
+                var nameInput = document.getElementById('filter-name-input');
+                var notesInput = document.getElementById('filter-notes-input');
+                var freqSelect = document.getElementById('filter-display-frequency');
+                var typeSelect = document.getElementById('filter-display-type');
+                var locSelect = document.getElementById('filter-display-location');
+                var ctextInput = document.getElementById('filter-custom-text-input');
+                var colorHex = document.getElementById('filter-color-hex');
+
+                var initialFilter = null;
+                var initialColor = '#e74c3c';
+
+                var appliesCalCheckbox = document.getElementById('filter-applies-calendar');
+                var appliesPatCheckbox = document.getElementById('filter-applies-patterns');
+                var appliesTreCheckbox = document.getElementById('filter-applies-trends');
+                var appliesTraCheckbox = document.getElementById('filter-applies-trace');
+
+                if (editingFilterId) {
+                    title.textContent = 'Edit Custom Overlay';
+                    var existing = filtersList.find(function (f) { return f.id === editingFilterId; });
+                    if (existing) {
+                        nameInput.value = existing.name;
+                        notesInput.value = existing.notes || '';
+                        initialFilter = existing.filter_tree;
+
+                        var defs = existing.display_defaults || {};
+                        var dtype = defs.type || defs.style || 'badge';
+                        if (dtype === 'fill-color') dtype = 'fill';
+                        if (dtype === 'corner-badge') dtype = 'badge';
+                        if (dtype === 'status-icon') dtype = 'tick';
+                        if (dtype === 'number') dtype = 'value';
+
+                        if (freqSelect) freqSelect.value = defs.show_frequency || 'matching';
+                        if (typeSelect) typeSelect.value = dtype;
+                        if (locSelect) locSelect.value = defs.location || (dtype === 'fill' ? 'center' : (dtype === 'badge' ? 'top-right' : 'center'));
+                        if (ctextInput) ctextInput.value = defs.custom_text || '';
+                        initialColor = defs.color || '#e74c3c';
+
+                        onOverlayDisplayTypeChange();
+
+                        var existingAppliesTo = existing.applies_to || ['calendar'];
+                        if (appliesCalCheckbox) appliesCalCheckbox.checked = existingAppliesTo.indexOf('calendar') !== -1;
+                        if (appliesPatCheckbox) appliesPatCheckbox.checked = existingAppliesTo.indexOf('patterns') !== -1;
+                        if (appliesTreCheckbox) appliesTreCheckbox.checked = existingAppliesTo.indexOf('trends') !== -1;
+                        if (appliesTraCheckbox) appliesTraCheckbox.checked = existingAppliesTo.indexOf('trace') !== -1;
+                    }
+                } else {
+                    title.textContent = 'New Custom Overlay';
+                    nameInput.value = '';
+                    nameInput.placeholder = 'e.g. Weekend Hypo Risk';
+                    notesInput.value = '';
+                    if (freqSelect) freqSelect.value = 'matching';
+                    if (typeSelect) typeSelect.value = 'badge';
+                    if (locSelect) locSelect.value = 'top-right';
+                    if (ctextInput) ctextInput.value = '';
+                    initialColor = '#e74c3c';
+                    onOverlayDisplayTypeChange();
+                    if (appliesCalCheckbox) appliesCalCheckbox.checked = true;
+                    if (appliesPatCheckbox) appliesPatCheckbox.checked = false;
+                    if (appliesTreCheckbox) appliesTreCheckbox.checked = false;
+                    if (appliesTraCheckbox) appliesTraCheckbox.checked = false;
+                }
+
+                updateAppliesVisibility();
+                updateFilterNameCounter();
+                updateFilterNotesCounter();
+                colorHex.value = initialColor;
+                renderColorPalette('filter-color-palette', 'filter-color-hex', initialColor);
+
+                filterBuilderInstance = NSFilterBuilder.createFilterBuilder({
+                    containerId: 'filter-builder-container',
+                    metrics: metricsCatalog,
+                    initialFilter: initialFilter,
+                    onChange: function() {
+                        var dt = document.getElementById('filter-display-type');
+                        if (dt && (dt.value === 'value' || dt.value === 'num_badge' || dt.value === 'custom_text')) {
+                            updateFilterValMetricOptions();
+                        }
+                    }
+                });
+
+                var displayTypeSelect = document.getElementById('filter-display-type');
+                if (displayTypeSelect && (displayTypeSelect.value === 'value' || displayTypeSelect.value === 'num_badge' || displayTypeSelect.value === 'custom_text')) {
+                    updateFilterValMetricOptions(editingFilterId ? (existing && existing.display_defaults && existing.display_defaults.value_metric) : null);
+                }
+
+                if (document.getElementById('cal-settings-popover')) {
+                    document.getElementById('cal-settings-popover').classList.remove('active');
+                }
+                modal.classList.add('active');
+            }
+
+            function updateAppliesVisibility() {
+                var calCb = document.getElementById('filter-applies-calendar');
+                var patCb = document.getElementById('filter-applies-patterns');
+                var treCb = document.getElementById('filter-applies-trends');
+                var traCb = document.getElementById('filter-applies-trace');
+
+                var calSection = document.getElementById('calendar-display-section');
+                if (calSection && calCb) {
+                    calSection.style.display = calCb.checked ? 'block' : 'none';
+                }
+
+                var patHint = document.getElementById('patterns-applies-hint');
+                if (patHint && patCb) patHint.style.display = patCb.checked ? 'block' : 'none';
+
+                var treHint = document.getElementById('trends-applies-hint');
+                if (treHint && treCb) treHint.style.display = treCb.checked ? 'block' : 'none';
+
+                var traHint = document.getElementById('trace-applies-hint');
+                if (traHint && traCb) traHint.style.display = traCb.checked ? 'block' : 'none';
+            }
+            window.updateAppliesVisibility = updateAppliesVisibility;
+
+            function closeFilterModal() {
+                var modal = document.getElementById('filter-modal-backdrop');
+                modal.classList.remove('active');
+                if (filterBuilderInstance && typeof filterBuilderInstance.destroy === 'function') {
+                    filterBuilderInstance.destroy();
+                }
+                editingFilterId = null;
+            }
+
+            function refreshOverlaysAfterFilterChange() {
+                setupDynamicOverlays().then(function () {
+                    updateLegendUI();
+                    if (scroll.bufferStartYear && scroll.bufferEndYear) {
+                        rerenderBufferInPlace();
+                    }
+                });
+            }
+
+            function saveFilter() {
+                var nameInput = document.getElementById('filter-name-input');
+                var notesInput = document.getElementById('filter-notes-input');
+                var freqSelect = document.getElementById('filter-display-frequency');
+                var typeSelect = document.getElementById('filter-display-type');
+                var locSelect = document.getElementById('filter-display-location');
+                var ctextInput = document.getElementById('filter-custom-text-input');
+                var valMetricSelect = document.getElementById('filter-val-metric-select');
+                var colorHex = document.getElementById('filter-color-hex');
+
+                var name = nameInput.value.trim();
+                if (!name) {
+                    alert('Overlay name is required.');
+                    return;
+                }
+                if (name.length > 30) {
+                    alert('Overlay name must be 30 characters or fewer.');
+                    return;
+                }
+
+                var tree = filterBuilderInstance ? filterBuilderInstance.getFilter() : null;
+                if (!tree) {
+                    alert('Overlay definition is required.');
+                    return;
+                }
+
+                var dFreq = freqSelect ? freqSelect.value : 'matching';
+                var dType = typeSelect.value;
+                var dLoc = (dType === 'fill') ? 'center' : (locSelect.value || 'center');
+
+                var displayDefaults = {
+                    type: dType,
+                    location: dLoc,
+                    color: colorHex.value.trim() || '#e74c3c',
+                    show_frequency: dFreq
+                };
+                if (dType === 'custom_text' && ctextInput) {
+                    displayDefaults.custom_text = ctextInput.value.trim();
+                }
+                if ((dType === 'value' || dType === 'num_badge' || dType === 'custom_text') && valMetricSelect && valMetricSelect.value) {
+                    displayDefaults.value_metric = valMetricSelect.value;
+                }
+
+                var appliesTo = [];
+                if (document.getElementById('filter-applies-calendar') && document.getElementById('filter-applies-calendar').checked) appliesTo.push('calendar');
+                if (document.getElementById('filter-applies-patterns') && document.getElementById('filter-applies-patterns').checked) appliesTo.push('patterns');
+                if (document.getElementById('filter-applies-trends') && document.getElementById('filter-applies-trends').checked) appliesTo.push('trends');
+                if (document.getElementById('filter-applies-trace') && document.getElementById('filter-applies-trace').checked) appliesTo.push('trace');
+                if (!appliesTo.length) {
+                    alert('Select at least one destination: Calendar, Patterns, Trends, or Trace.');
+                    return;
+                }
+
+                var payload = {
+                    name: name,
+                    notes: notesInput.value.trim(),
+                    filter_tree: tree,
+                    display_defaults: displayDefaults,
+                    applies_to: appliesTo
+                };
+
+                var url = editingFilterId ? '/api/v1/filters/' + editingFilterId : '/api/v1/filters';
+                var method = editingFilterId ? 'PUT' : 'POST';
+
+                fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                })
+                .then(function (r) {
+                    if (!r.ok) return r.json().then(function (e) { throw new Error(e.error || 'Failed to save custom overlay'); });
+                    return r.json();
+                })
+                .then(function () {
+                    closeFilterModal();
+                    refreshOverlaysAfterFilterChange();
+                    setStatus('Custom overlay saved successfully.');
+                })
+                .catch(function (err) {
+                    alert(err.message);
+                });
+            }
+
+            function duplicateFilter(filterId) {
+                var existing = filtersList.find(function (f) { return f.id === filterId; });
+                if (!existing) return;
+
+                var suffix = ' (Copy)';
+                var baseName = existing.name.length + suffix.length > 30
+                    ? existing.name.slice(0, 30 - suffix.length)
+                    : existing.name;
+
+                var payload = {
+                    name: baseName + suffix,
+                    notes: existing.notes || null,
+                    filter_tree: existing.filter_tree,
+                    display_defaults: existing.display_defaults,
+                    applies_to: existing.applies_to || ['calendar']
+                };
+
+                fetch('/api/v1/filters', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                })
+                .then(function (r) {
+                    if (!r.ok) throw new Error('Failed to duplicate filter');
+                    return r.json();
+                })
+                .then(function () {
+                    refreshOverlaysAfterFilterChange();
+                    setStatus('Smart filter duplicated.');
+                })
+                .catch(function (err) {
+                    alert(err.message);
+                });
+            }
+
+            function deleteFilter(filterId) {
+                if (!confirm('Are you sure you want to delete this smart filter?')) return;
+
+                fetch('/api/v1/filters/' + filterId, { method: 'DELETE' })
+                    .then(function (r) {
+                        return r.json().then(function (data) {
+                            return { status: r.status, data: data };
+                        });
+                    })
+                    .then(function (res) {
+                        if (res.status === 409) {
+                            showGuardModal('smart filter', res.data.blocking_views || []);
+                            return;
+                        }
+                        if (res.status !== 200) {
+                            alert(res.data.error || 'Failed to delete filter');
+                            return;
+                        }
+                        // If the deleted filter was checked, drop it from the
+                        // active set before refreshing so it doesn't linger
+                        // as a checked-but-nonexistent row.
+                        var regId = 'filter_' + filterId;
+                        var ids = getActiveOverlayIds().filter(function (id) { return id !== regId; });
+                        if (ids.length !== getActiveOverlayIds().length) {
+                            setActiveOverlayIds(ids);
+                        }
+                        refreshOverlaysAfterFilterChange();
+                        setStatus('Smart filter deleted.');
+                    })
+                    .catch(function (err) {
+                        alert(err.message);
+                    });
+            }
+            window.openFilterModal = openFilterModal;
+            window.duplicateFilter = duplicateFilter;
+            window.deleteFilter = deleteFilter;
+
+            // --- DELETION GUARD MODAL ---
+            function showGuardModal(kind, blockingViews) {
+                var modal = document.getElementById('guard-modal-backdrop');
+                var msg = document.getElementById('guard-modal-msg');
+                var list = document.getElementById('guard-modal-views-list');
+                if (!modal || !msg || !list) return;
+
+                msg.textContent = 'This ' + kind + ' cannot be deleted because it is actively referenced by saved views. Remove it from the following views first:';
+                list.innerHTML = '';
+                blockingViews.forEach(function (v) {
+                    var li = document.createElement('li');
+                    li.textContent = (v.page ? v.page.toUpperCase() : 'PAGE') + ': "' + v.name + '"';
+                    list.appendChild(li);
+                });
+
+                modal.classList.add('active');
+            }
+
+            function closeGuardModal() {
+                var modal = document.getElementById('guard-modal-backdrop');
+                if (modal) modal.classList.remove('active');
+            }
+
+            function setupEventListeners() {
+                var prevBtn = document.getElementById('cal-prev-btn');
+                var nextBtn = document.getElementById('cal-next-btn');
+                var todayBtn = document.getElementById('cal-today-btn');
+                var monthLabelBtn = document.getElementById('cal-month-label');
+                var monthInput = document.getElementById('cal-month-input');
+
+                if (monthLabelBtn) {
+                    monthLabelBtn.addEventListener('click', toggleMonthPicker);
+                }
+                if (monthInput) {
+                    monthInput.addEventListener('change', handleMonthPickerChange);
+                }
+
+                if (prevBtn) {
+                    prevBtn.addEventListener('click', function () {
+                        state.month--;
+                        if (state.month < 1) {
+                            state.month = 12;
+                            state.year--;
+                        }
+                        updateControlsUI();
+                        scrollToMonth(state.year, state.month);
+                    });
+                }
+
+                if (nextBtn) {
+                    nextBtn.addEventListener('click', function () {
+                        state.month++;
+                        if (state.month > 12) {
+                            state.month = 1;
+                            state.year++;
+                        }
+                        updateControlsUI();
+                        scrollToMonth(state.year, state.month);
+                    });
+                }
+
+                if (todayBtn) {
+                    todayBtn.addEventListener('click', function () {
+                        state.year = todayYear;
+                        state.month = todayMonth;
+                        updateControlsUI();
+                        scrollToMonth(state.year, state.month);
+                    });
+                }
+
+                var overlaySearch = document.getElementById('cal-overlay-search');
+                if (overlaySearch) {
+                    overlaySearch.addEventListener('input', function () {
+                        renderOverlayList();
+                    });
+                }
+
+                var toggleAllBtn = document.getElementById('cal-overlay-toggle-all');
+                if (toggleAllBtn) {
+                    toggleAllBtn.addEventListener('change', function () {
+                        var activeIds = getActiveOverlayIds();
+                        var totalCount = (window.CALENDAR_REGISTRY || []).length;
+                        if (activeIds.length < totalCount) {
+                            selectAllOverlays();
+                        } else {
+                            deselectAllOverlays();
+                        }
+                        if (window.NSViews) window.NSViews.markViewDirty();
+                    });
+                }
+
+                var createBtn = document.getElementById('cal-overlay-create-btn');
+                if (createBtn) {
+                    createBtn.addEventListener('click', function () { openFilterModal(); });
+                }
+
+                var filterNameInput = document.getElementById('filter-name-input');
+                if (filterNameInput) {
+                    filterNameInput.addEventListener('input', updateFilterNameCounter);
+                }
+
+                var filterNotesInput = document.getElementById('filter-notes-input');
+                if (filterNotesInput) {
+                    filterNotesInput.addEventListener('input', updateFilterNotesCounter);
+                }
+
+                var filterDisplayType = document.getElementById('filter-display-type');
+                if (filterDisplayType) {
+                    filterDisplayType.addEventListener('change', onOverlayDisplayTypeChange);
+                }
+
+                var filterModalClose = document.getElementById('filter-modal-close');
+                if (filterModalClose) filterModalClose.addEventListener('click', closeFilterModal);
+                var filterModalCancel = document.getElementById('filter-modal-cancel');
+                if (filterModalCancel) filterModalCancel.addEventListener('click', closeFilterModal);
+                var filterModalSave = document.getElementById('filter-modal-save');
+                if (filterModalSave) filterModalSave.addEventListener('click', saveFilter);
+
+                var guardModalClose = document.getElementById('guard-modal-close');
+                if (guardModalClose) guardModalClose.addEventListener('click', closeGuardModal);
+                var guardModalOk = document.getElementById('guard-modal-ok');
+                if (guardModalOk) guardModalOk.addEventListener('click', closeGuardModal);
+            }
+
+            function init() {
+                setupEventListeners();
+                setupWheelAndKeyboard();
+
+                fetch('/api/v1/filters/metrics')
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) { metricsCatalog = data; })
+                    .catch(function (err) { console.error('Failed to load metrics catalog:', err); });
+
+                setupDynamicOverlays().then(function () {
+                    NSViews.init({
+                        page: 'calendar',
+                        activeViewKey: 'ns_calendar_active_view',
+                        defaultViews: DEFAULT_CALENDAR_VIEWS,
+                        titleElId: 'cal-chart-title-text',
+                        defaultTitle: 'Calendar',
+                        settingsPopoverId: 'cal-settings-popover',
+                        settingsBtnId: 'cal-settings-btn',
+                        captureState: getCurrentCalendarState,
+                        applyState: applyCalendarView
+                    }).then(function () {
+                        updateControlsUI();
+                        initialLoad();
+                    });
+                });
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+
+            // ---------------------------------------------------------------
+            // Day Note Popup: free-text notes (user + synced AAPS), Weight,
+            // HbA1c. See docs/analysis/notes-weight-hba1c-implementation-plan.md (v3).
+            // ---------------------------------------------------------------
+            var noteModalDate = null;
+            var noteDeletePendingId = null;
+
+            function noteTypeLabel(t) {
+                return { user: 'User Note', aaps: 'AAPS Note', weight: 'Weight', hba1c: 'HbA1c' }[t] || t;
+            }
+
+            function openDayNotePopup(dateStr) {
+                window.location.href = '/diary?date=' + encodeURIComponent(dateStr);
+            }
+
+            function hasUnsavedChanges() {
+                return !!document.querySelector('#note-panel-list .note-panel-card.dirty');
+            }
+
+            function closeDayNotePopup() {
+                if (hasUnsavedChanges() && !confirm('You have unsaved changes in this popup. Close without saving?')) {
+                    return;
+                }
+                document.getElementById('note-modal-backdrop').classList.remove('active');
+                document.getElementById('note-add-entry-popover').classList.remove('active');
+                noteModalDate = null;
+            }
+
+            function loadNotesForDate(dateStr) {
+                var listEl = document.getElementById('note-panel-list');
+                listEl.innerHTML = '';
+                fetch('/api/v1/notes?date=' + dateStr)
+                    .then(function (r) { return r.json(); })
+                    .then(function (notes) { renderNotePanels(notes || []); })
+                    .catch(function (err) {
+                        listEl.innerHTML = '<div class="overlay-list-empty">Failed to load notes.</div>';
+                        console.error(err);
+                    });
+            }
+
+            function renderNotePanels(notes) {
+                var listEl = document.getElementById('note-panel-list');
+                var emptyEl = document.getElementById('note-modal-empty');
+                listEl.innerHTML = '';
+                emptyEl.style.display = notes.length ? 'none' : '';
+                notes.forEach(function (note) { listEl.appendChild(buildPanelCard(note)); });
+            }
+
+            function timeOnly(timeCreated) {
+                // time_created comes back as an ISO-ish 'YYYY-MM-DD HH:MM:SS+TZ'
+                // string from psycopg2's RealDictCursor JSON serialization.
+                var m = /(\d{2}):(\d{2})/.exec(timeCreated || '');
+                return m ? (m[1] + ':' + m[2]) : '00:00';
+            }
+
+            function buildPanelCard(note) {
+                var card = document.createElement('div');
+                card.className = 'note-panel-card';
+                card.dataset.noteId = note.id || '';
+                card.dataset.noteType = note.note_type;
+                card.dataset.original = JSON.stringify(note);
+
+                var header = document.createElement('div');
+                header.className = 'note-panel-header';
+
+                var badge = document.createElement('span');
+                badge.className = 'note-panel-type-badge';
+                badge.textContent = noteTypeLabel(note.note_type);
+                header.appendChild(badge);
+
+                // Time-of-day is only meaningful for free-text notes --
+                // Weight and HbA1c are logged against a day, not a moment,
+                // and Harry doesn't want a time field cluttering those two
+                // panel types (per his direct feedback after using it).
+                // The row still needs *a* time_created value for the DB's
+                // NOT NULL column/ordering, so we default to 00:00 for
+                // those types without exposing a control for it -- see
+                // collectCardPayload(), which simply omits time_created
+                // for weight/hba1c and lets the backend default apply.
+                var timeInput = null;
+                if (note.note_type === 'user' || note.note_type === 'aaps') {
+                    timeInput = document.createElement('input');
+                    timeInput.type = 'time';
+                    timeInput.className = 'form-input form-input-sm note-time-input';
+                    timeInput.value = timeOnly(note.time_created);
+                    header.appendChild(timeInput);
+                }
+
+                var actions = document.createElement('div');
+                actions.className = 'note-panel-actions';
+                var resetBtn = document.createElement('button');
+                resetBtn.type = 'button';
+                resetBtn.className = 'btn btn-secondary note-reset-btn';
+                resetBtn.textContent = 'Reset';
+                resetBtn.disabled = true;
+                var saveBtn = document.createElement('button');
+                saveBtn.type = 'button';
+                saveBtn.className = 'btn btn-primary note-save-btn';
+                saveBtn.textContent = 'Save';
+                var delBtn = document.createElement('button');
+                delBtn.type = 'button';
+                delBtn.className = 'btn btn-danger note-delete-btn';
+                delBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+                actions.appendChild(resetBtn);
+                actions.appendChild(saveBtn);
+                actions.appendChild(delBtn);
+                header.appendChild(actions);
+                card.appendChild(header);
+
+                var body = document.createElement('div');
+                body.className = 'note-panel-body';
+
+                if (note.note_type === 'user' || note.note_type === 'aaps') {
+                    var ta = document.createElement('textarea');
+                    ta.className = 'note-panel-textarea note-text-input';
+                    ta.value = note.text_content || '';
+                    body.appendChild(ta);
+                    if (note.note_type === 'aaps') {
+                        var hint = document.createElement('div');
+                        hint.className = 'note-panel-hint';
+                        hint.textContent = 'Editing will convert this to a User Note.';
+                        body.appendChild(hint);
+                    }
+                } else if (note.note_type === 'weight') {
+                    var row = document.createElement('div');
+                    row.className = 'note-metric-row';
+                    var wIn = document.createElement('input');
+                    wIn.type = 'number';
+                    wIn.step = '0.1';
+                    wIn.placeholder = 'e.g. 74.5';
+                    wIn.className = 'form-input note-weight-input';
+                    wIn.value = (note.weight_kg != null) ? note.weight_kg : '';
+                    row.appendChild(wIn);
+                    var unit = document.createElement('span');
+                    unit.textContent = 'kg';
+                    row.appendChild(unit);
+                    body.appendChild(row);
+                } else if (note.note_type === 'hba1c') {
+                    var row2 = document.createElement('div');
+                    row2.className = 'note-metric-row';
+                    var pctIn = document.createElement('input');
+                    pctIn.type = 'number';
+                    pctIn.step = '0.1';
+                    pctIn.className = 'form-input note-hba1c-pct-input';
+                    pctIn.value = (note.hba1c_percent != null) ? note.hba1c_percent : '';
+                    var pctLabel = document.createElement('span');
+                    pctLabel.textContent = '%';
+                    var sync = document.createElement('span');
+                    sync.className = 'metric-sync-icon';
+                    sync.innerHTML = '\u21C4';
+                    var mmolIn = document.createElement('input');
+                    mmolIn.type = 'number';
+                    mmolIn.step = '1';
+                    mmolIn.className = 'form-input note-hba1c-mmol-input';
+                    mmolIn.value = (note.hba1c_mmol_mol != null) ? note.hba1c_mmol_mol : '';
+                    var mmolLabel = document.createElement('span');
+                    mmolLabel.textContent = 'mmol/mol';
+                    row2.appendChild(pctIn);
+                    row2.appendChild(pctLabel);
+                    row2.appendChild(sync);
+                    row2.appendChild(mmolIn);
+                    row2.appendChild(mmolLabel);
+                    body.appendChild(row2);
+
+                    // Live conversion, matching plan spec: NGSP% <-> IFCC mmol/mol.
+                    pctIn.addEventListener('input', function () {
+                        if (pctIn.value === '') return;
+                        mmolIn.value = Math.round((parseFloat(pctIn.value) - 2.15) * 10.929);
+                        markDirty(card);
+                    });
+                    mmolIn.addEventListener('input', function () {
+                        if (mmolIn.value === '') return;
+                        pctIn.value = (parseFloat(mmolIn.value) / 10.929 + 2.15).toFixed(1);
+                        markDirty(card);
+                    });
+                }
+
+                card.appendChild(body);
+
+                // Any edit marks the card dirty (enables Reset, no-op for Save
+                // which is always clickable -- saving unchanged data is harmless).
+                card.querySelectorAll('input, textarea').forEach(function (el) {
+                    el.addEventListener('input', function () { markDirty(card); });
+                });
+
+                resetBtn.addEventListener('click', function () { resetCard(card); });
+                saveBtn.addEventListener('click', function () { saveCard(card); });
+                delBtn.addEventListener('click', function () { requestDeleteCard(card); });
+
+                return card;
+            }
+
+            function markDirty(card) {
+                card.classList.add('dirty');
+                var resetBtn = card.querySelector('.note-reset-btn');
+                if (resetBtn) resetBtn.disabled = false;
+            }
+
+            function resetCard(card) {
+                var original = JSON.parse(card.dataset.original);
+                var fresh = buildPanelCard(original);
+                card.replaceWith(fresh);
+            }
+
+            function collectCardPayload(card) {
+                var type = card.dataset.noteType;
+                var payload = {
+                    id: card.dataset.noteId || null,
+                    date: noteModalDate,
+                    note_type: type
+                };
+                var timeInput = card.querySelector('.note-time-input');
+                if (timeInput) payload.time_created = timeInput.value || '00:00';
+                if (type === 'user' || type === 'aaps') {
+                    payload.text_content = card.querySelector('.note-text-input').value;
+                } else if (type === 'weight') {
+                    var wv = card.querySelector('.note-weight-input').value;
+                    payload.weight_kg = wv === '' ? null : parseFloat(wv);
+                } else if (type === 'hba1c') {
+                    var pv = card.querySelector('.note-hba1c-pct-input').value;
+                    var mv = card.querySelector('.note-hba1c-mmol-input').value;
+                    payload.hba1c_percent = pv === '' ? null : parseFloat(pv);
+                    payload.hba1c_mmol_mol = mv === '' ? null : parseInt(mv, 10);
+                }
+                return payload;
+            }
+
+            // Harry caught this in testing: saving a Weight entry with no
+            // weight typed in silently "succeeded" (an empty row with
+            // nothing to show for it). Validate the field that actually
+            // matters per type before hitting the network at all.
+            function validateCardPayload(payload) {
+                if (payload.note_type === 'weight' && payload.weight_kg === null) {
+                    return 'Enter a weight before saving.';
+                }
+                if (payload.note_type === 'hba1c' && payload.hba1c_percent === null && payload.hba1c_mmol_mol === null) {
+                    return 'Enter an HbA1c value before saving.';
+                }
+                if ((payload.note_type === 'user' || payload.note_type === 'aaps') && !(payload.text_content || '').trim()) {
+                    return 'Enter some text before saving.';
+                }
+                return null;
+            }
+
+            function saveCard(card) {
+                var payload = collectCardPayload(card);
+                var validationError = validateCardPayload(payload);
+                if (validationError) { alert(validationError); return; }
+                var endpoint = (payload.note_type === 'weight' || payload.note_type === 'hba1c')
+                    ? '/api/v1/metrics/' + payload.note_type
+                    : '/api/v1/notes';
+                fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                })
+                .then(function (r) {
+                    if (!r.ok) return r.json().then(function (e) { throw new Error(e.error || 'Save failed'); });
+                    return r.json();
+                })
+                .then(function () {
+                    onNoteDataChanged();
+                    loadNotesForDate(noteModalDate);
+                })
+                .catch(function (err) { alert(err.message); });
+            }
+
+            function requestDeleteCard(card) {
+                var noteId = card.dataset.noteId;
+                if (!noteId) {
+                    // Unsaved draft card -- just remove it locally, nothing to delete server-side.
+                    card.remove();
+                    return;
+                }
+                noteDeletePendingId = noteId;
+                document.getElementById('note-delete-modal-backdrop').classList.add('active');
+            }
+
+            function onNoteDataChanged() {
+                // Refresh the pill for the currently-open day without a full
+                // calendar rebuild: re-fetch just this date's note-date status
+                // and toggle the pill class on the matching cell directly.
+                if (!noteModalDate) return;
+                fetch('/api/v1/notes/range?start=' + noteModalDate + '&end=' + noteModalDate)
+                    .then(function (r) { return r.json(); })
+                    .then(function (dates) {
+                        var hasNotes = (dates || []).indexOf(noteModalDate) !== -1;
+                        var cell = document.querySelector('.cal-cell[data-date="' + noteModalDate + '"]');
+                        if (!cell) return;
+                        var dayNum = cell.querySelector('.cal-day-num');
+                        if (!dayNum) return;
+                        if (hasNotes) {
+                            noteDatesSet[noteModalDate] = true;
+                            dayNum.classList.add('cal-day-pill');
+                            dayNum.title = 'View notes for ' + noteModalDate;
+                            dayNum.onclick = function (e) { e.stopPropagation(); openDayNotePopup(noteModalDate); };
+                        } else {
+                            delete noteDatesSet[noteModalDate];
+                            dayNum.classList.remove('cal-day-pill');
+                            dayNum.removeAttribute('title');
+                            dayNum.onclick = null;
+                        }
+                    })
+                    .catch(function (err) { console.warn('Failed to refresh note pill', err); });
+            }
+
+            function setupNotePopup() {
+                document.getElementById('note-modal-close').addEventListener('click', closeDayNotePopup);
+                document.getElementById('note-modal-backdrop').addEventListener('click', function (e) {
+                    if (e.target.id === 'note-modal-backdrop') closeDayNotePopup();
+                });
+
+                var addBtn = document.getElementById('note-add-entry-btn');
+                var addPopover = document.getElementById('note-add-entry-popover');
+                addBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    addPopover.classList.toggle('active');
+                });
+                document.addEventListener('click', function () { addPopover.classList.remove('active'); });
+
+                addPopover.querySelectorAll('[data-add-type]').forEach(function (row) {
+                    row.addEventListener('click', function () {
+                        addPopover.classList.remove('active');
+                        var type = row.getAttribute('data-add-type');
+                        var now = new Date();
+                        var draft = {
+                            id: null,
+                            date: noteModalDate,
+                            time_created: padZero(now.getHours()) + ':' + padZero(now.getMinutes()) + ':00',
+                            note_type: type,
+                            text_content: '',
+                            weight_kg: null,
+                            hba1c_percent: null,
+                            hba1c_mmol_mol: null
+                        };
+                        document.getElementById('note-modal-empty').style.display = 'none';
+                        var card = buildPanelCard(draft);
+                        markDirty(card);
+                        document.getElementById('note-panel-list').appendChild(card);
+                    });
+                });
+
+                document.getElementById('note-delete-cancel').addEventListener('click', function () {
+                    document.getElementById('note-delete-modal-backdrop').classList.remove('active');
+                    noteDeletePendingId = null;
+                });
+                document.getElementById('note-delete-confirm').addEventListener('click', function () {
+                    var id = noteDeletePendingId;
+                    document.getElementById('note-delete-modal-backdrop').classList.remove('active');
+                    noteDeletePendingId = null;
+                    if (!id) return;
+                    fetch('/api/v1/notes/' + id, { method: 'DELETE' })
+                        .then(function (r) {
+                            if (!r.ok) throw new Error('Delete failed');
+                            onNoteDataChanged();
+                            loadNotesForDate(noteModalDate);
+                        })
+                        .catch(function (err) { alert(err.message); });
+                });
+            }
+            setupNotePopup();
+
+            // Expose functions referenced by inline onclick="" attributes in
+            // this page's own markup -- everything above is scoped to this
+            // IIFE, so without this, onclick="toggleCalSettings(event)" and
+            // onclick="printCalPanel()" throw ReferenceError the moment
+            // they're clicked (confirmed 31 Aug: the settings gear button
+            // was dead, pre-dating this session's other changes -- it looks
+            // like this was never exercised by an actual click before).
+            // Same pattern ns-view-manager.js already uses for its own
+            // onclick-referenced functions (global.X = X at the bottom of
+            // its IIFE) -- this page's script just never did it for its own.
+            window.toggleCalSettings = toggleCalSettings;
+            window.printCalPanel = printCalPanel;
+            window.openDayNotePopup = openDayNotePopup;
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Filter & Target Engine Test Harness - ns-monitor</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <style>
+        .filter-test-card {
+            padding: 20px 22px 24px;
+            margin-bottom: 20px;
+        }
+
+        .filter-presets {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .preset-label {
+            font-size: 0.85em;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-right: 4px;
+        }
+
+        .date-range-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            font-size: 0.95rem;
+        }
+
+        .json-preview-box {
+            background: var(--surface-inset);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 0.85em;
+            color: #79c0ff;
+            max-height: 280px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .dates-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            max-height: 240px;
+            overflow-y: auto;
+            margin-top: 12px;
+            padding: 8px;
+            background: var(--surface-inset);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+        }
+
+        .date-chip {
+            background: var(--surface-raised);
+            color: var(--text-color);
+            border: 1px solid var(--border-color-strong);
+            border-radius: 4px;
+            padding: 3px 8px;
+            font-size: 0.85em;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .date-chip.match {
+            border-color: var(--accent);
+            color: var(--link-color-hover);
+        }
+    </style>
+</head>
+<body>
+    {% include "sidebar.html" %}
+
+    <div class="container">
+        <header class="page-header">
+            <h1 class="panel-h1">Filter & Target Engine Test Harness</h1>
+        </header>
+
+        <!-- Builder & Presets Card -->
+        <div class="card filter-test-card">
+            <div class="filter-presets">
+                <span class="preset-label">PRESETS:</span>
+                <button type="button" class="btn btn-secondary" id="preset-hypo-run">Hypo Run (BG &lt; 3.9 for &ge;15m)</button>
+                <button type="button" class="btn btn-secondary" id="preset-tir-streak">TIR Streak (&ge;70% for 3d)</button>
+                <button type="button" class="btn btn-secondary" id="preset-overnight-bg">Overnight Avg BG (&gt;8.0 mmol/L, 22:00-08:00)</button>
+                <button type="button" class="btn btn-secondary" id="preset-pod-change">Pod Change + High Carbs (&gt;150g)</button>
+                <button type="button" class="btn btn-secondary" id="preset-compound">Compound AND/OR Filter</button>
+            </div>
+
+            <div class="date-range-bar">
+                <span style="font-weight:600; color:var(--text-secondary);">Date Range:</span>
+                <label for="filter-start-date" style="color:var(--text-secondary);">From</label>
+                <input type="date" id="filter-start-date" class="form-input" value="{{ default_start }}">
+                <label for="filter-end-date" style="color:var(--text-secondary);">To</label>
+                <input type="date" id="filter-end-date" class="form-input" value="{{ today_local }}">
+            </div>
+
+            <div id="filter-builder-container"></div>
+
+            <div style="margin-top: 16px; display: flex; align-items: center; gap: 12px;">
+                <button type="button" class="btn btn-primary" id="btn-evaluate" style="padding: 8px 20px;">
+                    Execute Evaluation
+                </button>
+                <span id="eval-status" style="font-size: 0.9em; color: var(--text-secondary);"></span>
+            </div>
+        </div>
+
+        <!-- Evaluation Results & JSON Payload Card -->
+        <div class="card filter-test-card">
+            <div class="split-card">
+                <!-- Left: Request Payload -->
+                <div class="col-left">
+                    <h3 style="margin-top:0; font-size: 1.05rem; color: var(--text-color);">Live JSON Payload</h3>
+                    <div id="json-request-preview" class="json-preview-box">{}</div>
+                </div>
+
+                <!-- Right: Evaluation Summary & Matching Dates -->
+                <div class="col-right">
+                    <h3 style="margin-top:0; font-size: 1.05rem; color: var(--text-color);">Evaluation Results</h3>
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                        <div class="score-block" style="flex: 1; min-width: 110px;">
+                            <div class="score-val" id="res-total-days">-</div>
+                            <div class="score-label">Days Evaluated</div>
+                        </div>
+                        <div class="score-block" style="flex: 1; min-width: 110px;">
+                            <div class="score-val" id="res-match-count" style="color: var(--accent);">-</div>
+                            <div class="score-label">Matching Days</div>
+                        </div>
+                        <div class="score-block" style="flex: 1; min-width: 110px;">
+                            <div class="score-val" id="res-exec-time">-</div>
+                            <div class="score-label">Latency (ms)</div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 14px;">
+                        <span style="font-weight:600; font-size: 0.9em; color: var(--text-secondary);">Matching Calendar Dates:</span>
+                        <div id="res-dates-list" class="dates-grid">
+                            <span style="color: var(--text-tertiary); font-style: italic; font-size: 0.9em;">No evaluation performed yet.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/ns-filter-builder.js"></script>
+    <script>
+        var metricsCatalog = {};
+        var builderInstance = null;
+
+        function updateJsonPreview() {
+            if (!builderInstance) return;
+            var payload = {
+                filter: builderInstance.getFilter(),
+                dateRange: {
+                    start: document.getElementById('filter-start-date').value,
+                    end: document.getElementById('filter-end-date').value
+                }
+            };
+            document.getElementById('json-request-preview').textContent = JSON.stringify(payload, null, 2);
+        }
+
+        function setStatus(text, isError) {
+            var el = document.getElementById('eval-status');
+            el.textContent = text;
+            el.style.color = isError ? 'var(--danger)' : 'var(--text-secondary)';
+        }
+
+        function executeEvaluation() {
+            if (!builderInstance) return;
+            var startDate = document.getElementById('filter-start-date').value;
+            var endDate = document.getElementById('filter-end-date').value;
+            var filterObj = builderInstance.getFilter();
+
+            var payload = {
+                filter: filterObj,
+                dateRange: {
+                    start: startDate,
+                    end: endDate
+                }
+            };
+
+            setStatus('Evaluating filter against historical records...', false);
+            var btn = document.getElementById('btn-evaluate');
+            btn.disabled = true;
+
+            fetch('/api/v1/filters/evaluate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(function(res) {
+                return res.json().then(function(data) {
+                    return { ok: res.ok, status: res.status, data: data };
+                });
+            })
+            .then(function(resObj) {
+                btn.disabled = false;
+                if (!resObj.ok) {
+                    setStatus('Error: ' + (resObj.data.error || 'Evaluation failed'), true);
+                    return;
+                }
+                var result = resObj.data;
+                setStatus('Evaluation complete in ' + result.meta.executionTimeMs + ' ms.', false);
+
+                document.getElementById('res-total-days').textContent = result.meta.totalDaysEvaluated;
+                document.getElementById('res-match-count').textContent = result.meta.matchCount;
+                document.getElementById('res-exec-time').textContent = result.meta.executionTimeMs;
+
+                var datesListEl = document.getElementById('res-dates-list');
+                datesListEl.innerHTML = '';
+                if (result.matchingDates && result.matchingDates.length > 0) {
+                    result.matchingDates.forEach(function(dt) {
+                        var chip = document.createElement('span');
+                        chip.className = 'date-chip match';
+                        chip.textContent = dt;
+                        datesListEl.appendChild(chip);
+                    });
+                } else {
+                    var empty = document.createElement('span');
+                    empty.style.color = 'var(--text-tertiary)';
+                    empty.style.fontStyle = 'italic';
+                    empty.style.fontSize = '0.9em';
+                    empty.textContent = '0 dates matched the filter criteria in this period.';
+                    datesListEl.appendChild(empty);
+                }
+            })
+            .catch(function(err) {
+                btn.disabled = false;
+                setStatus('Network error: ' + err.message, true);
+            });
+        }
+
+        function loadPreset(presetKey) {
+            if (!builderInstance) return;
+            var newFilter = null;
+
+            if (presetKey === 'hypo-run') {
+                newFilter = {
+                    op: 'AND',
+                    clauses: [
+                        {
+                            metric: 'bg',
+                            comparator: 'lt',
+                            threshold: 3.9,
+                            duration: { value: 15, unit: 'minutes' }
+                        }
+                    ]
+                };
+            } else if (presetKey === 'tir-streak') {
+                newFilter = {
+                    op: 'AND',
+                    clauses: [
+                        {
+                            metric: 'tir',
+                            comparator: 'gte',
+                            threshold: 70.0,
+                            duration: { value: 3, unit: 'days' }
+                        }
+                    ]
+                };
+            } else if (presetKey === 'overnight-bg') {
+                newFilter = {
+                    op: 'AND',
+                    clauses: [
+                        {
+                            metric: 'avg_bg',
+                            comparator: 'gt',
+                            threshold: 8.0,
+                            timeScope: { start: '22:00', end: '08:00' }
+                        }
+                    ]
+                };
+            } else if (presetKey === 'pod-change') {
+                newFilter = {
+                    op: 'AND',
+                    clauses: [
+                        {
+                            metric: 'pod_change',
+                            comparator: 'occurred',
+                            threshold: 1
+                        },
+                        {
+                            metric: 'carbs',
+                            comparator: 'gt',
+                            threshold: 150
+                        }
+                    ]
+                };
+            } else if (presetKey === 'compound') {
+                newFilter = {
+                    op: 'AND',
+                    clauses: [
+                        {
+                            metric: 'tdd',
+                            comparator: 'gt',
+                            threshold: 40.0
+                        },
+                        {
+                            op: 'OR',
+                            clauses: [
+                                {
+                                    metric: 'bg',
+                                    comparator: 'lt',
+                                    threshold: 3.9,
+                                    duration: { value: 15, unit: 'minutes' }
+                                },
+                                {
+                                    metric: 'carbs',
+                                    comparator: 'gt',
+                                    threshold: 180
+                                }
+                            ]
+                        }
+                    ]
+                };
+            }
+
+            if (newFilter) {
+                builderInstance.setFilter(newFilter);
+            }
+        }
+
+        function initHarness() {
+            fetch('/api/v1/filters/metrics')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    metricsCatalog = data;
+                    builderInstance = NSFilterBuilder.createFilterBuilder({
+                        containerId: 'filter-builder-container',
+                        metrics: metricsCatalog,
+                        onChange: updateJsonPreview
+                    });
+                    updateJsonPreview();
+                })
+                .catch(function(err) {
+                    setStatus('Failed to load metrics catalog: ' + err.message, true);
+                });
+
+            document.getElementById('filter-start-date').addEventListener('change', updateJsonPreview);
+            document.getElementById('filter-end-date').addEventListener('change', updateJsonPreview);
+            document.getElementById('btn-evaluate').addEventListener('click', executeEvaluation);
+
+            document.getElementById('preset-hypo-run').addEventListener('click', function() { loadPreset('hypo-run'); });
+            document.getElementById('preset-tir-streak').addEventListener('click', function() { loadPreset('tir-streak'); });
+            document.getElementById('preset-overnight-bg').addEventListener('click', function() { loadPreset('overnight-bg'); });
+            document.getElementById('preset-pod-change').addEventListener('click', function() { loadPreset('pod-change'); });
+            document.getElementById('preset-compound').addEventListener('click', function() { loadPreset('compound'); });
+        }
+
+        document.addEventListener('DOMContentLoaded', initHarness);
+    </script>
+</body>
+</html>

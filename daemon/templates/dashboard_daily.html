@@ -1,0 +1,1757 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trace — ns-monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="/static/js/ns-date-selector.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <style>
+        @page {
+            size: landscape;
+            margin: 8mm 10mm;
+        }
+        @media print {
+        }
+    </style>
+</head>
+
+<body>
+    <div class="sidebar-wrapper">
+        {% include "sidebar.html" %}
+    </div>
+
+    <div id="axis-scale-hint"></div>
+
+    <div class="container container-fluid">
+        <!-- Sticky Header with Vertically Aligned Controls -->
+        <header class="page-header">
+            <h1 class="panel-h1">Trace</h1>
+            <div class="trace-header-controls">
+                <button type="button" class="btn btn-secondary" onclick="setNow()">Now</button>
+                <div class="date-pill">
+                    <button type="button" class="step-btn" onclick="stepView(-1)" title="Previous day">&lsaquo;</button>
+                    <input type="date" id="target-date" class="pill-date-input" onchange="handleDateChange()">
+                    <button type="button" class="step-btn" onclick="stepView(1)" title="Next day">&rsaquo;</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Continuous Longitudinal Trace Card -->
+        <div class="card print-break-avoid" id="trace-panel">
+            <!-- Header Row: Title, Date Range, Views Pill, Print & Settings Buttons -->
+            <div class="panel-header">
+                <div class="panel-header-left">
+                    <h2 class="panel-h2">
+                        <span id="trace-chart-title-text">Default Trace</span>
+                    </h2>
+                </div>
+                <div class="panel-header-right">
+                    <span id="trace-date-range" class="text-secondary" style="font-size: 11px; font-weight: 500;">Loading range...</span>
+                    <div class="header-action-buttons">
+                        <!-- Saved Views Pill Dropdown -->
+                        <div class="view-pill-container">
+                            <button type="button" class="view-pill-btn" id="view-pill-btn" onclick="toggleViewDropdown(event)" title="Switch or manage views">
+                                <i class="fa-solid fa-layer-group"></i>
+                                <span id="active-view-label">Default Trace</span>
+                                <i class="fa-solid fa-chevron-down" style="margin-left: 6px; font-size: 0.75em; opacity: 0.7;"></i>
+                            </button>
+                            <div class="view-dropdown-popover" id="view-dropdown-popover" onclick="event.stopPropagation()">
+                                <div class="view-dropdown-header">Saved Views</div>
+                                <div class="view-list" id="all-views-list"></div>
+                                <div class="view-save-section">
+                                    <div class="view-save-prompt-row" id="view-save-prompt-row" onclick="showSaveViewInput()">
+                                        <i class="fa-solid fa-plus"></i> Save Current View...
+                                    </div>
+                                    <div class="view-save-input-row" id="view-save-input-row" style="display: none;">
+                                        <input type="text" class="view-save-input" id="new-view-name" placeholder="View name..." maxlength="25" onkeydown="if(event.key==='Enter') saveCurrentView(); if(event.key==='Escape') cancelSaveView();" />
+                                        <button type="button" class="view-save-btn" onclick="saveCurrentView()">Save</button>
+                                        <button type="button" class="view-save-cancel" onclick="cancelSaveView()">✕</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Print Button -->
+                        <button type="button" class="panel-icon-btn" id="trace-print-btn" onclick="printTracePanel()" title="Print Trace Chart">
+                            <i class="fa-solid fa-print"></i>
+                        </button>
+
+                        <!-- Settings Button & Popover -->
+                        <div class="settings-menu-container">
+                            <button type="button" class="panel-icon-btn" id="trace-settings-btn" onclick="toggleTraceSettings(event)" title="Chart display settings">
+                                <i class="fa-solid fa-gear"></i>
+                            </button>
+                            <div class="settings-popover" id="trace-settings-popover" onclick="event.stopPropagation()" style="min-width: 330px;">
+                                <div class="settings-popover-title" id="trace-settings-popover-title">Trace Display Settings</div>
+                                <div class="settings-row">
+                                    <label for="target-band-toggle">Target Zone</label>
+                                    <div class="settings-toggle-group" id="target-band-toggle">
+                                        <button type="button" class="settings-toggle-btn" data-mode="dual" onclick="setTargetBandMode('dual')">Dual Tier</button>
+                                        <button type="button" class="settings-toggle-btn" data-mode="titr" id="target-band-btn-titr" onclick="setTargetBandMode('titr')">3.9–7.8</button>
+                                        <button type="button" class="settings-toggle-btn" data-mode="tir" id="target-band-btn-tir" onclick="setTargetBandMode('tir')">3.9–10</button>
+                                        <button type="button" class="settings-toggle-btn" data-mode="off" onclick="setTargetBandMode('off')">Off</button>
+                                    </div>
+                                </div>
+                                <div class="settings-row" style="margin-top: 8px;">
+                                    <input type="text" id="trace-overlay-search" class="form-input form-input-full" placeholder="Search series...">
+                                </div>
+                                <div class="overlay-list-actions">
+                                    <label class="overlay-list-toggle-all-label">
+                                        <input type="checkbox" id="trace-overlay-toggle-all" class="overlay-list-checkbox overlay-list-toggle-all">
+                                        <span>Select all</span>
+                                    </label>
+                                    <a href="/settings?tab=ranges&subtab=trace" class="btn-link">Trace Settings &rsaquo;</a>
+                                </div>
+                                <div class="overlay-list-container" id="trace-overlay-list"></div>
+
+                                <div class="settings-popover-title" style="margin-top: 14px; margin-bottom: 8px;">Axis Scale Limits (Min / Max)</div>
+                                <div id="axis-bounds-controls"></div>
+                                <div class="settings-note">Drag or scroll upper/lower half of any active Y-axis directly on the chart to adjust limits. Double-click to reset.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Context Menu (Right Click on any View in Dropdown) -->
+            <div class="tab-context-menu" id="tab-context-menu" onclick="event.stopPropagation()">
+                <div class="tab-context-header" id="tab-context-header">View Options</div>
+                <div class="tab-context-item" id="ctx-update" onclick="onContextUpdate()">
+                    <i class="fa-solid fa-floppy-disk"></i> Update with current setup
+                </div>
+                <div class="tab-context-item" id="ctx-duplicate" onclick="onContextDuplicate()">
+                    <i class="fa-solid fa-copy"></i> Duplicate as new view...
+                </div>
+                <div class="tab-context-item" id="ctx-rename" onclick="onContextRename()">
+                    <i class="fa-solid fa-pen-to-square"></i> Rename view...
+                </div>
+                <div class="tab-context-item danger" id="ctx-delete" onclick="onContextDelete()">
+                    <i class="fa-solid fa-trash"></i> Delete view
+                </div>
+            </div>
+
+            <!-- Chart Canvas & Gesture Pillars Overlay -->
+            <div class="agp-container" style="min-height: 560px; background: #fff; padding: 5px; border-radius: 4px; display: block; border: 1px solid #ddd; position: relative;">
+                <div class="loading-overlay" id="loading" style="background: rgba(255,255,255,0.85); color: #333;">Loading clinical data...</div>
+                <div class="axis-pillars-container" id="trace-axis-pillars" style="position: absolute; top: 5px; left: 5px; right: 5px; bottom: 5px; pointer-events: none; z-index: 6;"></div>
+                <div id="chart" style="min-height: 550px; width: 100%; cursor: grab; user-select: none; touch-action: pan-y;"></div>
+            </div>
+        </div>
+
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+
+    <script src="/static/js/ns-view-manager.js"></script>
+    <script src="/static/js/ns-axis-pillars.js"></script>
+    <script src="/static/js/registries/trace.js"></script>
+    <script src="/static/js/ns-orchestrator.js"></script>
+    <script src="/static/js/ns-chart-customizer.js"></script>
+    <script>
+        'use strict';
+
+        // --- 1. Declarative Registry & Visual Constants ---
+        const TRACE_METRICS = window.TRACE_REGISTRY || [];
+
+        // Point-marker symbols for Line metrics, matching Trends/Patterns'
+        // MARKER_SYMBOL_MAP exactly (same shapes, same fixed 3x-line-
+        // thickness sizing). Trace has no smoothing row in its style popover,
+        // but markers apply here too. Uses the same \x2f\x2f hex-escape
+        // convention this file already established for its other path://
+        // literals (see lines above -- getLegendIcon fallbacks), rather than
+        // a literal 'path://...' -- see check_js_references.py's
+        // strip_strings_and_comments() fix, 4 Sep 2026: a raw // inside a
+        // single-quoted string on one line used to corrupt that checker's
+        // quote-parity tracking for the rest of the file.
+        const TRACE_MARKER_SYMBOL_MAP = {
+            none: 'none',
+            circle: 'circle',
+            triangle: 'triangle',
+            square: 'rect',
+            cross: "path:\x2f\x2fM3.2,0 L6.8,0 L6.8,3.2 L10,3.2 L10,6.8 L6.8,6.8 L6.8,10 L3.2,10 L3.2,6.8 L0,6.8 L0,3.2 L3.2,3.2 Z"
+        };
+
+        // Composite entries (currently just `dev_bgi`) have no single
+        // dataKey -- they carry a `parts` array instead, each part shaped
+        // like a normal registry entry (dataKey, renderType, optional
+        // colorBy, style). Every place that used to assume 1 registry entry
+        // == 1 series goes through this so composites expand to N series
+        // while everything else stays a 1-element array, unchanged.
+        function traceEntryParts(entry) {
+            return entry.parts || [entry];
+        }
+
+        // --- 2. Unified View Presets & Lifecycle ---
+        const DEFAULT_TRACE_VIEWS = [
+            {
+                id: 'view_default_bg',
+                name: 'Default BG',
+                isDefault: true,
+                registryIds: ['bg', 'carbs', 'bolus', 'basal_rate'],
+                types: { carbs: 'bar', cob: 'line', bolus: 'bar', iob: 'line', basal: 'step' },
+                targetBandMode: 'dual',
+                axisBounds: {}
+            },
+            {
+                id: 'view_dosing_intake',
+                name: 'Dosing & Intake',
+                isDefault: true,
+                registryIds: ['bg', 'carbs', 'cob', 'bolus', 'iob', 'scheduled_basal', 'basal_rate'],
+                types: { carbs: 'bar', cob: 'line', bolus: 'bar', iob: 'line', basal: 'step' },
+                targetBandMode: 'dual',
+                axisBounds: {}
+            },
+            {
+                id: 'view_dynamics',
+                name: 'Algorithm Dynamics',
+                isDefault: true,
+                // dev_bgi replaces the old bare 'deviation'+'bgi' pair here --
+                // this view is about the AAPS-style diagnostic chart, which is
+                // now the built-in composite; the plain single-colour
+                // 'deviation'/'bgi' metrics are opt-in extras elsewhere.
+                registryIds: ['bg', 'iob', 'basal_rate', 'dev_bgi', 'isf'],
+                types: { carbs: 'bar', cob: 'line', bolus: 'bar', iob: 'line', basal: 'step' },
+                targetBandMode: 'dual',
+                axisBounds: {}
+            }
+        ];
+
+        let lastSelectedState = {};
+        let liveMetricTypes = { carbs: 'bar', cob: 'line', bolus: 'bar', iob: 'line', basal: 'step' };
+        let currentLayout = null;
+
+        function getSavedTraceVisibility(metricLabel, defaultVal) {
+            return lastSelectedState[metricLabel] !== undefined ? lastSelectedState[metricLabel] : defaultVal;
+        }
+
+        function saveTraceVisibility(metricLabel, isVisible) {
+            lastSelectedState[metricLabel] = isVisible;
+        }
+
+        // NSViews.captureState hook: everything a Trace view records.
+        function getCurrentTraceState() {
+            const activeIds = [];
+            TRACE_METRICS.forEach(entry => {
+                if (getSavedTraceVisibility(entry.label, false)) {
+                    activeIds.push(entry.id);
+                }
+            });
+
+            const activeView = (window.NSViews && typeof window.NSViews.getActiveView === 'function')
+                ? window.NSViews.getActiveView()
+                : (window.NSViews && typeof window.NSViews.findView === 'function' ? window.NSViews.findView(window.NSViews.getActiveViewId()) : null);
+            const currentStyles = (activeView && (activeView.styles || (activeView.payload && activeView.payload.styles))) || {};
+
+            return {
+                registryIds: activeIds,
+                types: Object.assign({}, liveMetricTypes),
+                targetBandMode: getTargetBandMode(),
+                axisBounds: NSAxisPillars.getAllBounds(),
+                styles: currentStyles
+            };
+        }
+
+        function traceChartTitle(activeView) {
+            return activeView ? activeView.name : 'Default Trace';
+        }
+
+        // NSViews.applyState hook: put a saved view's payload into effect.
+        function applyTraceView(view) {
+            if (view.styles) {
+                const activeView = (window.NSViews && typeof window.NSViews.getActiveView === 'function')
+                    ? window.NSViews.getActiveView()
+                    : (window.NSViews && typeof window.NSViews.findView === 'function' ? window.NSViews.findView(window.NSViews.getActiveViewId()) : null);
+                if (activeView) activeView.styles = view.styles;
+            }
+            if (view.registryIds && Array.isArray(view.registryIds)) {
+                TRACE_METRICS.forEach(entry => {
+                    const isVisible = view.registryIds.includes(entry.id);
+                    saveTraceVisibility(entry.label, isVisible);
+                });
+            } else if (view.series) {
+                // Backward-compatibility fallback for legacy views
+                TRACE_METRICS.forEach(entry => {
+                    const isVisible = view.series[entry.label] !== undefined
+                        ? !!view.series[entry.label]
+                        : (view.series[entry.id] !== undefined ? !!view.series[entry.id] : false);
+                    saveTraceVisibility(entry.label, isVisible);
+                });
+                Object.keys(view.series).forEach(name => {
+                    saveTraceVisibility(name, !!view.series[name]);
+                });
+            } else if (view.legend) {
+                TRACE_METRICS.forEach(entry => {
+                    const isVisible = view.legend[entry.label] !== undefined
+                        ? !!view.legend[entry.label]
+                        : (view.legend[entry.id] !== undefined ? !!view.legend[entry.id] : false);
+                    saveTraceVisibility(entry.label, isVisible);
+                });
+                Object.keys(view.legend).forEach(name => {
+                    saveTraceVisibility(name, !!view.legend[name]);
+                });
+            }
+
+            liveMetricTypes = Object.assign({ carbs: 'bar', cob: 'line', bolus: 'bar', iob: 'line', basal: 'step' }, view.types || {});
+            if (liveMetricTypes.basal === 'line') liveMetricTypes.basal = 'step';
+            NSAxisPillars.setAllBounds(view.axisBounds || {});
+            if (view.targetBandMode) {
+                localStorage.setItem('ns_trace_target_band_mode', view.targetBandMode);
+            }
+
+            updateSettingsTogglesUi();
+            updateAxisBoundsUi();
+
+            if (bufferData && bufferData.length > 0) {
+                renderTraceFromData(bufferData);
+            }
+        }
+
+        function printTracePanel() {
+            const settingsPopover = document.getElementById('trace-settings-popover');
+            if (settingsPopover) settingsPopover.classList.remove('active');
+            const viewDropdown = document.getElementById('view-dropdown-popover');
+            if (viewDropdown) viewDropdown.classList.remove('active');
+            window.print();
+        }
+
+        // --- 3. Settings Popover & Display Controls ---
+        function toggleTraceSettings(event) {
+            if (event) event.stopPropagation();
+            const popover = document.getElementById('trace-settings-popover');
+            if (popover) {
+                const opening = !popover.classList.contains('active');
+                if (opening) {
+                    const viewDropdown = document.getElementById('view-dropdown-popover');
+                    if (viewDropdown) viewDropdown.classList.remove('active');
+                } else {
+                    if (window.NSChartCustomizer && typeof window.NSChartCustomizer.closeStylePopover === 'function') {
+                        NSChartCustomizer.closeStylePopover();
+                    }
+                }
+                updateSettingsTogglesUi();
+                updateAxisBoundsUi();
+                popover.classList.toggle('active');
+            }
+        }
+
+        let chartBands = { titr: { low: 3.9, high: 7.8 }, tir: { low: 3.9, high: 10.0 } };
+
+        function loadChartBands() {
+            fetch('/api/v1/chart_bands')
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.titr && data.tir) {
+                        chartBands = data;
+                        updateChartBandLabels();
+                        if (bufferData && bufferData.length > 0) {
+                            renderTraceFromData(bufferData);
+                        }
+                    }
+                })
+                .catch(err => console.warn('[trace] Failed to load chart bands:', err));
+        }
+
+        function updateChartBandLabels() {
+            const titrLow = (chartBands && chartBands.titr && chartBands.titr.low !== undefined) ? chartBands.titr.low : 3.9;
+            const titrHigh = (chartBands && chartBands.titr && chartBands.titr.high !== undefined) ? chartBands.titr.high : 7.8;
+            const tirHigh = (chartBands && chartBands.tir && chartBands.tir.high !== undefined) ? chartBands.tir.high : 10.0;
+            const titrBtn = document.getElementById('target-band-btn-titr');
+            const tirBtn = document.getElementById('target-band-btn-tir');
+            if (titrBtn) titrBtn.textContent = `${titrLow}\u2013${titrHigh}`;
+            if (tirBtn) tirBtn.textContent = `${titrLow}\u2013${titrHigh}`;
+        }
+
+        function getTargetBandMode() {
+            return localStorage.getItem('ns_trace_target_band_mode') || 'dual';
+        }
+
+        function setTargetBandMode(mode) {
+            localStorage.setItem('ns_trace_target_band_mode', mode);
+            markViewDirty();
+            updateSettingsTogglesUi();
+            if (bufferData && bufferData.length > 0) {
+                renderTraceFromData(bufferData);
+            }
+        }
+
+        function buildTargetMarkArea(mode) {
+            if (!mode || mode === 'off') return { silent: true, data: [] };
+            const titrLow = (chartBands && chartBands.titr && chartBands.titr.low !== undefined) ? chartBands.titr.low : 3.9;
+            const titrHigh = (chartBands && chartBands.titr && chartBands.titr.high !== undefined) ? chartBands.titr.high : 7.8;
+            const tirHigh = (chartBands && chartBands.tir && chartBands.tir.high !== undefined) ? chartBands.tir.high : 10.0;
+
+            const areas = [];
+            if (mode === 'dual') {
+                areas.push([
+                    { yAxis: titrLow, itemStyle: { color: 'rgba(46, 204, 113, 0.20)' } },
+                    { yAxis: titrHigh }
+                ]);
+                areas.push([
+                    { yAxis: titrHigh, itemStyle: { color: 'rgba(46, 204, 113, 0.08)' } },
+                    { yAxis: tirHigh }
+                ]);
+            } else if (mode === 'titr') {
+                areas.push([
+                    { yAxis: titrLow, itemStyle: { color: 'rgba(46, 204, 113, 0.22)' } },
+                    { yAxis: titrHigh }
+                ]);
+            } else if (mode === 'tir') {
+                areas.push([
+                    { yAxis: titrLow, itemStyle: { color: 'rgba(46, 204, 113, 0.16)' } },
+                    { yAxis: tirHigh }
+                ]);
+            }
+            return { silent: true, z: 0, data: areas };
+        }
+
+        function buildTargetMarkLine(mode) {
+            const lines = [];
+            if (mode !== 'off') {
+                const titrLow = (chartBands && chartBands.titr && chartBands.titr.low !== undefined) ? chartBands.titr.low : 3.9;
+                const titrHigh = (chartBands && chartBands.titr && chartBands.titr.high !== undefined) ? chartBands.titr.high : 7.8;
+                const tirHigh = (chartBands && chartBands.tir && chartBands.tir.high !== undefined) ? chartBands.tir.high : 10.0;
+
+                lines.push({
+                    yAxis: titrLow,
+                    lineStyle: { color: '#888888', type: 'dashed', width: 1 },
+                    label: {
+                        show: true,
+                        position: 'start',
+                        distance: 8,
+                        formatter: titrLow.toFixed(1),
+                        color: '#555555',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        padding: [0, 4, 0, 0]
+                    }
+                });
+                if (mode === 'dual' || mode === 'titr') {
+                    lines.push({
+                        yAxis: titrHigh,
+                        lineStyle: { color: '#888888', type: 'dashed', width: 1 },
+                        label: {
+                            show: true,
+                            position: 'start',
+                            distance: 8,
+                            formatter: titrHigh.toFixed(1),
+                            color: '#555555',
+                            fontSize: 11,
+                            fontWeight: 'bold',
+                            padding: [0, 4, 0, 0]
+                        }
+                    });
+                }
+                if (mode === 'dual' || mode === 'tir') {
+                    lines.push({
+                        yAxis: tirHigh,
+                        lineStyle: { color: '#888888', type: 'dashed', width: 1 },
+                        label: {
+                            show: true,
+                            position: 'start',
+                            distance: 8,
+                            formatter: tirHigh.toFixed(1),
+                            color: '#555555',
+                            fontSize: 11,
+                            fontWeight: 'bold',
+                            padding: [0, 4, 0, 0]
+                        }
+                    });
+                }
+            }
+            return lines;
+        }
+
+        function setTraceMetricType(metric, type) {
+            liveMetricTypes[metric] = type;
+            markViewDirty();
+            updateSettingsTogglesUi();
+            if (bufferData && bufferData.length > 0) {
+                renderTraceFromData(bufferData);
+            }
+        }
+
+        function renderTraceOverlayList() {
+            const searchInput = document.getElementById('trace-overlay-search');
+            const searchTerm = searchInput ? searchInput.value : '';
+            const activeIds = [];
+            TRACE_METRICS.forEach(entry => {
+                if (getSavedTraceVisibility(entry.label, entry.id === 'bg' || entry.id === 'carbs' || entry.id === 'bolus' || entry.id === 'basal_rate')) {
+                    activeIds.push(entry.id);
+                }
+            });
+
+            const toggleAllEl = document.getElementById('trace-overlay-toggle-all');
+            if (toggleAllEl) {
+                const totalCount = TRACE_METRICS.length;
+                const activeCount = activeIds.length;
+                if (activeCount === totalCount && totalCount > 0) {
+                    toggleAllEl.checked = true;
+                    toggleAllEl.classList.remove('is-partial');
+                } else if (activeCount > 0) {
+                    toggleAllEl.checked = true;
+                    toggleAllEl.classList.add('is-partial');
+                } else {
+                    toggleAllEl.checked = false;
+                    toggleAllEl.classList.remove('is-partial');
+                }
+            }
+
+            if (window.NSChartCustomizer) {
+                NSChartCustomizer.renderPopoverChecklist('trace-overlay-list', {
+                    page: 'trace',
+                    registry: TRACE_METRICS,
+                    activeIds: activeIds,
+                    searchTerm: searchTerm,
+                    onToggle: function(metricId, isChecked) {
+                        const m = TRACE_METRICS.find(item => item.id === metricId);
+                        if (!m) return;
+                        saveTraceVisibility(m.label, isChecked);
+                        markViewDirty();
+                        if (bufferData && bufferData.length > 0) renderTraceFromData(bufferData);
+                    },
+                    onEdit: function(metricId, iconEl) {
+                        const m = TRACE_METRICS.find(item => item.id === metricId);
+                        if (!m) return;
+                        let activeView = (window.NSViews && typeof window.NSViews.getActiveView === 'function')
+                            ? window.NSViews.getActiveView()
+                            : (window.NSViews && typeof window.NSViews.findView === 'function' ? window.NSViews.findView(window.NSViews.getActiveViewId()) : null);
+                        if (!activeView && window.NSViews && typeof window.NSViews.getAllViews === 'function') {
+                            const all = window.NSViews.getAllViews();
+                            if (all && all.length > 0) activeView = all[0];
+                        }
+                        const viewOverrides = (activeView && (activeView.styles || (activeView.payload && activeView.payload.styles))) || {};
+                        NSChartCustomizer.openStylePopover(iconEl, {
+                            page: 'trace',
+                            metricId: metricId,
+                            registryItem: m,
+                            viewOverrides: viewOverrides,
+                            mode: 'view',
+                            onPreview: function(mid, previewStyle) {
+                                if (previewStyle) {
+                                    if (!_traceLivePreviewOverrides) _traceLivePreviewOverrides = {};
+                                    _traceLivePreviewOverrides[mid] = previewStyle;
+                                } else {
+                                    if (_traceLivePreviewOverrides) delete _traceLivePreviewOverrides[mid];
+                                }
+                                if (bufferData && bufferData.length > 0) renderTraceFromData(bufferData);
+                            },
+                            onSaveView: function(mid, updatedStyle) {
+                                _traceLivePreviewOverrides = null;
+                                let curView = (window.NSViews && typeof window.NSViews.getActiveView === 'function')
+                                    ? window.NSViews.getActiveView()
+                                    : activeView;
+                                if (!curView && window.NSViews && typeof window.NSViews.getAllViews === 'function') {
+                                    const all = window.NSViews.getAllViews();
+                                    if (all && all.length > 0) curView = all[0];
+                                }
+                                if (curView) {
+                                    if (!curView.styles) curView.styles = {};
+                                    curView.styles[mid] = updatedStyle;
+                                    if (!curView.payload) curView.payload = {};
+                                    curView.payload.styles = curView.styles;
+                                    if (window.NSViews && typeof window.NSViews.saveActiveView === 'function') {
+                                        window.NSViews.saveActiveView();
+                                    } else {
+                                        markViewDirty();
+                                    }
+                                }
+                                renderTraceOverlayList();
+                                if (bufferData && bufferData.length > 0) renderTraceFromData(bufferData);
+                            },
+                            onSaveGlobal: function(mid, updatedStyle, cascadeIds) {
+                                _traceLivePreviewOverrides = null;
+                                let curView = (window.NSViews && typeof window.NSViews.getActiveView === 'function')
+                                    ? window.NSViews.getActiveView()
+                                    : activeView;
+                                if (curView && cascadeIds && cascadeIds.includes(parseInt(curView.id, 10))) {
+                                    if (curView.styles) delete curView.styles[mid];
+                                    if (curView.payload && curView.payload.styles) delete curView.payload.styles[mid];
+                                }
+                                renderTraceOverlayList();
+                                if (bufferData && bufferData.length > 0) renderTraceFromData(bufferData);
+                            },
+                            onRestoreView: function(mid) {
+                                _traceLivePreviewOverrides = null;
+                                let curView = (window.NSViews && typeof window.NSViews.getActiveView === 'function')
+                                    ? window.NSViews.getActiveView()
+                                    : activeView;
+                                if (curView) {
+                                    if (curView.styles) delete curView.styles[mid];
+                                    if (curView.payload && curView.payload.styles) delete curView.payload.styles[mid];
+                                    if (window.NSViews && typeof window.NSViews.saveActiveView === 'function') {
+                                        window.NSViews.saveActiveView();
+                                    } else {
+                                        markViewDirty();
+                                    }
+                                }
+                                renderTraceOverlayList();
+                                if (bufferData && bufferData.length > 0) renderTraceFromData(bufferData);
+                            },
+                            onAfterRestoreGlobal: function() {
+                                _traceLivePreviewOverrides = null;
+                                renderTraceOverlayList();
+                                if (bufferData && bufferData.length > 0) renderTraceFromData(bufferData);
+                            }
+                        });
+                    }
+                });
+                const popoverTitle = document.getElementById('trace-settings-popover-title');
+                if (popoverTitle && window.NSChartCustomizer) popoverTitle.textContent = NSChartCustomizer.getPageMenuLabel('trace', 'Trace') + ' Display Settings';
+            }
+        }
+
+        function updateSettingsTogglesUi() {
+            updateChartBandLabels();
+            const targetMode = getTargetBandMode();
+            const targetContainer = document.getElementById('target-band-toggle');
+            if (targetContainer) {
+                targetContainer.querySelectorAll('.settings-toggle-btn').forEach(btn => {
+                    if (btn.getAttribute('data-mode') === targetMode) btn.classList.add('active');
+                    else btn.classList.remove('active');
+                });
+            }
+            renderTraceOverlayList();
+        }
+
+        // --- 4. Custom Axis Bounds ---
+        function getCustomAxisBound(group, type) {
+            return NSAxisPillars.getCustomBound(group, type);
+        }
+
+        function setCustomAxisBound(group, type, val) {
+            NSAxisPillars.setCustomBound(group, type, val, true);
+        }
+
+        function resetCustomAxisBounds(group) {
+            NSAxisPillars.resetBound(group);
+        }
+
+        function getEffectiveAxisBounds(axisInfo) {
+            return NSAxisPillars.getEffectiveBounds(axisInfo);
+        }
+
+        function updateAxisBoundsUi() {
+            const container = document.getElementById('axis-bounds-controls');
+            if (!container || !currentLayout) return;
+            container.innerHTML = '';
+
+            const allActiveAxes = (currentLayout.activeLeftAxes || []).concat(currentLayout.activeRightAxes || []);
+            allActiveAxes.forEach(axisInfo => {
+                const bounds = getEffectiveAxisBounds(axisInfo);
+                const hasCustom = getCustomAxisBound(axisInfo.group, 'min') !== null || getCustomAxisBound(axisInfo.group, 'max') !== null;
+
+                const row = document.createElement('div');
+                row.className = 'axis-bounds-row';
+                row.innerHTML = `
+                    <span style="color: ${axisInfo.color}; font-weight: 600;">${axisInfo.name}</span>
+                    <div class="axis-bounds-inputs">
+                        <input type="number" step="${axisInfo.decimals === 0 ? '1' : (axisInfo.decimals === 2 ? '0.05' : '0.1')}" class="axis-bound-input" id="bound-min-${axisInfo.group}" value="${bounds.min}" placeholder="Min" />
+                        <span style="color: #666;">–</span>
+                        <input type="number" step="${axisInfo.decimals === 0 ? '1' : (axisInfo.decimals === 2 ? '0.05' : '0.1')}" class="axis-bound-input" id="bound-max-${axisInfo.group}" value="${bounds.max}" placeholder="Max" />
+                        <button type="button" class="btn-reset-axis" title="Reset axis to auto" style="opacity: ${hasCustom ? '1' : '0.4'};"><i class="fa-solid fa-rotate-left"></i></button>
+                    </div>
+                `;
+
+                const minInput = row.querySelector(`#bound-min-${axisInfo.group}`);
+                const maxInput = row.querySelector(`#bound-max-${axisInfo.group}`);
+                const resetBtn = row.querySelector('.btn-reset-axis');
+
+                minInput.onchange = () => {
+                    setCustomAxisBound(axisInfo.group, 'min', minInput.value);
+                    applyAxisBoundsToChart();
+                    updateAxisBoundsUi();
+                };
+                maxInput.onchange = () => {
+                    setCustomAxisBound(axisInfo.group, 'max', maxInput.value);
+                    applyAxisBoundsToChart();
+                    updateAxisBoundsUi();
+                };
+                resetBtn.onclick = () => {
+                    resetCustomAxisBounds(axisInfo.group);
+                    applyAxisBoundsToChart();
+                    updateAxisBoundsUi();
+                };
+
+                container.appendChild(row);
+            });
+        }
+
+        function applyAxisBoundsToChart() {
+            if (bufferData && bufferData.length > 0) {
+                renderTraceFromData(bufferData);
+            }
+        }
+
+        // --- 5. Axis Pillars (Gesture engine) ---
+        function updateAxisPillars() {
+            if (!currentLayout) return;
+            NSAxisPillars.renderPillars('trace-axis-pillars', 'chart', {
+                top: currentLayout.grid.top,
+                bottom: currentLayout.grid.bottom,
+                left: currentLayout.grid.left,
+                right: currentLayout.grid.right,
+                activeLeftAxes: currentLayout.activeLeftAxes,
+                activeRightAxes: currentLayout.activeRightAxes
+            });
+        }
+
+        // --- 6. Date Boundaries & Continuous Timeline Logic (Section 4a: Page-local Buffer) ---
+        let chart = null;
+        const dateEl = document.getElementById('target-date');
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        if (dateEl) dateEl.setAttribute('max', todayStr);
+
+        const DAY_MS = 24 * 60 * 60 * 1000;
+        const BUFFER_RADIUS_DAYS = 3;
+        const EDGE_TRIGGER_DAYS = 1;
+        const maxViewEnd = new Date(todayStr + 'T00:00:00').getTime() + DAY_MS;
+
+        let bufferData = [];
+        let _traceLivePreviewOverrides = null;
+        let bufferBasalEvents = [];
+        let bufferStartDate = null;
+        let bufferEndDate = null;
+        let viewStart = null;
+        let viewEnd = null;
+        let extendInFlight = false;
+
+        const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        function formatDayDate(isoStr) {
+            if (!isoStr) return '';
+            const d = new Date(isoStr + 'T00:00:00');
+            const dName = DAY_NAMES[d.getDay()];
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mName = MONTH_NAMES[d.getMonth()];
+            return `${dName} ${dd} ${mName}`;
+        }
+
+        function mergeBasalEvents(existing, incoming) {
+            if (!incoming || incoming.length === 0) return existing || [];
+            if (!existing || existing.length === 0) return incoming.slice();
+            const map = new Map();
+            existing.forEach(e => map.set(e.ts, e));
+            incoming.forEach(e => map.set(e.ts, e));
+            return Array.from(map.values()).sort((a, b) => new Date(a.local_ts || a.ts).getTime() - new Date(b.local_ts || b.ts).getTime());
+        }
+
+        function projectExactBasalSeries(bData, basalEvents) {
+            if (!basalEvents || basalEvents.length === 0) return null;
+            const sorted = basalEvents.slice().sort((a, b) => new Date(a.local_ts || a.ts).getTime() - new Date(b.local_ts || b.ts).getTime());
+            if (sorted.length === 0) return null;
+
+            function getProfileRateAt(tMs) {
+                if (!bData || bData.length === 0) return 0;
+                let best = bData[0];
+                let minDiff = Math.abs(new Date(best.local_ts || best.ts).getTime() - tMs);
+                for (let i = 1; i < bData.length; i++) {
+                    const diff = Math.abs(new Date(bData[i].local_ts || bData[i].ts).getTime() - tMs);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        best = bData[i];
+                    }
+                }
+                return best.scheduled_basal !== undefined && best.scheduled_basal !== null ? Number(best.scheduled_basal) : 0;
+            }
+
+            const pts = [];
+            for (let i = 0; i < sorted.length; i++) {
+                const ev = sorted[i];
+                const startMs = new Date(ev.local_ts || ev.ts).getTime();
+                const durMs = (Number(ev.duration) || 0) * 60 * 1000;
+                const endMs = startMs + durMs;
+                const rate = Number(ev.rate);
+
+                if (i === 0 && bData && bData.length > 0) {
+                    const firstBufMs = new Date(bData[0].local_ts || bData[0].ts).getTime();
+                    if (startMs > firstBufMs) {
+                        pts.push([firstBufMs, getProfileRateAt(firstBufMs)]);
+                    }
+                }
+
+                if (i > 0) {
+                    const prevEv = sorted[i - 1];
+                    const prevEndMs = new Date(prevEv.local_ts || prevEv.ts).getTime() + (Number(prevEv.duration) || 0) * 60 * 1000;
+                    if (startMs > prevEndMs + 1000) {
+                        pts.push([prevEndMs, getProfileRateAt(prevEndMs)]);
+                    }
+                }
+
+                pts.push([startMs, rate]);
+
+                if (i === sorted.length - 1 && durMs > 0) {
+                    pts.push([endMs, getProfileRateAt(endMs)]);
+                }
+            }
+            return pts;
+        }
+
+        function formatTooltipDateTime(val) {
+            if (val === undefined || val === null || val === '') return '';
+            const num = Number(val);
+            const d = !isNaN(num) ? new Date(num) : new Date(val);
+            if (isNaN(d.getTime())) return String(val);
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mo = String(d.getMonth() + 1).padStart(2, '0');
+            const yy = String(d.getFullYear()).slice(-2);
+            return `${hh}:${mm} ${dd}/${mo}/${yy}`;
+        }
+
+        function localDateStr(ms) { return new Date(ms).toLocaleDateString('en-CA'); }
+        function addDaysStr(dateStr, days) {
+            const d = new Date(dateStr + 'T00:00:00');
+            d.setDate(d.getDate() + days);
+            return d.toLocaleDateString('en-CA');
+        }
+        function dayStartMs(dateStr) { return new Date(dateStr + 'T00:00:00').getTime(); }
+
+        function clampView() {
+            if (viewEnd > maxViewEnd) {
+                viewEnd = maxViewEnd;
+                viewStart = viewEnd - DAY_MS;
+            }
+        }
+
+        function saveViewPosition() {
+            localStorage.setItem('ns_trace_view_start', String(Math.round(viewStart)));
+        }
+
+        function setNow() {
+            const now = Date.now();
+            viewEnd = now;
+            viewStart = now - DAY_MS;
+            clampView();
+            saveViewPosition();
+            loadBuffer(todayStr, true);
+        }
+
+        function stepView(direction) {
+            const deltaMs = direction * DAY_MS;
+            viewStart += deltaMs;
+            viewEnd += deltaMs;
+            clampView();
+            scheduleViewportRender();
+            saveViewPosition();
+            maybeExtendBuffer();
+        }
+
+        document.addEventListener('keydown', function(e) {
+            const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable)) {
+                return;
+            }
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                stepView(-1);
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                stepView(1);
+            }
+        });
+
+        function handleDateChange() {
+            if (!dateEl) return;
+            const d = dateEl.value;
+            localStorage.setItem('ns_daily_date', d);
+            localStorage.setItem('ns_start_date', d);
+            localStorage.setItem('ns_end_date', d);
+            viewStart = dayStartMs(d);
+            viewEnd = viewStart + DAY_MS;
+            saveViewPosition();
+            loadBuffer(d, true);
+        }
+
+        async function loadBuffer(centerDateStr, recenter) {
+            const start = addDaysStr(centerDateStr, -BUFFER_RADIUS_DAYS);
+            let end = addDaysStr(centerDateStr, BUFFER_RADIUS_DAYS);
+            if (end > todayStr) end = todayStr;
+            const loading = document.getElementById('loading');
+            if (loading) loading.style.display = 'flex';
+            try {
+                const r = await fetch('/api/v1/daily_chart_data_range?start=' + start + '&end=' + end);
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const res = await r.json();
+                bufferData = res.data || [];
+                bufferBasalEvents = res.basal_events || [];
+                bufferStartDate = start;
+                bufferEndDate = end;
+                renderTraceFromData(bufferData);
+            } catch (err) {
+                console.error('[trace] loadBuffer:', err);
+            } finally {
+                if (loading) loading.style.display = 'none';
+            }
+        }
+
+        async function maybeExtendBuffer() {
+            if (extendInFlight || !bufferStartDate || !bufferEndDate) return;
+            const bufStartMs = dayStartMs(bufferStartDate);
+            const bufEndMs = dayStartMs(bufferEndDate) + DAY_MS;
+            const nearStart = (viewStart - bufStartMs) < EDGE_TRIGGER_DAYS * DAY_MS;
+            const nearEnd = (bufEndMs - viewEnd) < EDGE_TRIGGER_DAYS * DAY_MS && bufferEndDate < todayStr;
+            if (!nearStart && !nearEnd) return;
+
+            extendInFlight = true;
+            try {
+                if (nearStart) {
+                    const newStart = addDaysStr(bufferStartDate, -BUFFER_RADIUS_DAYS);
+                    const fetchEnd = addDaysStr(bufferStartDate, -1);
+                    const r = await fetch('/api/v1/daily_chart_data_range?start=' + newStart + '&end=' + fetchEnd);
+                    if (r.ok) {
+                        const res = await r.json();
+                        bufferData = (res.data || []).concat(bufferData);
+                        bufferBasalEvents = mergeBasalEvents(bufferBasalEvents, res.basal_events);
+                        bufferStartDate = newStart;
+                        renderTraceFromData(bufferData);
+                    }
+                }
+                if (nearEnd) {
+                    let newEnd = addDaysStr(bufferEndDate, BUFFER_RADIUS_DAYS);
+                    if (newEnd > todayStr) newEnd = todayStr;
+                    if (newEnd > bufferEndDate) {
+                        const fetchStart = addDaysStr(bufferEndDate, 1);
+                        const r = await fetch('/api/v1/daily_chart_data_range?start=' + fetchStart + '&end=' + newEnd);
+                        if (r.ok) {
+                            const res = await r.json();
+                            bufferData = bufferData.concat(res.data || []);
+                            bufferBasalEvents = mergeBasalEvents(bufferBasalEvents, res.basal_events);
+                            bufferEndDate = newEnd;
+                            renderTraceFromData(bufferData);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('[trace] maybeExtendBuffer:', err);
+            } finally {
+                extendInFlight = false;
+            }
+        }
+
+        function syncDateSelector() {
+            const dayAStr = localDateStr(viewStart);
+            const dayAStart = dayStartMs(dayAStr);
+            const dayAEnd = dayAStart + DAY_MS;
+            const overlapA = Math.min(viewEnd, dayAEnd) - Math.max(viewStart, dayAStart);
+            const majorityDay = (overlapA >= DAY_MS / 2) ? dayAStr : addDaysStr(dayAStr, 1);
+            if (dateEl && dateEl.value !== majorityDay) {
+                dateEl.value = majorityDay;
+                localStorage.setItem('ns_daily_date', majorityDay);
+                localStorage.setItem('ns_start_date', majorityDay);
+                localStorage.setItem('ns_end_date', majorityDay);
+            }
+            const dateRangeLabel = document.getElementById('trace-date-range');
+            if (dateRangeLabel) {
+                dateRangeLabel.textContent = `${window.formatDMY(localDateStr(viewStart))} to ${window.formatDMY(localDateStr(viewEnd))}`;
+            }
+        }
+
+        // --- 7. Midnight Date Boundary MarkLines ---
+        function generateDateBoundaryMarkLines() {
+            if (!bufferStartDate || !bufferEndDate) return [];
+            const markLines = [];
+            let curr = bufferStartDate;
+            while (curr <= bufferEndDate) {
+                const midnightMs = dayStartMs(curr);
+                const prevDayStr = addDaysStr(curr, -1);
+                const leftText = '◄ ' + formatDayDate(prevDayStr);
+                const rightText = formatDayDate(curr) + ' ►';
+                markLines.push({
+                    xAxis: midnightMs,
+                    lineStyle: { color: '#888888', width: 1, type: 'dashed' },
+                    label: {
+                        show: true,
+                        position: 'end',
+                        align: 'center',
+                        distance: 6,
+                        formatter: `{prev|${leftText}} {gap|} {next|${rightText}}`,
+                        rich: {
+                            prev: {
+                                backgroundColor: '#18181b',
+                                color: '#ffffff',
+                                fontSize: 11,
+                                fontWeight: 'bold',
+                                padding: [3, 6, 3, 7],
+                                borderRadius: [4, 0, 0, 4],
+                                borderColor: '#3f3f46',
+                                borderWidth: 1
+                            },
+                            gap: {
+                                width: 4
+                            },
+                            next: {
+                                backgroundColor: '#18181b',
+                                color: '#ffffff',
+                                fontSize: 11,
+                                fontWeight: 'bold',
+                                padding: [3, 7, 3, 6],
+                                borderRadius: [0, 4, 4, 0],
+                                borderColor: '#3f3f46',
+                                borderWidth: 1
+                            }
+                        }
+                    }
+                });
+                curr = addDaysStr(curr, 1);
+            }
+            return markLines;
+        }
+
+        // --- 8. Multi-Axis Layout Builder ---
+        function buildTraceAxesAndGrid(legendSelected, viewOverrides) {
+            if (!viewOverrides) {
+                let activeView = (window.NSViews && typeof window.NSViews.getActiveView === 'function')
+                    ? window.NSViews.getActiveView()
+                    : (window.NSViews && typeof window.NSViews.findView === 'function' ? window.NSViews.findView(window.NSViews.getActiveViewId()) : null);
+                if (!activeView && window.NSViews && typeof window.NSViews.getAllViews === 'function') {
+                    const all = window.NSViews.getAllViews();
+                    if (all && all.length > 0) activeView = all[0];
+                }
+                const baseOverrides = (activeView && (activeView.styles || (activeView.payload && activeView.payload.styles))) || {};
+                viewOverrides = _traceLivePreviewOverrides ? Object.assign({}, baseOverrides, _traceLivePreviewOverrides) : baseOverrides;
+            }
+            const activeGroups = new Set();
+            TRACE_METRICS.forEach(entry => {
+                if (legendSelected[entry.label]) {
+                    activeGroups.add(entry.axis.group);
+                }
+            });
+
+            const uniqueGroups = {};
+            TRACE_METRICS.forEach(entry => {
+                if (!uniqueGroups[entry.axis.group]) {
+                    uniqueGroups[entry.axis.group] = entry;
+                }
+            });
+
+            // Compute data-driven min/max per group across visible buffer
+            const calcMinMap = {};
+            const calcMaxMap = {};
+
+            TRACE_METRICS.forEach(entry => {
+                const group = entry.axis.group;
+                if (!activeGroups.has(group)) return;
+
+                // Composite entries (dev_bgi) have no single dataKey of their
+                // own -- union the min/max across every part so the shared
+                // axis still auto-scales to whichever part is more extreme.
+                traceEntryParts(entry).forEach(part => {
+                    const projected = NSOrchestrator.projectTrace(bufferData, part);
+                    projected.forEach(pt => {
+                        const val = pt[1];
+                        if (val !== null && val !== undefined && !isNaN(val)) {
+                            if (calcMinMap[group] === undefined || val < calcMinMap[group]) calcMinMap[group] = val;
+                            if (calcMaxMap[group] === undefined || val > calcMaxMap[group]) calcMaxMap[group] = val;
+                        }
+                    });
+                });
+            });
+
+            let leftOffsetCount = 0;
+            let rightOffsetCount = 0;
+            const yAxes = [];
+            const groupAxisIndexMap = {};
+            const activeLeftAxes = [];
+            const activeRightAxes = [];
+
+            Object.keys(uniqueGroups).forEach(grp => {
+                const entry = uniqueGroups[grp];
+                const isGroupActive = activeGroups.has(grp);
+
+                let offset = 0;
+                if (isGroupActive) {
+                    if (entry.axis.side === 'left') {
+                        offset = leftOffsetCount * 54;
+                        leftOffsetCount++;
+                    } else {
+                        offset = rightOffsetCount * 54;
+                        rightOffsetCount++;
+                    }
+                }
+
+                const customMin = getCustomAxisBound(grp, 'min');
+                const customMax = getCustomAxisBound(grp, 'max');
+
+                let minVal = (customMin !== null && !isNaN(customMin)) ? customMin : entry.axis.defaultBounds?.min;
+                let maxVal = (customMax !== null && !isNaN(customMax)) ? customMax : entry.axis.defaultBounds?.max;
+
+                if (minVal === null || minVal === undefined) {
+                    minVal = calcMinMap[grp] !== undefined ? Math.floor(calcMinMap[grp]) : 0;
+                }
+                if (maxVal === null || maxVal === undefined) {
+                    maxVal = calcMaxMap[grp] !== undefined ? Math.ceil(calcMaxMap[grp] * 1.1) : 10;
+                }
+
+                const isFirstLeft = entry.axis.side === 'left' && offset === 0;
+
+                let isInverse = false;
+                TRACE_METRICS.forEach(m => {
+                    if (m.axis && m.axis.group === grp && legendSelected[m.label]) {
+                        const mStyle = window.NSChartCustomizer
+                            ? NSChartCustomizer.getResolvedStyle('trace', m.id, m.style, viewOverrides)
+                            : m.style;
+                        if (mStyle && mStyle.invertAxis) {
+                            isInverse = true;
+                        }
+                    }
+                });
+
+                // Axis name/line/label/pillar colour must track the metric's
+                // RESOLVED style (global default + saved-view override), same
+                // as the series/legend already do -- not the raw registry
+                // baseline. See the identical fix on Trends (4 Sep 2026).
+                const entryResolvedStyle = window.NSChartCustomizer
+                    ? NSChartCustomizer.getResolvedStyle('trace', entry.id, entry.style, viewOverrides)
+                    : entry.style;
+                const axisColor = entryResolvedStyle.color || entry.style.color;
+
+                const axisObj = {
+                    type: 'value',
+                    name: entry.axis.label || entry.label,
+                    nameLocation: 'middle',
+                    nameRotate: entry.axis.side === 'left' ? 90 : -90,
+                    nameGap: entry.axis.side === 'left' ? 34 : 26,
+                    position: entry.axis.side,
+                    offset: offset,
+                    min: minVal,
+                    max: maxVal,
+                    inverse: isInverse,
+                    show: isGroupActive,
+                    nameTextStyle: { color: axisColor, fontWeight: 600, fontSize: 11 },
+                    axisLine: { show: isGroupActive, lineStyle: { color: axisColor } },
+                    axisLabel: {
+                        color: axisColor,
+                        fontSize: 11,
+                        formatter: function(val) {
+                            if (entry.axis.decimals === 0) return Math.round(val);
+                            return Number(val).toFixed(entry.axis.decimals || 1);
+                        }
+                    },
+                    splitLine: {
+                        show: isFirstLeft,
+                        lineStyle: { color: '#e8e8e8', type: 'dashed' }
+                    }
+                };
+
+                const axisIndex = yAxes.length;
+                yAxes.push(axisObj);
+                groupAxisIndexMap[grp] = axisIndex;
+
+                if (isGroupActive) {
+                    const info = {
+                        group: grp,
+                        name: entry.axis.label || entry.label,
+                        color: axisColor,
+                        decimals: entry.axis.decimals !== undefined ? entry.axis.decimals : 1,
+                        side: entry.axis.side,
+                        defaultMin: entry.axis.defaultBounds?.min,
+                        defaultMax: entry.axis.defaultBounds?.max,
+                        calculatedMin: calcMinMap[grp],
+                        calculatedMax: calcMaxMap[grp],
+                        inverse: isInverse
+                    };
+                    if (entry.axis.side === 'left') activeLeftAxes.push(info);
+                    else activeRightAxes.push(info);
+                }
+            });
+
+            const gridLeft = Math.max(55, leftOffsetCount * 54 + 10);
+            const gridRight = Math.max(55, rightOffsetCount * 54 + 10);
+
+            currentLayout = {
+                yAxes: yAxes,
+                groupAxisIndexMap: groupAxisIndexMap,
+                activeLeftAxes: activeLeftAxes,
+                activeRightAxes: activeRightAxes,
+                grid: { top: 40, bottom: 60, left: gridLeft, right: gridRight, containLabel: false }
+            };
+
+            return currentLayout;
+        }
+
+        // --- 9. Chart Renderer & Orchestrated Projection ---
+        function renderTraceFromData(data) {
+            const chartNode = document.getElementById('chart');
+            if (!chartNode || !data || data.length === 0) return;
+
+            let activeView = (window.NSViews && typeof window.NSViews.getActiveView === 'function')
+                ? window.NSViews.getActiveView()
+                : (window.NSViews && typeof window.NSViews.findView === 'function' ? window.NSViews.findView(window.NSViews.getActiveViewId()) : null);
+            if (!activeView && window.NSViews && typeof window.NSViews.getAllViews === 'function') {
+                const all = window.NSViews.getAllViews();
+                if (all && all.length > 0) activeView = all[0];
+            }
+            const baseOverrides = (activeView && (activeView.styles || (activeView.payload && activeView.payload.styles))) || {};
+            const viewOverrides = _traceLivePreviewOverrides ? Object.assign({}, baseOverrides, _traceLivePreviewOverrides) : baseOverrides;
+            const legendSelected = {};
+            const legendItems = [];
+
+            TRACE_METRICS.forEach(entry => {
+                const isVisible = getSavedTraceVisibility(entry.label, entry.id === 'bg' || entry.id === 'carbs' || entry.id === 'bolus' || entry.id === 'basal_rate');
+                legendSelected[entry.label] = isVisible;
+                if (!isVisible) return; // Only active series in legend!
+
+                if (entry.composite) {
+                    // Composite entries (dev_bgi) are locked/not style-editable,
+                    // so each part uses its own registry style directly rather
+                    // than going through getResolvedStyle -- and each part gets
+                    // its own legend row, named with the parent label as a
+                    // prefix so it can't collide with a standalone metric of the
+                    // same short name (e.g. the plain 'Deviation' entry).
+                    traceEntryParts(entry).forEach(part => {
+                        const pStyle = part.style || {};
+                        const pType = part.renderType || 'line';
+                        const pColor = pStyle.color || '#555555';
+                        const pWidth = pStyle.defaultWeight !== undefined ? pStyle.defaultWeight : 2;
+                        const pFullStyle = Object.assign({}, pStyle, {
+                            renderType: pType,
+                            color: pColor,
+                            defaultWeight: pWidth
+                        });
+                        const pIcon = window.NSChartCustomizer
+                            ? NSChartCustomizer.getLegendIcon(pFullStyle)
+                            : (pType === 'bar' ? 'roundRect' : "path:\x2f\x2fM 0 3.5 L 20 3.5 L 20 6.5 L 0 6.5 Z");
+                        legendItems.push({
+                            name: entry.label + ': ' + part.label,
+                            icon: pIcon,
+                            itemStyle: { color: pColor }
+                        });
+                    });
+                    return;
+                }
+
+                const effectiveStyle = window.NSChartCustomizer
+                    ? NSChartCustomizer.getResolvedStyle('trace', entry.id, entry.style, viewOverrides)
+                    : entry.style;
+
+                let metricType = effectiveStyle.renderType || liveMetricTypes[entry.id] || entry.renderType;
+                if (entry.id === 'scheduled_basal' || entry.id === 'basal_rate') {
+                    metricType = effectiveStyle.renderType || liveMetricTypes.basal || 'step';
+                    if (metricType === 'line') metricType = 'step';
+                }
+
+                const strokeColor = effectiveStyle.color || entry.style.color;
+                const strokeWidth = effectiveStyle.defaultWeight !== undefined ? effectiveStyle.defaultWeight : 2;
+                const fullStyle = Object.assign({}, effectiveStyle, {
+                    renderType: metricType,
+                    color: strokeColor,
+                    defaultWeight: strokeWidth
+                });
+                const icon = window.NSChartCustomizer
+                    ? NSChartCustomizer.getLegendIcon(fullStyle)
+                    : (metricType === 'bar' ? 'roundRect' : "path:\x2f\x2fM 0 3.5 L 20 3.5 L 20 6.5 L 0 6.5 Z");
+
+                legendItems.push({
+                    name: entry.label,
+                    icon: icon,
+                    itemStyle: { color: strokeColor }
+                });
+            });
+
+            const layout = buildTraceAxesAndGrid(legendSelected);
+            const targetMode = getTargetBandMode();
+            const boundaryMarkLines = generateDateBoundaryMarkLines();
+            const targetMarkLines = buildTargetMarkLine(targetMode);
+
+            const series = [];
+
+            TRACE_METRICS.forEach(entry => {
+                const isVisible = legendSelected[entry.label];
+                if (!isVisible) return; // Don't push inactive series
+
+                const axisIdx = layout.groupAxisIndexMap[entry.axis.group] !== undefined ? layout.groupAxisIndexMap[entry.axis.group] : 0;
+
+                if (entry.composite) {
+                    // Composite entries expand to one series per part, all on
+                    // the composite's own axis. Not style-editable (lockColor),
+                    // so each part's registry style is used directly rather
+                    // than resolved through NSChartCustomizer -- there's no
+                    // override to resolve. colorBy works exactly as it did for
+                    // the old standalone 'deviation' entry, just now scoped to
+                    // the part rather than the top-level entry.
+                    traceEntryParts(entry).forEach(part => {
+                        const pStyle = part.style || {};
+                        const pType = part.renderType || 'line';
+                        const pColor = pStyle.color || '#555555';
+                        const pOpacity = pStyle.opacity !== undefined ? pStyle.opacity : 1.0;
+                        const pWidth = pStyle.defaultWeight !== undefined ? pStyle.defaultWeight : 2;
+
+                        let pProjected = NSOrchestrator.projectTrace(data, part);
+                        if (part.colorBy && Array.isArray(pProjected)) {
+                            const cb = part.colorBy;
+                            pProjected = pProjected.map(function (pt, i) {
+                                const row = data[i];
+                                const cls = (row && row[cb.key]) ? row[cb.key] : null;
+                                return {
+                                    value: pt,
+                                    devClass: cls,
+                                    itemStyle: {
+                                        color: (cls && cb.palette[cls]) ? cb.palette[cls] : cb.fallback,
+                                        opacity: pOpacity
+                                    }
+                                };
+                            });
+                        }
+
+                        const pIsBar = (pType === 'bar');
+                        series.push({
+                            name: entry.label + ': ' + part.label,
+                            type: pIsBar ? 'bar' : 'line',
+                            yAxisIndex: axisIdx,
+                            data: pProjected,
+                            symbol: 'none',
+                            smooth: false,
+                            step: false,
+                            lineStyle: {
+                                color: pColor,
+                                width: pWidth,
+                                type: pStyle.lineType || 'solid',
+                                opacity: pOpacity
+                            },
+                            itemStyle: { color: pColor, opacity: pOpacity },
+                            z: pIsBar ? 3 : 5
+                        });
+                    });
+                    return;
+                }
+
+                const effectiveStyle = window.NSChartCustomizer
+                    ? NSChartCustomizer.getResolvedStyle('trace', entry.id, entry.style, viewOverrides)
+                    : entry.style;
+
+                let metricType = effectiveStyle.renderType || liveMetricTypes[entry.id] || entry.renderType;
+                if (entry.id === 'scheduled_basal' || entry.id === 'basal_rate') {
+                    metricType = effectiveStyle.renderType || liveMetricTypes.basal || 'step';
+                    if (metricType === 'line') metricType = 'step';
+                }
+
+                let projectedData = null;
+                if ((metricType === 'step' || metricType === 'icicle') && entry.id === 'basal_rate') {
+                    projectedData = projectExactBasalSeries(data, bufferBasalEvents);
+                }
+                if (!projectedData) {
+                    projectedData = NSOrchestrator.projectTrace(data, entry);
+                }
+                const isBar = (metricType === 'bar');
+                const isDashed = effectiveStyle.lineType === 'dashed';
+                const isStepped = (metricType === 'step' || metricType === 'icicle');
+                const strokeColor = effectiveStyle.color || entry.style.color;
+                const lineOpacity = effectiveStyle.opacity !== undefined ? effectiveStyle.opacity : 1.0;
+                const strokeWidth = effectiveStyle.defaultWeight !== undefined ? effectiveStyle.defaultWeight : 2;
+                const fillColor = effectiveStyle.fillColor || strokeColor;
+                const fillOpacity = effectiveStyle.fillOpacity !== undefined ? effectiveStyle.fillOpacity : (isBar ? 0.75 : 0.22);
+                const barFill = (window.NSChartCustomizer && typeof window.NSChartCustomizer.colorWithOpacity === 'function')
+                    ? NSChartCustomizer.colorWithOpacity(fillColor, fillOpacity)
+                    : fillColor;
+                const barStroke = (window.NSChartCustomizer && typeof window.NSChartCustomizer.colorWithOpacity === 'function')
+                    ? NSChartCustomizer.colorWithOpacity(strokeColor, lineOpacity)
+                    : strokeColor;
+                const strokeBorderWidth = (effectiveStyle.lineType === 'none' || lineOpacity <= 0) ? 0 : strokeWidth;
+
+                // Markers -- Line only, and skipped for colorBy metrics (the
+                // DEV-style per-point categorical colouring) to avoid the
+                // series-level marker colour fighting with each point's own
+                // itemStyle.color set below. No smoothing row on Trace's style
+                // popover -- "Smoothing has no place on trace" (Harry, 4 Sep
+                // 2026) -- so unlike Trends/Patterns there's no smooth/spline/
+                // monotone to resolve here, only the marker fields.
+                const traceMarkerType = (!isBar && !entry.colorBy && effectiveStyle.markerType) ? effectiveStyle.markerType : 'none';
+                const traceMarkerColor = effectiveStyle.markerColor || strokeColor;
+                const traceSymbol = TRACE_MARKER_SYMBOL_MAP[traceMarkerType] || 'none';
+                const traceSymbolSize = strokeWidth * 3; // fixed: no user-facing size control
+
+                // Categorical per-point colouring (DEV bars). NSOrchestrator
+                // .projectTrace() is a straight 1:1 map over `data`, so index i
+                // here still refers to data[i] -- that alignment is what makes
+                // this safe. devClass is carried through for the tooltip.
+                if (entry.colorBy && Array.isArray(projectedData)) {
+                    const cb = entry.colorBy;
+                    projectedData = projectedData.map(function (pt, i) {
+                        const row = data[i];
+                        const cls = (row && row[cb.key]) ? row[cb.key] : null;
+                        const ptColor = (cls && cb.palette[cls]) ? cb.palette[cls] : cb.fallback;
+                        return {
+                            value: pt,
+                            devClass: cls,
+                            itemStyle: isBar ? {
+                                color: (window.NSChartCustomizer && typeof window.NSChartCustomizer.colorWithOpacity === 'function') ? NSChartCustomizer.colorWithOpacity(ptColor, fillOpacity) : ptColor,
+                                borderColor: barStroke,
+                                borderWidth: strokeBorderWidth,
+                                borderType: effectiveStyle.lineType || 'solid'
+                            } : {
+                                color: ptColor,
+                                opacity: lineOpacity
+                            }
+                        };
+                    });
+                }
+
+                const isBg = (entry.id === 'bg');
+                const sObj = {
+                    name: entry.label,
+                    type: isBar ? 'bar' : 'line',
+                    yAxisIndex: axisIdx,
+                    data: projectedData,
+                    symbol: traceSymbol,
+                    symbolSize: traceSymbolSize,
+                    smooth: false,
+                    step: isStepped ? 'end' : false,
+                    lineStyle: {
+                        color: strokeColor,
+                        width: strokeWidth,
+                        type: isDashed ? 'dashed' : (effectiveStyle.lineType || 'solid'),
+                        opacity: lineOpacity
+                    },
+                    itemStyle: isBar ? {
+                        color: barFill,
+                        borderColor: barStroke,
+                        borderWidth: strokeBorderWidth,
+                        borderType: effectiveStyle.lineType || 'solid'
+                    } : {
+                        color: (traceMarkerType === 'none' || entry.colorBy) ? strokeColor : traceMarkerColor,
+                        opacity: lineOpacity
+                    },
+                    z: isBg ? 10 : (isBar ? 3 : 5)
+                };
+
+                const isArea = (metricType === 'area');
+                const isStepWithFill = (metricType === 'icicle') || (metricType === 'step' && ((effectiveStyle.fillOpacity !== undefined && effectiveStyle.fillOpacity > 0) || entry.id === 'basal_rate' || entry.id === 'scheduled_basal'));
+                if (isArea || isStepWithFill) {
+                    const fillColor = effectiveStyle.fillColor || strokeColor;
+                    const fillOpacity = effectiveStyle.fillOpacity !== undefined ? effectiveStyle.fillOpacity : 0.22;
+                    sObj.areaStyle = {
+                        color: fillColor,
+                        opacity: fillOpacity,
+                        origin: (effectiveStyle.invertAxis || metricType === 'icicle') ? 'start' : 'auto'
+                    };
+                }
+
+                // Attach target band markArea & markLines to the primary BG series
+                if (entry.id === 'bg') {
+                    sObj.markArea = buildTargetMarkArea(targetMode);
+                    sObj.markLine = {
+                        silent: true,
+                        symbol: 'none',
+                        z: 1,
+                        data: targetMarkLines.concat(boundaryMarkLines)
+                    };
+                }
+
+                series.push(sObj);
+            });
+
+            const option = {
+                animation: false,
+                backgroundColor: '#ffffff',
+                grid: layout.grid,
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(34, 39, 46, 0.95)',
+                    borderColor: '#444c56',
+                    borderWidth: 1,
+                    textStyle: { color: '#adbac7', fontSize: 11 },
+                    formatter: function(params) {
+                        if (!params || !params.length) return '';
+                        const rawVal = params[0].axisValue !== undefined ? params[0].axisValue : (params[0].value && params[0].value[0]);
+                        const dateTitle = formatTooltipDateTime(rawVal);
+                        let html = `<div style="font-weight:700; margin-bottom:4px; border-bottom:1px solid #444c56; padding-bottom:2px;">${dateTitle}</div>`;
+                        params.forEach(p => {
+                            if (p.value !== null && p.value !== undefined && p.value[1] !== null) {
+                                const val = p.value[1];
+                                let decimals = 2;
+                                const sName = p.seriesName;
+                                if (sName === 'BG' || sName === 'PG' || sName === 'Blood Glucose' || sName === 'Predicted Glucose') {
+                                    decimals = 1;
+                                } else {
+                                    const matched = TRACE_METRICS.find(m => {
+                                        if (m.label === sName) return true;
+                                        if (m.composite && m.parts) {
+                                            return m.parts.some(pt => (m.label + ': ' + pt.label === sName || pt.label === sName));
+                                        }
+                                        return false;
+                                    });
+                                    if (matched && matched.axis && typeof matched.axis.decimals === 'number') {
+                                        decimals = matched.axis.decimals;
+                                    }
+                                }
+                                const valStr = typeof val === 'number' ? (Number.isInteger(val) && decimals === 0 ? val : val.toFixed(decimals)) : val;
+                                // Categorically-coloured series (DEV) carry the
+                                // bucket's class; the colour alone doesn't say
+                                // which of RES/SENS/UAM/COB/EQUAL it landed in.
+                                const cls = (p.data && p.data.devClass) ? ` <span style="opacity:0.7;">(${p.data.devClass})</span>` : '';
+                                html += `<div style="margin:2px 0;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px;"></span>${p.seriesName}: <b>${valStr}</b>${cls}</div>`;
+                            }
+                        });
+                        return html;
+                    }
+                },
+                legend: {
+                    type: 'scroll',
+                    bottom: 5,
+                    data: legendItems,
+                    selectedMode: false,
+                    selected: legendSelected,
+                    itemGap: 14,
+                    itemWidth: 16,
+                    itemHeight: 10,
+                    inactiveColor: '#768390',
+                    inactiveBorderColor: '#768390',
+                    textStyle: { color: '#333333', fontSize: 11 }
+                },
+                xAxis: {
+                    type: 'time',
+                    min: viewStart,
+                    max: viewEnd,
+                    minInterval: 3600 * 1000 * 2,
+                    maxInterval: 3600 * 1000 * 2,
+                    splitNumber: 12,
+                    axisLine: {
+                        onZero: false,
+                        lineStyle: { color: '#888888' }
+                    },
+                    axisTick: {
+                        show: true,
+                        alignWithLabel: true,
+                        lineStyle: { color: '#888888' }
+                    },
+                    axisLabel: {
+                        color: '#555555',
+                        fontSize: 11,
+                        formatter: function(val) {
+                            const d = new Date(val);
+                            const hh = String(d.getHours()).padStart(2, '0');
+                            const mm = String(d.getMinutes()).padStart(2, '0');
+                            return `${hh}:${mm}`;
+                        }
+                    },
+                    splitLine: {
+                        show: true,
+                        lineStyle: { color: '#e8e8e8', type: 'dashed' }
+                    }
+                },
+                yAxis: layout.yAxes,
+                series: series
+            };
+
+            if (!chart) {
+                chart = echarts.init(chartNode, null, { renderer: 'canvas' });
+                window.addEventListener('resize', () => {
+                    if (chart) {
+                        chart.resize();
+                        updateAxisPillars();
+                    }
+                });
+                chart.on('legendselectchanged', function(params) {
+                    saveTraceVisibility(params.name, params.selected[params.name]);
+                    markViewDirty();
+                    renderTraceFromData(bufferData);
+                    updateAxisBoundsUi();
+                });
+                initChartDragPanning();
+            }
+
+            chart.setOption(option, true);
+            syncDateSelector();
+            updateAxisBoundsUi();
+            updateAxisPillars();
+        }
+
+        function scheduleViewportRender() {
+            if (!chart) return;
+            chart.setOption({
+                xAxis: {
+                    min: viewStart,
+                    max: viewEnd,
+                    minInterval: 3600 * 1000 * 2,
+                    maxInterval: 3600 * 1000 * 2
+                }
+            });
+            syncDateSelector();
+        }
+
+        // --- 10. Direct Chart Drag-to-Pan Gestures ---
+        //
+        // Pointer Events (not mouse-only) as of the 3 Sep 2026 iPad touch pass
+        // -- see docs/analysis/ipad-touch-support-plan.md Phase B. One code
+        // path covers mouse, touch, and pen.
+        //
+        // Two things this needs beyond a straight mouse->pointer rename:
+        //   1. A movement deadband before engaging the pan. On a mouse, hover
+        //      (no button) and drag (button down) are physically distinct, so
+        //      ECharts' own tap/hover tooltip and this pan handler never
+        //      compete. On touch there's no separate "hover" state -- a
+        //      finger landing on the chart is already a pointerdown. Without
+        //      a deadband, tapping a reading to inspect its tooltip would
+        //      immediately register as (and get consumed by) a 1px pan.
+        //      DRAG_DEADBAND_PX of held-still movement is treated as "reading
+        //      a tooltip", not panning; ECharts shows its own tap tooltip
+        //      throughout. Only once movement crosses the deadband does this
+        //      become a pan, at which point the tooltip is explicitly hidden
+        //      so it doesn't keep following the finger during the drag.
+        //   2. pointercancel alongside pointerup. iPadOS system gestures
+        //      (Control Center, dock swipe, palm rejection) interrupt a touch
+        //      with pointercancel, not pointerup -- without handling it,
+        //      isDragging would stay stuck true and the chart would keep
+        //      panning on the next unrelated touch.
+        function initChartDragPanning() {
+            const chartDom = document.getElementById('chart');
+            if (!chartDom) return;
+
+            const DRAG_DEADBAND_PX = 6;
+
+            let isDragging = false;
+            let deadbandCrossed = false;
+            let startX = 0;
+            let startY = 0;
+            let initialStart = 0;
+            let initialEnd = 0;
+
+            chartDom.addEventListener('pointerdown', function(e) {
+                if (e.button !== 0) return;
+                isDragging = true;
+                deadbandCrossed = false;
+                startX = e.clientX;
+                startY = e.clientY;
+                initialStart = viewStart;
+                initialEnd = viewEnd;
+                // Not calling setPointerCapture here: capturing on pointerdown
+                // would stop ECharts' own canvas from seeing the same pointer
+                // stream, and ECharts needs it to drive its tap-to-tooltip
+                // behaviour for the "held under the deadband" case above.
+            });
+
+            function endDrag() {
+                if (!isDragging) return;
+                isDragging = false;
+                chartDom.style.cursor = 'grab';
+                document.body.classList.remove('dragging-chart');
+                if (deadbandCrossed) saveViewPosition();
+            }
+
+            window.addEventListener('pointermove', function(e) {
+                if (!isDragging) return;
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+
+                if (!deadbandCrossed) {
+                    if (Math.sqrt(deltaX * deltaX + deltaY * deltaY) < DRAG_DEADBAND_PX) return;
+                    deadbandCrossed = true;
+                    chartDom.style.cursor = 'grabbing';
+                    document.body.classList.add('dragging-chart');
+                    if (chart) chart.dispatchAction({ type: 'hideTip' });
+                }
+
+                const gridWidth = chartDom.clientWidth - (currentLayout ? (currentLayout.grid.left + currentLayout.grid.right) : 100);
+                if (gridWidth <= 0) return;
+
+                const msPerPixel = (initialEnd - initialStart) / gridWidth;
+                const deltaMs = -deltaX * msPerPixel;
+
+                viewStart = initialStart + deltaMs;
+                viewEnd = initialEnd + deltaMs;
+                clampView();
+                scheduleViewportRender();
+                maybeExtendBuffer();
+            });
+
+            window.addEventListener('pointerup', endDrag);
+            window.addEventListener('pointercancel', endDrag);
+        }
+
+        // --- 11. Page Initialization ---
+        window.addEventListener('DOMContentLoaded', () => {
+            // An explicit ?date=YYYY-MM-DD in the URL is a deliberate deep link
+            // (e.g. Calendar's drill-in, Phase 7a) and must win over whatever
+            // viewport/date was saved from a previous session -- previously this
+            // block never consulted the URL at all, so a deep link silently
+            // reopened wherever Trace was last left, ignoring the requested date.
+            const urlDate = new URLSearchParams(window.location.search).get('date');
+            const urlDateValid = urlDate && /^\d{4}-\d{2}-\d{2}$/.test(urlDate) && !isNaN(dayStartMs(urlDate));
+
+            if (urlDateValid) {
+                viewStart = dayStartMs(urlDate);
+                viewEnd = viewStart + DAY_MS;
+                // Keep localStorage in sync so subsequent in-page navigation
+                // (panning, the date stepper) continues from here, same as the
+                // existing pattern used elsewhere in this file (e.g. line ~552).
+                localStorage.setItem('ns_daily_date', urlDate);
+                localStorage.setItem('ns_start_date', urlDate);
+                localStorage.setItem('ns_end_date', urlDate);
+                localStorage.removeItem('ns_trace_view_start');
+            } else {
+                const savedViewStart = localStorage.getItem('ns_trace_view_start');
+                if (savedViewStart && !isNaN(parseInt(savedViewStart, 10))) {
+                    viewStart = parseInt(savedViewStart, 10);
+                    viewEnd = viewStart + DAY_MS;
+                } else {
+                    const initialDay = localStorage.getItem('ns_daily_date') || todayStr;
+                    viewStart = dayStartMs(initialDay);
+                    viewEnd = viewStart + DAY_MS;
+                }
+            }
+            clampView();
+
+            if (dateEl) dateEl.value = localDateStr(viewStart);
+
+            updateSettingsTogglesUi();
+
+            if (window.NSChartCustomizer) {
+                NSChartCustomizer.loadGlobalSettings('trace', () => {
+                    if (bufferData && bufferData.length > 0) renderTraceFromData(bufferData);
+                });
+            }
+
+            const searchInput = document.getElementById('trace-overlay-search');
+            if (searchInput) searchInput.addEventListener('input', renderTraceOverlayList);
+
+            const toggleAllBtn = document.getElementById('trace-overlay-toggle-all');
+            if (toggleAllBtn) {
+                toggleAllBtn.addEventListener('change', () => {
+                    const defaultShown = ['bg', 'carbs', 'bolus', 'basal_rate'];
+                    const activeCount = TRACE_METRICS.filter(m => getSavedTraceVisibility(m.label, defaultShown.includes(m.id))).length;
+                    const shouldEnable = activeCount < TRACE_METRICS.length;
+                    TRACE_METRICS.forEach(m => saveTraceVisibility(m.label, shouldEnable));
+                    markViewDirty();
+                    renderTraceOverlayList();
+                    if (bufferData && bufferData.length > 0) renderTraceFromData(bufferData);
+                });
+            }
+
+            // Derive clamp envelopes dynamically from TRACE_REGISTRY
+            const axisClamps = {};
+            TRACE_METRICS.forEach(entry => {
+                if (entry.axis && entry.axis.clamp) {
+                    axisClamps[entry.axis.group] = entry.axis.clamp;
+                }
+            });
+
+            NSAxisPillars.init({
+                clamp: axisClamps,
+                storageKey: 'ns_trace_yaxis_bounds',
+                onLiveUpdate: () => { if (bufferData && bufferData.length > 0) renderTraceFromData(bufferData); },
+                onCommit: () => { markViewDirty(); updateAxisBoundsUi(); }
+            });
+
+            NSViews.init({
+                page: 'trace',
+                activeViewKey: 'ns_trace_active_view',
+                defaultViews: DEFAULT_TRACE_VIEWS,
+                titleElId: 'trace-chart-title-text',
+                titleFor: traceChartTitle,
+                settingsPopoverId: 'trace-settings-popover',
+                settingsBtnId: 'trace-settings-btn',
+                captureState: getCurrentTraceState,
+                applyState: applyTraceView
+            });
+
+            loadChartBands();
+            loadBuffer(localDateStr(viewStart), true);
+        });
+    </script>
+</body>
+
+</html>

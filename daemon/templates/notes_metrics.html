@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weight &amp; HbA1c - ns-monitor</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+</head>
+
+<body>
+    {% include "sidebar.html" %}
+
+    <div class="container">
+        <header class="page-header">
+            <h1 class="panel-h1">Weight &amp; HbA1c</h1>
+            <div class="trace-header-controls">
+                <div class="tab-context-menu" style="position:static; display:flex; box-shadow:none; border:none; background:transparent; padding:0;">
+                    <button type="button" class="btn btn-secondary" id="metric-tab-weight" onclick="switchMetricTab('weight')">Weight</button>
+                    <button type="button" class="btn btn-secondary" id="metric-tab-hba1c" onclick="switchMetricTab('hba1c')">HbA1c</button>
+                </div>
+                <button type="button" class="btn btn-primary" id="metric-add-row-btn" onclick="addMetricRow()">+ New Entry</button>
+            </div>
+        </header>
+
+        <!-- Records here originate from the same clinical_notes table the
+             Calendar day popup writes to -- editing here or in the popup
+             updates the same rows, so the two stay in sync automatically
+             with no separate reconciliation step needed.
+             See docs/analysis/notes-weight-hba1c-implementation-plan.md (v3). -->
+        <div class="card">
+            <table class="form-input-full" style="width:100%; border-collapse:collapse;" id="metric-table">
+                <thead>
+                    <tr id="metric-table-header"></tr>
+                </thead>
+                <tbody id="metric-table-body"></tbody>
+            </table>
+            <div class="overlay-list-empty" id="metric-table-empty" style="display:none;">No records yet. Click &ldquo;+ New Entry&rdquo; to add one.</div>
+        </div>
+
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+
+    <script>
+        var TODAY_LOCAL = {{ today_local | tojson }};
+        var currentMetricType = 'weight';
+
+        var COLUMNS = {
+            weight: [
+                { key: 'date', label: 'Date', type: 'date' },
+                { key: 'weight_kg', label: 'Weight (kg)', type: 'number', step: '0.1' }
+            ],
+            hba1c: [
+                { key: 'date', label: 'Date', type: 'date' },
+                { key: 'hba1c_percent', label: 'HbA1c (%)', type: 'number', step: '0.1' },
+                { key: 'hba1c_mmol_mol', label: 'HbA1c (mmol/mol)', type: 'number', step: '1' }
+            ]
+        };
+
+        function switchMetricTab(type) {
+            currentMetricType = type;
+            document.getElementById('metric-tab-weight').classList.toggle('btn-primary', type === 'weight');
+            document.getElementById('metric-tab-weight').classList.toggle('btn-secondary', type !== 'weight');
+            document.getElementById('metric-tab-hba1c').classList.toggle('btn-primary', type === 'hba1c');
+            document.getElementById('metric-tab-hba1c').classList.toggle('btn-secondary', type !== 'hba1c');
+            loadMetricRecords();
+        }
+
+        function renderHeader() {
+            var headerRow = document.getElementById('metric-table-header');
+            var cols = COLUMNS[currentMetricType];
+            var html = '';
+            cols.forEach(function (c) { html += '<th style="text-align:left; padding:8px; border-bottom:1px solid var(--border-color-strong);">' + c.label + '</th>'; });
+            html += '<th style="padding:8px; border-bottom:1px solid var(--border-color-strong);">Actions</th>';
+            headerRow.innerHTML = html;
+        }
+
+        function timeOnly(timeCreated) {
+            var m = /(\d{2}):(\d{2})/.exec(timeCreated || '');
+            return m ? (m[1] + ':' + m[2]) : '00:00';
+        }
+
+        function loadMetricRecords() {
+            renderHeader();
+            var body = document.getElementById('metric-table-body');
+            var emptyEl = document.getElementById('metric-table-empty');
+            body.innerHTML = '';
+            fetch('/api/v1/metrics/' + currentMetricType + '?start=2000-01-01&end=' + TODAY_LOCAL)
+                .then(function (r) { return r.json(); })
+                .then(function (records) {
+                    emptyEl.style.display = (records && records.length) ? 'none' : '';
+                    (records || []).forEach(function (rec) { body.appendChild(buildRow(rec)); });
+                })
+                .catch(function (err) {
+                    console.error(err);
+                    emptyEl.textContent = 'Failed to load records.';
+                    emptyEl.style.display = '';
+                });
+        }
+
+        function buildRow(record) {
+            var tr = document.createElement('tr');
+            tr.className = 'metric-table-row';
+            tr.dataset.id = record.id || '';
+            tr.dataset.original = JSON.stringify(record);
+
+            var cols = COLUMNS[currentMetricType];
+            cols.forEach(function (c) {
+                var td = document.createElement('td');
+                td.style.padding = '6px 8px';
+                var input = document.createElement('input');
+                input.className = 'form-input';
+                input.type = c.type;
+                if (c.step) input.step = c.step;
+                if (c.type === 'date') input.max = TODAY_LOCAL;
+                var val;
+                if (c.key === 'time') {
+                    val = timeOnly(record.time_created);
+                } else {
+                    val = record[c.key];
+                }
+                input.value = (val === null || val === undefined) ? '' : val;
+                input.dataset.field = c.key;
+                input.addEventListener('input', function () {
+                    tr.classList.add('dirty');
+                    // Live HbA1c sync, matching the Day Note Popup's behavior.
+                    if (currentMetricType === 'hba1c') {
+                        var pctIn = tr.querySelector('[data-field="hba1c_percent"]');
+                        var mmolIn = tr.querySelector('[data-field="hba1c_mmol_mol"]');
+                        if (c.key === 'hba1c_percent' && input.value !== '') {
+                            mmolIn.value = Math.round((parseFloat(input.value) - 2.15) * 10.929);
+                        } else if (c.key === 'hba1c_mmol_mol' && input.value !== '') {
+                            pctIn.value = (parseFloat(input.value) / 10.929 + 2.15).toFixed(1);
+                        }
+                    }
+                });
+                td.appendChild(input);
+                tr.appendChild(td);
+            });
+
+            var actionsTd = document.createElement('td');
+            actionsTd.style.padding = '6px 8px';
+            actionsTd.style.whiteSpace = 'nowrap';
+
+            var saveBtn = document.createElement('button');
+            saveBtn.type = 'button';
+            saveBtn.className = 'btn btn-primary';
+            saveBtn.style.padding = '3px 9px';
+            saveBtn.style.fontSize = '0.8rem';
+            saveBtn.textContent = 'Save';
+            saveBtn.addEventListener('click', function () { saveRow(tr); });
+
+            var revertBtn = document.createElement('button');
+            revertBtn.type = 'button';
+            revertBtn.className = 'btn btn-secondary';
+            revertBtn.style.padding = '3px 9px';
+            revertBtn.style.fontSize = '0.8rem';
+            revertBtn.style.marginLeft = '4px';
+            revertBtn.textContent = 'Revert';
+            revertBtn.addEventListener('click', function () { revertRow(tr); });
+
+            var delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.className = 'btn btn-danger';
+            delBtn.style.padding = '3px 9px';
+            delBtn.style.fontSize = '0.8rem';
+            delBtn.style.marginLeft = '4px';
+            delBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+            delBtn.addEventListener('click', function () { deleteRow(tr); });
+
+            actionsTd.appendChild(saveBtn);
+            actionsTd.appendChild(revertBtn);
+            actionsTd.appendChild(delBtn);
+            tr.appendChild(actionsTd);
+
+            return tr;
+        }
+
+        function revertRow(tr) {
+            var original = JSON.parse(tr.dataset.original);
+            var fresh = buildRow(original);
+            tr.replaceWith(fresh);
+        }
+
+        function saveRow(tr) {
+            var payload = { id: tr.dataset.id || null, date: null };
+            tr.querySelectorAll('input').forEach(function (input) {
+                var field = input.dataset.field;
+                if (field === 'date') {
+                    payload.date = input.value;
+                } else if (field === 'time') {
+                    payload.time_created = input.value || '00:00';
+                } else {
+                    payload[field] = input.value === '' ? null : parseFloat(input.value);
+                }
+            });
+            if (!payload.date) { alert('Date is required.'); return; }
+            if (payload.date > TODAY_LOCAL) { alert('Date cannot be in the future.'); return; }
+            if (currentMetricType === 'weight' && (payload.weight_kg === null || payload.weight_kg === undefined)) {
+                alert('Enter a weight before saving.'); return;
+            }
+            if (currentMetricType === 'hba1c' && payload.hba1c_percent == null && payload.hba1c_mmol_mol == null) {
+                alert('Enter an HbA1c value before saving.'); return;
+            }
+
+            fetch('/api/v1/metrics/' + currentMetricType, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(function (r) {
+                if (!r.ok) return r.json().then(function (e) { throw new Error(e.error || 'Save failed'); });
+                return r.json();
+            })
+            .then(function () { loadMetricRecords(); })
+            .catch(function (err) { alert(err.message); });
+        }
+
+        function deleteRow(tr) {
+            var id = tr.dataset.id;
+            if (!id) { tr.remove(); return; }
+            if (!confirm('Delete this entry? This cannot be undone.')) return;
+            fetch('/api/v1/notes/' + id, { method: 'DELETE' })
+                .then(function (r) {
+                    if (!r.ok) throw new Error('Delete failed');
+                    loadMetricRecords();
+                })
+                .catch(function (err) { alert(err.message); });
+        }
+
+        function addMetricRow() {
+            document.getElementById('metric-table-empty').style.display = 'none';
+            var draft = { id: null, date: TODAY_LOCAL, time_created: null, weight_kg: null, hba1c_percent: null, hba1c_mmol_mol: null };
+            var row = buildRow(draft);
+            row.classList.add('dirty');
+            document.getElementById('metric-table-body').prepend(row);
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            switchMetricTab('weight');
+        });
+    </script>
+</body>
+</html>

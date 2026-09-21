@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnipod</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        /* Single-family component (Advanced Analytics / Novel Reports /
+           Clinical Reports / Omnipod family only) -- deliberately NOT in
+           ns-shared.css, see its own section 17 "NOT INCLUDED,
+           DELIBERATELY" note. Height tuned to this page's own charts. */
+        .chart-container { min-height: 280px; width: 100%; }
+    </style>
+</head>
+<body>
+    {% include "sidebar.html" %}
+
+    <div class="container">
+        <header class="page-header">
+            <h1 class="panel-h1">Omnipod</h1>
+            {% include "_header_date_selector.html" %}
+        </header>
+
+        <!-- SUMMARY -->
+        <div class="card">
+            <h2 class="panel-h2">Summary</h2>
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: var(--space-4);">
+                <div class="score-row">
+                    <div class="score-block">
+                        <div class="score-value" id="stat-pod-count">&ndash;</div>
+                        <span class="score-label"># of Pods</span>
+                    </div>
+                    <div class="score-block">
+                        <div class="score-value" id="stat-avg-lifespan">&ndash;</div>
+                        <span class="score-label">Average lifespan (hours)</span>
+                    </div>
+                </div>
+
+                <!-- Time Filter Group on the right margin -->
+                <div class="pod-time-filter" style="display: flex; align-items: flex-end; gap: var(--space-3); flex-wrap: wrap;">
+                    <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+                        <span class="score-label" style="margin: 0;">Pod start time:</span>
+                        <div style="display: inline-flex; align-items: center; gap: 6px; background: var(--surface-inset); border: 1px solid var(--border-color-strong); border-radius: 6px; padding: 4px 10px;">
+                            <input type="text" id="pod-start-time" class="form-input" value="00:00" placeholder="00:00" maxlength="5"
+                                   style="width: 48px; padding: 0; text-align: center; border: none; background: transparent; font-variant-numeric: tabular-nums;"
+                                   oninput="checkTimeDirty()" onkeydown="onTimeInputKeydown(event)">
+                            <span style="color: var(--text-secondary); font-size: 0.85em;">to</span>
+                            <input type="text" id="pod-end-time" class="form-input" value="24:00" placeholder="24:00" maxlength="5"
+                                   style="width: 48px; padding: 0; text-align: center; border: none; background: transparent; font-variant-numeric: tabular-nums;"
+                                   oninput="checkTimeDirty()" onkeydown="onTimeInputKeydown(event)">
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="btn-filter-time" disabled onclick="onFilterTimeClick()" style="padding: 6px 14px;">
+                        Filter Now
+                    </button>
+                </div>
+            </div>
+            <div class="panel-text-minor" style="margin-top: var(--space-4);">
+                Excludes the pod currently in use (if any) &mdash; its real duration isn't known yet. A pod is counted here once its duration is determined: either a next site change was logged, or 80 hours have elapsed (Omnipod's hardware time limit). This means lifespan is slightly exagerated because only pod start times are recorded, not pod ends.
+            </div>
+        </div>
+
+        <!-- HOUR OF DAY HISTOGRAM -->
+        <div class="card">
+            <h2 class="panel-h2">Pod Starts by Hour of Day</h2>
+            <div class="panel-text-minor" style="margin-bottom: var(--space-3);">
+                When pod changes happen, pooled across every day in the selected range.
+            </div>
+            <div class="chart-wrap">
+                <div id="hour-histogram-chart" class="chart-container"></div>
+                <div class="loading-overlay" id="hour-histogram-loading" style="display:none;">Loading...</div>
+            </div>
+        </div>
+
+        <!-- LIFESPAN HISTOGRAM -->
+        <div class="card">
+            <h2 class="panel-h2">Pod Lifespan Distribution</h2>
+            <div class="panel-text-minor" style="margin-bottom: var(--space-3);">
+                Duration per pod, grouped into 5-hour blocks (max 80 hours).
+            </div>
+            <div class="chart-wrap">
+                <div id="lifespan-histogram-chart" class="chart-container"></div>
+                <div class="loading-overlay" id="lifespan-histogram-loading" style="display:none;">Loading...</div>
+            </div>
+        </div>
+
+        <!-- BG RELATIVE CURVE -->
+        <div class="card">
+            <h2 class="panel-h2">BG Trend Either Side of Pod Start</h2>
+            <div class="panel-text-minor" style="margin-bottom: var(--space-3);">
+                Every clean pod in range (see notes below the table),
+                normalized to its own start-time BG reading (= 0), then
+                averaged across the population at each 5-minute point from
+                24 hours before to 24 hours after pod start. Blue band is
+                the 10th&ndash;90th percentile spread between pods at each
+                point; orange band is the 95% confidence interval on the
+                mean itself &mdash; a narrow, consistent gap between the
+                orange band and zero is stronger evidence of a real effect
+                than the mean line alone.
+            </div>
+            <div class="chart-wrap">
+                <div id="bg-curve-chart" class="chart-container" style="min-height: 380px;"></div>
+                <div class="loading-overlay" id="bg-curve-loading" style="display:none;">Loading...</div>
+            </div>
+
+            <div class="panel-heading-sm" style="margin-top: var(--space-5);">Milestone significance</div>
+            <div class="panel-text-minor" style="margin-bottom: var(--space-3);">
+                One-sample t-test of BG delta against zero, at 4 pre-chosen
+                hours (not scanned across every bucket, to avoid a
+                multiple-comparisons false-positive problem).
+            </div>
+            <table class="panel-table" id="milestone-table">
+                <thead>
+                    <tr>
+                        <th>Hour</th>
+                        <th>Mean &Delta; (mmol/L)</th>
+                        <th>95% CI</th>
+                        <th>n</th>
+                        <th>p-value</th>
+                        <th>Result</th>
+                    </tr>
+                </thead>
+                <tbody id="milestone-table-body"></tbody>
+            </table>
+
+            <ul class="panel-list panel-list--minor" id="bg-window-notes" style="margin-top: var(--space-4);">
+                <li>Window: -24h to +24h relative to each pod's own start (0 = that pod's own first BG reading at/after its start time).</li>
+                <li>A pod is only included once 24 hours of real time have passed since its start, so a full +24h forward window can exist.</li>
+                <li>Forward data is cut off at the next pod's own start if that happened sooner than +24h, so a short-lived pod's window never absorbs the next pod's own onset transition.</li>
+                <li>A pod is excluded entirely (not just truncated) if the pod immediately before it started less than 24 hours earlier -- otherwise this pod's -24h lookback would reach into that previous pod's own still-settling onset transition rather than its steady-state tail.</li>
+                <li id="bg-window-counts-note">Pod counts: &ndash; eligible, &ndash; clean, &ndash; excluded.</li>
+            </ul>
+        </div>
+
+        <!-- BG RATE OF CHANGE CURVE -->
+        <div class="card">
+            <h2 class="panel-h2">BG Rate of Change Either Side of Pod Start</h2>
+            <div class="panel-text-minor" style="margin-bottom: var(--space-3);">
+                Same eligible/clean pod population and same -24h to +24h
+                window as the trend chart above, but plotting the first
+                derivative of BG (mmol/L per hour) instead of the delta
+                from the pod's own start reading. Where the trend chart
+                shows <em>where</em> BG sits relative to pod start, this
+                shows <em>how fast</em> it's moving at each point -- a flat
+                but elevated plateau and a BG still actively climbing look
+                identical on the delta chart above, but are clearly
+                distinguished here. Blue band is the 10th&ndash;90th
+                percentile spread between pods at each point; orange band
+                is the 95% confidence interval on the mean itself.
+            </div>
+            <div class="chart-wrap">
+                <div id="bg-roc-curve-chart" class="chart-container" style="min-height: 380px;"></div>
+                <div class="loading-overlay" id="bg-roc-curve-loading" style="display:none;">Loading...</div>
+            </div>
+
+            <div class="panel-heading-sm" style="margin-top: var(--space-5);">Milestone significance</div>
+            <div class="panel-text-minor" style="margin-bottom: var(--space-3);">
+                One-sample t-test of BG rate of change against zero, at the
+                same 4 pre-chosen hours as above.
+            </div>
+            <table class="panel-table" id="roc-milestone-table">
+                <thead>
+                    <tr>
+                        <th>Hour</th>
+                        <th>Mean RoC (mmol/L/h)</th>
+                        <th>95% CI</th>
+                        <th>n</th>
+                        <th>p-value</th>
+                        <th>Result</th>
+                    </tr>
+                </thead>
+                <tbody id="roc-milestone-table-body"></tbody>
+            </table>
+
+            <ul class="panel-list panel-list--minor" style="margin-top: var(--space-4);">
+                <li>Same eligibility, cleanliness, and window rules as the BG trend chart above (see its notes for details) -- this is the identical pod population, plotted as a rate instead of a cumulative delta.</li>
+                <li>RoC at each point is computed only between adjacent 5-minute readings; where the underlying data has a gap, that point is left out of the rate curve rather than averaged across the gap, so this chart can have more missing points than the trend chart above in places with sensor dropouts.</li>
+            </ul>
+        </div>
+
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+
+    <script src="/static/js/ns-date-selector.js"></script>
+    <script>
+        const todayStr = "{{ today_local }}";
+
+        // ─── Charts ─────────────────────────────────────────────────────
+        let hourChart = null, lifespanChart = null, bgCurveChart = null, bgRocCurveChart = null;
+
+        function renderHourHistogram(counts) {
+            const categories = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0') + ':00');
+            const el = document.querySelector('#hour-histogram-chart');
+            if (!hourChart) {
+                hourChart = echarts.init(el, null, { renderer: 'canvas' });
+                window.addEventListener('resize', () => hourChart && hourChart.resize());
+            }
+            hourChart.setOption({
+                animation: false,
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                grid: { top: 20, bottom: 40, left: 40, right: 20 },
+                xAxis: { type: 'category', data: categories, axisLabel: { color: '#888', rotate: -45, fontSize: 10 } },
+                yAxis: { type: 'value', name: 'Pod starts', minInterval: 1, axisLabel: { color: '#888' }, splitLine: { lineStyle: { color: '#333' } } },
+                series: [{ name: 'Pod starts', type: 'bar', data: counts, itemStyle: { color: '#3498db', borderRadius: 3 } }]
+            }, true);
+        }
+
+        function renderLifespanHistogram(buckets) {
+            const categories = buckets.map((_, i) => `${i * 5}-${i * 5 + 5}`);
+            const el = document.querySelector('#lifespan-histogram-chart');
+            if (!lifespanChart) {
+                lifespanChart = echarts.init(el, null, { renderer: 'canvas' });
+                window.addEventListener('resize', () => lifespanChart && lifespanChart.resize());
+            }
+            lifespanChart.setOption({
+                animation: false,
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                grid: { top: 20, bottom: 40, left: 40, right: 20 },
+                xAxis: { type: 'category', data: categories, name: 'Lifespan (hours)', axisLabel: { color: '#888', fontSize: 10 } },
+                yAxis: { type: 'value', name: 'Pod count', minInterval: 1, axisLabel: { color: '#888' }, splitLine: { lineStyle: { color: '#333' } } },
+                series: [{ name: 'Pods', type: 'bar', data: buckets, itemStyle: { color: '#00e676', borderRadius: 3 } }]
+            }, true);
+        }
+
+        // ─── Time Filter ────────────────────────────────────────────────
+        let activeStartTime = '00:00';
+        let activeEndTime = '24:00';
+
+        function checkTimeDirty() {
+            const sEl = document.getElementById('pod-start-time');
+            const eEl = document.getElementById('pod-end-time');
+            const btn = document.getElementById('btn-filter-time');
+            if (!sEl || !eEl || !btn) return;
+            const isDirty = (sEl.value.trim() !== activeStartTime || eEl.value.trim() !== activeEndTime);
+            btn.disabled = !isDirty;
+        }
+
+        function onTimeInputKeydown(e) {
+            if (e.key === 'Enter') {
+                const btn = document.getElementById('btn-filter-time');
+                if (btn && !btn.disabled) {
+                    onFilterTimeClick();
+                }
+            }
+        }
+
+        function normalizeTime(val, defaultVal) {
+            const t = (val || '').trim();
+            if (!t) return defaultVal;
+            const m = t.match(/^([0-1]?[0-9]|2[0-4]):([0-5][0-9])$/);
+            if (m) {
+                const h = m[1].padStart(2, '0');
+                const min = m[2];
+                if (h === '24' && min !== '00') return '24:00';
+                return `${h}:${min}`;
+            }
+            return null;
+        }
+
+        function onFilterTimeClick() {
+            const sEl = document.getElementById('pod-start-time');
+            const eEl = document.getElementById('pod-end-time');
+            const btn = document.getElementById('btn-filter-time');
+            if (!sEl || !eEl) return;
+
+            const sVal = normalizeTime(sEl.value, '00:00');
+            const eVal = normalizeTime(eEl.value, '24:00');
+
+            if (!sVal) {
+                alert('Invalid start time. Please use HH:MM format (e.g. 08:00 or 00:00).');
+                sEl.focus();
+                return;
+            }
+            if (!eVal) {
+                alert('Invalid end time. Please use HH:MM format (e.g. 18:00 or 24:00).');
+                eEl.focus();
+                return;
+            }
+
+            sEl.value = sVal;
+            eEl.value = eVal;
+            activeStartTime = sVal;
+            activeEndTime = eVal;
+            if (btn) btn.disabled = true;
+
+            syncAndSubmit();
+        }
+
+        function renderPodCurveChart(series, elSelector, chartHolder, yAxisName, meanName, stackPrefix) {
+            const hours = series.map(p => (p.minute / 60).toFixed(1));
+            const p10 = series.map(p => (p.n >= 2 && p.p10 !== null) ? p.p10 : null);
+            const p90_diff = series.map(p => (p.n >= 2 && p.p10 !== null && p.p90 !== null) ? Math.max(0, p.p90 - p.p10) : null);
+            const ci_lo = series.map(p => (p.n >= 2 && p.ci_lo !== null) ? p.ci_lo : null);
+            const ci_diff = series.map(p => (p.n >= 2 && p.ci_lo !== null && p.ci_hi !== null) ? Math.max(0, p.ci_hi - p.ci_lo) : null);
+            const mean = series.map(p => (p.n >= 2 && p.mean !== null) ? p.mean : null);
+
+            const el = document.querySelector(elSelector);
+            let chart = chartHolder.chart;
+            if (!chart) {
+                chart = echarts.init(el, null, { renderer: 'canvas' });
+                chartHolder.chart = chart;
+                window.addEventListener('resize', () => chart && chart.resize());
+            }
+            chart.setOption({
+                animation: false,
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+                legend: {
+                    data: [
+                        { name: '10th-90th percentile', icon: 'roundRect', itemStyle: { color: 'rgba(52, 152, 219, 0.45)' } },
+                        { name: '95% CI of mean', icon: 'roundRect', itemStyle: { color: 'rgba(243, 156, 18, 0.7)' } },
+                        { name: meanName, icon: 'line', itemStyle: { color: '#00e676' } }
+                    ],
+                    textStyle: { color: '#e0e0e0' }
+                },
+                grid: { top: 40, bottom: 40, left: 50, right: 30 },
+                xAxis: {
+                    type: 'category',
+                    data: hours,
+                    name: 'Hours relative to pod start',
+                    nameLocation: 'middle',
+                    nameGap: 26,
+                    axisLine: { lineStyle: { color: '#555' } },
+                    axisLabel: {
+                        color: '#aaa',
+                        interval: (index) => index % 36 === 0,
+                        formatter: function (val, index) {
+                            const h = Math.round((index - 288) / 12);
+                            return h > 0 ? `+${h}` : `${h}`;
+                        }
+                    },
+                    axisTick: {
+                        show: true,
+                        alignWithLabel: true,
+                        interval: (index) => index % 36 === 0,
+                        lineStyle: { color: '#666' }
+                    },
+                    splitLine: {
+                        show: true,
+                        interval: (index) => index % 36 === 0,
+                        lineStyle: { color: '#333', type: 'dashed' }
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: yAxisName,
+                    axisLabel: { color: '#aaa' },
+                    splitLine: { lineStyle: { color: '#333' } }
+                },
+                series: [
+                    {
+                        name: '10th Base',
+                        type: 'line',
+                        data: p10,
+                        stack: `${stackPrefix}_p`,
+                        lineStyle: { opacity: 0 },
+                        symbol: 'none',
+                        tooltip: { show: false }
+                    },
+                    {
+                        name: '10th-90th percentile',
+                        type: 'line',
+                        data: p90_diff,
+                        stack: `${stackPrefix}_p`,
+                        areaStyle: { color: '#3498db', opacity: 0.25 },
+                        lineStyle: { opacity: 0 },
+                        itemStyle: { color: '#3498db' },
+                        symbol: 'none'
+                    },
+                    {
+                        name: 'CI Base',
+                        type: 'line',
+                        data: ci_lo,
+                        stack: `${stackPrefix}_ci`,
+                        lineStyle: { opacity: 0 },
+                        symbol: 'none',
+                        tooltip: { show: false }
+                    },
+                    {
+                        name: '95% CI of mean',
+                        type: 'line',
+                        data: ci_diff,
+                        stack: `${stackPrefix}_ci`,
+                        areaStyle: { color: '#f39c12', opacity: 0.45 },
+                        lineStyle: { opacity: 0 },
+                        itemStyle: { color: '#f39c12' },
+                        symbol: 'none'
+                    },
+                    {
+                        name: meanName,
+                        type: 'line',
+                        data: mean,
+                        smooth: true,
+                        connectNulls: true,
+                        lineStyle: { color: '#00e676', width: 2.5 },
+                        itemStyle: { color: '#00e676' },
+                        symbol: 'none',
+                        markLine: {
+                            silent: true,
+                            symbol: 'none',
+                            lineStyle: { color: '#666', type: 'dashed' },
+                            data: [{ yAxis: 0 }, { xAxis: 288 }]
+                        }
+                    }
+                ]
+            }, true);
+        }
+
+        const bgCurveHolder = { chart: null };
+        const bgRocCurveHolder = { chart: null };
+
+        function renderBgCurve(series) {
+            renderPodCurveChart(series, '#bg-curve-chart', bgCurveHolder, 'BG delta (mmol/L)', 'Mean delta', 'band');
+        }
+
+        function renderBgRocCurve(series) {
+            renderPodCurveChart(series, '#bg-roc-curve-chart', bgRocCurveHolder, 'Rate of change (mmol/L/hr)', 'Mean rate of change', 'band_roc');
+        }
+
+        function renderBgWindowCounts(counts) {
+            const el = document.getElementById('bg-window-counts-note');
+            if (!el || !counts) return;
+            el.innerHTML = `Pod counts for this range: <strong>${counts.eligible_count}</strong> eligible, `
+                + `<strong>${counts.clean_count}</strong> clean and used above, `
+                + `<strong>${counts.excluded_count}</strong> excluded for adjacent-pod contamination.`;
+        }
+
+        function renderMilestoneTableInto(tbodyId, milestones) {
+            const tbody = document.getElementById(tbodyId);
+            tbody.innerHTML = milestones.map(m => {
+                if (m.p_value === null) {
+                    return `<tr>
+                        <td>${m.hour}h</td>
+                        <td>${m.mean !== null ? m.mean.toFixed(2) : '–'}</td>
+                        <td colspan="3" class="metric-neutral">Insufficient data (n=${m.n})</td>
+                    </tr>`;
+                }
+                const resultClass = m.significant ? 'metric-better' : 'metric-neutral';
+                const resultText = m.significant ? 'Significant (p<0.05)' : 'Not significant';
+                return `<tr>
+                    <td>${m.hour}h</td>
+                    <td>${m.mean.toFixed(2)}</td>
+                    <td>[${m.ci_lo.toFixed(2)}, ${m.ci_hi.toFixed(2)}]</td>
+                    <td>${m.n}</td>
+                    <td>${m.p_value.toFixed(4)}</td>
+                    <td class="${resultClass}">${resultText}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function renderMilestoneTable(milestones) {
+            renderMilestoneTableInto('milestone-table-body', milestones);
+        }
+
+        function renderRocMilestoneTable(milestones) {
+            renderMilestoneTableInto('roc-milestone-table-body', milestones);
+        }
+
+        let loadSeqId = 0;
+        async function syncAndSubmit() {
+            const start = document.getElementById('start_date').value;
+            const end = document.getElementById('end_date').value;
+            if (!start || !end) return;
+
+            const cid = ++loadSeqId;
+            ['hour-histogram-loading', 'lifespan-histogram-loading', 'bg-curve-loading', 'bg-roc-curve-loading'].forEach(id => {
+                document.getElementById(id).style.display = 'flex';
+            });
+
+            updateTriggerText();
+            localStorage.setItem('ns_date_start', start);
+            localStorage.setItem('ns_date_end', end);
+
+            try {
+                const paramsObj = { start_date: start, end_date: end };
+                if (activeStartTime !== '00:00' || (activeEndTime !== '24:00' && activeEndTime !== '23:59')) {
+                    paramsObj.start_time = activeStartTime;
+                    paramsObj.end_time = activeEndTime;
+                }
+                const params = new URLSearchParams(paramsObj).toString();
+                window.history.replaceState(null, '', '?' + params);
+                const resp = await fetch(`/api/v1/omnipod/data?${params}`);
+                const data = await resp.json();
+                if (cid !== loadSeqId) return; // a newer request superseded this one
+
+                if (data.status !== 'success') throw new Error(data.message || 'request failed');
+
+                document.getElementById('stat-pod-count').innerText = data.pod_count;
+                document.getElementById('stat-avg-lifespan').innerText =
+                    data.avg_duration_hours !== null ? data.avg_duration_hours.toFixed(1) : '\u2013';
+
+                renderHourHistogram(data.hour_of_day_counts);
+                renderLifespanHistogram(data.lifespan_buckets);
+                renderBgCurve(data.bg_curve);
+                renderMilestoneTable(data.bg_milestones);
+                renderBgRocCurve(data.bg_roc_curve);
+                renderRocMilestoneTable(data.bg_roc_milestones);
+                renderBgWindowCounts(data.bg_window_counts);
+            } catch (err) {
+                console.error('Omnipod data load failed:', err);
+            } finally {
+                if (cid === loadSeqId) {
+                    ['hour-histogram-loading', 'lifespan-histogram-loading', 'bg-curve-loading', 'bg-roc-curve-loading'].forEach(id => {
+                        document.getElementById(id).style.display = 'none';
+                    });
+                }
+            }
+        }
+
+        window.syncAndSubmit = syncAndSubmit;
+        window.onDateOrPresetChange = syncAndSubmit;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            syncAndSubmit();
+        });
+    </script>
+</body>
+</html>

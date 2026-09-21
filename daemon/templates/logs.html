@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status &amp; Logs</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        /* Status & Logs terminal styles (strict ns-shared.css tokens) */
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: var(--space-4);
+            margin-bottom: var(--space-5);
+        }
+
+        .terminal-card {
+            background-color: var(--card-bg);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 320px);
+            min-height: 380px;
+        }
+
+        .terminal-header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: var(--space-3);
+            padding: var(--space-3) var(--space-4);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .terminal-header-left,
+        .terminal-header-center,
+        .terminal-header-right {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .terminal-title {
+            font-size: 0.85em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .scroll-status {
+            font-size: 0.75em;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .status-live {
+            color: var(--success);
+            background: oklch(0.25 0.05 145);
+        }
+
+        .status-paused {
+            color: var(--warning);
+            background: oklch(0.25 0.05 85);
+        }
+
+        .daemon-level-wrap {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-left: var(--space-2);
+        }
+
+        .daemon-level-select {
+            background: var(--surface-raised);
+            color: var(--text-color);
+            border: 1px solid var(--border-color-strong);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .daemon-level-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .level-pills-group {
+            display: flex;
+            gap: 4px;
+            background: var(--surface-inset);
+            padding: 3px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .level-pill {
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .level-pill:hover {
+            color: var(--text-color);
+            background: var(--surface-hover);
+        }
+
+        .level-pill.active {
+            background: var(--accent);
+            color: var(--accent-foreground);
+        }
+
+        .pill-count {
+            font-size: 10px;
+            padding: 0 4px;
+            border-radius: 8px;
+            background: var(--border-color-strong);
+        }
+
+        .level-pill.active .pill-count {
+            background: oklch(0 0 0 / 20%);
+        }
+
+        .log-search-input {
+            background: var(--surface-inset);
+            color: var(--text-color);
+            border: 1px solid var(--border-color-strong);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            width: 170px;
+        }
+
+        .log-search-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .log-download-wrap {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        .log-file-select {
+            background: var(--surface-raised);
+            color: var(--text-color);
+            border: 1px solid var(--border-color-strong);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            max-width: 220px;
+        }
+
+        .log-file-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .btn-term {
+            background: var(--surface-raised);
+            color: var(--text-color);
+            border: 1px solid var(--border-color-strong);
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+            font-weight: 500;
+            transition: background 0.2s, border-color 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-term:hover {
+            background: var(--surface-hover);
+            border-color: var(--accent);
+        }
+
+        .btn-term.active {
+            background: var(--success);
+            border-color: var(--success);
+            color: #fff;
+        }
+
+        .terminal-subbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px var(--space-4);
+            background: var(--surface-inset);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 11px;
+            color: var(--text-tertiary);
+            flex-shrink: 0;
+        }
+
+        .terminal-subbar-hint {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        #terminal {
+            flex-grow: 1;
+            padding: var(--space-3) var(--space-4);
+            overflow-y: auto;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            background: var(--surface-inset);
+            border-bottom-left-radius: var(--radius);
+            border-bottom-right-radius: var(--radius);
+        }
+
+        #terminal::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #terminal::-webkit-scrollbar-track {
+            background: var(--surface-inset);
+        }
+
+        #terminal::-webkit-scrollbar-thumb {
+            background: var(--surface-raised);
+            border-radius: 3px;
+        }
+
+        /* Log Row Layout */
+        .log-row {
+            display: flex;
+            align-items: baseline;
+            gap: var(--space-2);
+            padding: 2px 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .log-row.hidden {
+            display: none !important;
+        }
+
+        .log-ts {
+            color: var(--text-tertiary);
+            font-size: 11px;
+            flex-shrink: 0;
+            min-width: 62px;
+        }
+
+        .log-level-badge {
+            font-size: 9px;
+            font-weight: 700;
+            padding: 1px 5px;
+            border-radius: 3px;
+            flex-shrink: 0;
+            min-width: 44px;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .level-badge-info {
+            background: oklch(0.28 0.04 250);
+            color: oklch(0.85 0.08 250);
+        }
+
+        .level-badge-warn {
+            background: oklch(0.32 0.08 85);
+            color: var(--warning);
+        }
+
+        .level-badge-error {
+            background: oklch(0.32 0.12 25);
+            color: #ff7b7b;
+        }
+
+        .level-badge-debug {
+            background: oklch(0.26 0.03 200);
+            color: #7dd3fc;
+        }
+
+        .log-comp {
+            color: var(--text-secondary);
+            font-size: 11px;
+            flex-shrink: 0;
+        }
+
+        .log-msg {
+            color: var(--text-color);
+            font-size: 12px;
+            flex-grow: 1;
+        }
+
+        .log-row.level-error .log-msg {
+            color: #ff9e9e;
+        }
+
+        .log-row.level-warn .log-msg {
+            color: #ffe680;
+        }
+
+        .log-row.level-debug .log-msg {
+            color: var(--text-tertiary);
+        }
+    </style>
+</head>
+
+<body>
+
+    {% include "sidebar.html" %}
+
+    <div class="container">
+        <header class="page-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <h1 class="panel-h1">Status &amp; Logs</h1>
+            <div>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-restart-daemon" onclick="confirmRestartDaemon()" title="Gracefully restart the backend container">
+                    <i class="fa-solid fa-arrows-rotate"></i> Restart Daemon
+                </button>
+            </div>
+        </header>
+
+        <!-- Restart Overlay -->
+        <div id="restart-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(3px);z-index:99999;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
+            <i class="fa-solid fa-arrows-rotate fa-spin" style="font-size:2.5rem;color:var(--accent);"></i>
+            <div style="font-size:1.2rem;font-weight:700;color:#e6edf3;">Restarting Nightscout Daemon...</div>
+            <div id="restart-countdown" style="font-size:0.9rem;color:var(--text-secondary);">Reconnecting in 5 seconds...</div>
+        </div>
+
+        <!-- STATUS OVERVIEW  -->
+        <div class="status-grid">
+            <div class="card">
+                <div class="score-block" style="text-align: left;">
+                    <div class="score-label">Polling</div>
+                    <div class="score-value" id="heartbeat" style="font-size: 1.8em;">...</div>
+                    <div class="hint">Last Poll: <span id="last-poll">...</span> <span id="poll-timer"
+                            style="color: var(--text-tertiary); font-size: 0.9em;"></span></div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="score-block" style="text-align: left;">
+                    <div class="score-label">Backfill Status</div>
+                    <div class="score-value" id="bf-status" style="font-size: 1.8em;">...</div>
+                    <div id="bf-progress" class="hint">...</div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="score-block" style="text-align: left;">
+                    <div class="score-label">Watchdog Health</div>
+                    <div id="soh-chips" style="margin-top: var(--space-2);">
+                        <span class="status-chip" id="chip-sync"
+                            title="Data synchronization with Nightscout API">SYNC</span>
+                    </div>
+                    <div class="hint" style="margin-top: var(--space-2);">Service connectivity</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LOG TERMINAL -->
+        <div class="terminal-card">
+            <div class="terminal-header">
+                <!-- Left: Title, Live indicator, Daemon level -->
+                <div class="terminal-header-left">
+                    <span class="terminal-title">System Log</span>
+                    <span id="scroll-status" class="scroll-status status-live">● LIVE</span>
+                    <div class="daemon-level-wrap">
+                        <label for="daemon-level-select">Daemon Level:</label>
+                        <select id="daemon-level-select" class="daemon-level-select" title="Change backend recording level in real-time">
+                            <option value="DEBUG" {% if current_level == 'DEBUG' %}selected{% endif %}>DEBUG</option>
+                            <option value="INFO" {% if current_level == 'INFO' or not current_level %}selected{% endif %}>INFO</option>
+                            <option value="WARN" {% if current_level == 'WARN' or current_level == 'WARNING' %}selected{% endif %}>WARN</option>
+                            <option value="ERROR" {% if current_level == 'ERROR' %}selected{% endif %}>ERROR</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Center: Filter pills -->
+                <div class="terminal-header-center">
+                    <div class="level-pills-group">
+                        <button type="button" class="level-pill active" data-level="ALL">ALL <span class="pill-count" id="count-all">0</span></button>
+                        <button type="button" class="level-pill" data-level="INFO">INFO <span class="pill-count" id="count-info">0</span></button>
+                        <button type="button" class="level-pill" data-level="WARN">WARN <span class="pill-count" id="count-warn">0</span></button>
+                        <button type="button" class="level-pill" data-level="ERROR">ERROR <span class="pill-count" id="count-error">0</span></button>
+                        <button type="button" class="level-pill" data-level="DEBUG">DEBUG <span class="pill-count" id="count-debug">0</span></button>
+                    </div>
+                </div>
+
+                <!-- Right: Search and action buttons -->
+                <div class="terminal-header-right">
+                    <input type="text" id="log-search" class="log-search-input" placeholder="Search logs..." autocomplete="off">
+                    <div class="log-download-wrap">
+                        <select id="log-file-select" class="log-file-select" title="Select log file to download">
+                            {% for lf in log_files %}
+                            <option value="{{ lf.filename }}">{{ lf.filename }} ({{ lf.size_formatted }}){% if lf.is_active %} [Active]{% endif %}</option>
+                            {% else %}
+                            <option value="daemon.log">daemon.log [Active]</option>
+                            {% endfor %}
+                        </select>
+                        <button type="button" id="download-btn" class="btn-term" title="Download selected log file"><i class="fa-solid fa-download"></i> Download</button>
+                    </div>
+                    <button type="button" id="pause-btn" class="btn-term"><i class="fa-solid fa-pause"></i> Pause</button>
+                    <button type="button" id="clear-btn" class="btn-term"><i class="fa-solid fa-trash-can"></i> Clear</button>
+                    <button type="button" id="copy-btn" class="btn-term"><i class="fa-solid fa-copy"></i> Copy</button>
+                </div>
+            </div>
+
+            <!-- Subbar: Retention details & buffer metrics -->
+            <div class="terminal-subbar">
+                <div class="terminal-subbar-hint">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Rotates daily at midnight &bull; 7-day retention retained</span>
+                </div>
+                <span id="buffer-stat">0 records</span>
+            </div>
+
+            <div id="terminal"></div>
+        </div>
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+
+    <script>
+        // ----- Status cards -----
+        let lastPollAt = null;
+
+        async function loadStatus() {
+            try {
+                const r = await fetch('/api/stats');
+                const data = await r.json();
+
+                const hb = document.getElementById('heartbeat');
+                hb.innerText = data.status.daemon_heartbeat ? 'RUNNING' : 'STOPPED';
+                hb.className = 'stat-value ' + (data.status.daemon_heartbeat ? 'status-ok' : 'status-err');
+
+                if (data.status.last_poll_utc) {
+                    const d = new Date(data.status.last_poll_utc);
+                    document.getElementById('last-poll').innerText = d.toLocaleString();
+                    lastPollAt = d.getTime();
+                    updateTimer();
+                } else {
+                    document.getElementById('last-poll').innerText = 'Never';
+                    lastPollAt = null;
+                }
+
+                const bf = document.getElementById('bf-status');
+                bf.innerText = data.status.backfill.running ? 'ACTIVE' : 'IDLE';
+                bf.className = 'stat-value ' + (data.status.backfill.running ? 'status-warn' : '');
+                document.getElementById('bf-progress').innerText = data.status.backfill.progress || 'No active task';
+
+                const health = data.status.service_health || {};
+                const updateChip = (id, status) => {
+                    const el = document.getElementById('chip-' + id);
+                    if (!el) return;
+                    const s = (status || '').toLowerCase();
+                    if (s.startsWith('ok') || s.includes('polling') || s.includes('replaying')) {
+                        el.className = 'status-chip status-ok';
+                    } else if (s.includes('disabled')) {
+                        el.className = 'status-chip status-warn';
+                    } else {
+                        el.className = 'status-chip status-err';
+                    }
+                    if (status) {
+                        el.title = 'Data synchronization: ' + status;
+                    }
+                };
+                updateChip('sync', health.sync);
+
+                // Polling Heartbeat override if Disabled
+                if (health.sync === 'Disabled') {
+                    hb.innerText = 'DISABLED';
+                    hb.className = 'stat-value status-warn';
+                }
+            } catch (e) { console.error('Status load error:', e); }
+        }
+
+        function updateTimer() {
+            if (!lastPollAt) return;
+            const sec = Math.floor((Date.now() - lastPollAt) / 1000);
+            document.getElementById('poll-timer').innerText = `(${sec}s ago)`;
+        }
+
+        loadStatus();
+        setInterval(loadStatus, 10000);
+        setInterval(updateTimer, 1000);
+
+        // ----- Terminal / SSE / Filtering -----
+        const terminal = document.getElementById('terminal');
+        const pauseBtn = document.getElementById('pause-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const copyBtn = document.getElementById('copy-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        const scrollStatus = document.getElementById('scroll-status');
+        const daemonLevelSelect = document.getElementById('daemon-level-select');
+        const logSearchInput = document.getElementById('log-search');
+        const levelPills = document.querySelectorAll('.level-pill');
+        const bufferStat = document.getElementById('buffer-stat');
+
+        let isPaused = false;
+        let autoScroll = true;
+        let activeLevel = 'ALL';
+        let searchQuery = '';
+
+        const counts = {
+            ALL: 0,
+            INFO: 0,
+            WARN: 0,
+            ERROR: 0,
+            DEBUG: 0
+        };
+
+        function updateCountBadges() {
+            document.getElementById('count-all').textContent = counts.ALL;
+            document.getElementById('count-info').textContent = counts.INFO;
+            document.getElementById('count-warn').textContent = counts.WARN;
+            document.getElementById('count-error').textContent = counts.ERROR;
+            document.getElementById('count-debug').textContent = counts.DEBUG;
+            bufferStat.textContent = `${counts.ALL} records`;
+        }
+
+        function markLive() {
+            scrollStatus.textContent = '● LIVE';
+            scrollStatus.className = 'scroll-status status-live';
+        }
+
+        function markPaused(label = 'PAUSED') {
+            scrollStatus.textContent = '⏸ ' + label;
+            scrollStatus.className = 'scroll-status status-paused';
+        }
+
+        function normalizeLevel(lvl) {
+            if (!lvl) return 'INFO';
+            const u = lvl.toUpperCase();
+            if (u === 'WARNING') return 'WARN';
+            if (u === 'CRITICAL') return 'ERROR';
+            return u;
+        }
+
+        function isRowVisible(level, text) {
+            if (activeLevel !== 'ALL' && level !== activeLevel) {
+                return false;
+            }
+            if (searchQuery && !text.toLowerCase().includes(searchQuery)) {
+                return false;
+            }
+            return true;
+        }
+
+        function createLogRow(item) {
+            const level = normalizeLevel(item.level);
+            item.level = level;
+
+            const row = document.createElement('div');
+            row.className = `log-row level-${level.toLowerCase()}`;
+            row.dataset.level = level;
+            row.dataset.search = (item.msg + ' ' + (item.component || '')).toLowerCase();
+
+            if (!isRowVisible(level, row.dataset.search)) {
+                row.classList.add('hidden');
+            }
+
+            const tsSpan = document.createElement('span');
+            tsSpan.className = 'log-ts';
+            tsSpan.textContent = item.ts || '';
+
+            const badgeSpan = document.createElement('span');
+            badgeSpan.className = `log-level-badge level-badge-${level.toLowerCase()}`;
+            badgeSpan.textContent = level;
+
+            const compSpan = document.createElement('span');
+            compSpan.className = 'log-comp';
+            compSpan.textContent = item.component ? `[${item.component}]` : '';
+
+            const msgSpan = document.createElement('span');
+            msgSpan.className = 'log-msg';
+            msgSpan.textContent = item.msg || '';
+
+            row.appendChild(tsSpan);
+            row.appendChild(badgeSpan);
+            row.appendChild(compSpan);
+            row.appendChild(msgSpan);
+
+            return { row, level };
+        }
+
+        function handleLogBatch(data) {
+            let items;
+            try {
+                items = typeof data === 'string' ? JSON.parse(data) : data;
+            } catch (e) {
+                console.error('Failed to parse log batch', e);
+                return;
+            }
+
+            if (!Array.isArray(items)) return;
+
+            // Reset counts and clear terminal on batch to prevent stacking duplicates
+            terminal.innerHTML = '';
+            counts.ALL = 0;
+            counts.INFO = 0;
+            counts.WARN = 0;
+            counts.ERROR = 0;
+            counts.DEBUG = 0;
+
+            const fragment = document.createDocumentFragment();
+
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                const { row, level } = createLogRow(item);
+                counts.ALL++;
+                if (counts[level] !== undefined) {
+                    counts[level]++;
+                }
+                fragment.appendChild(row);
+            }
+
+            terminal.appendChild(fragment);
+            updateCountBadges();
+
+            if (autoScroll && !isPaused) {
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+        }
+
+        function appendLogEntry(data) {
+            let item;
+            if (typeof data === 'string') {
+                try {
+                    item = JSON.parse(data);
+                } catch (err) {
+                    item = {
+                        ts: new Date().toTimeString().split(' ')[0],
+                        level: 'INFO',
+                        component: 'daemon',
+                        msg: data,
+                        raw: data
+                    };
+                }
+            } else {
+                item = data;
+            }
+
+            const { row, level } = createLogRow(item);
+
+            counts.ALL++;
+            if (counts[level] !== undefined) {
+                counts[level]++;
+            }
+            updateCountBadges();
+
+            terminal.appendChild(row);
+
+            // Bounded memory / DOM pruning
+            if (terminal.childNodes.length > 2000) {
+                const evicted = terminal.firstChild;
+                const evictedLvl = evicted.dataset ? evicted.dataset.level : null;
+                if (evictedLvl && counts[evictedLvl] !== undefined) {
+                    counts[evictedLvl] = Math.max(0, counts[evictedLvl] - 1);
+                }
+                counts.ALL = Math.max(0, counts.ALL - 1);
+                terminal.removeChild(evicted);
+                updateCountBadges();
+            }
+
+            if (autoScroll && !isPaused && !row.classList.contains('hidden')) {
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+        }
+
+        // SSE Connection
+        const eventSource = new EventSource('/api/v1/system/logs/stream');
+        eventSource.addEventListener('batch', (e) => handleLogBatch(e.data));
+        eventSource.onmessage = (e) => appendLogEntry(e.data);
+        eventSource.onerror = () => {
+            // Standard EventSource auto-reconnects on dropped connections
+        };
+
+        // Clean up connection immediately on navigate or refresh to avoid holding connection slots
+        window.addEventListener('beforeunload', () => {
+            if (eventSource) eventSource.close();
+        });
+        window.addEventListener('pagehide', () => {
+            if (eventSource) eventSource.close();
+        });
+
+        // Filter pills interaction
+        levelPills.forEach((pill) => {
+            pill.addEventListener('click', () => {
+                levelPills.forEach((p) => p.classList.remove('active'));
+                pill.classList.add('active');
+                activeLevel = pill.dataset.level;
+                refilterTerminal();
+            });
+        });
+
+        // Search interaction with debounce
+        let searchTimer = null;
+        logSearchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => {
+                searchQuery = e.target.value.trim().toLowerCase();
+                refilterTerminal();
+            }, 150);
+        });
+
+        function refilterTerminal() {
+            const rows = terminal.querySelectorAll('.log-row');
+            rows.forEach((row) => {
+                const lvl = row.dataset.level;
+                const text = row.dataset.search || '';
+                if (isRowVisible(lvl, text)) {
+                    row.classList.remove('hidden');
+                } else {
+                    row.classList.add('hidden');
+                }
+            });
+            if (autoScroll && !isPaused) {
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+        }
+
+        // Daemon level selector change
+        daemonLevelSelect.addEventListener('change', function (e) {
+            const newLevel = e.target.value;
+            fetch('/api/v1/system/log_level', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ level: newLevel })
+            })
+            .then(function (res) { return res.json(); })
+            .then(function (result) {
+                if (result.status === 'ok') {
+                    daemonLevelSelect.style.borderColor = 'var(--success)';
+                    setTimeout(function () { daemonLevelSelect.style.borderColor = ''; }, 1500);
+                } else {
+                    alert('Failed to update daemon log level: ' + (result.error || 'Unknown error'));
+                }
+            })
+            .catch(function (err) {
+                console.error('Failed to change log level:', err);
+                alert('Connection error while changing log level.');
+            });
+        });
+
+        // Action buttons
+        pauseBtn.addEventListener('click', () => {
+            isPaused = !isPaused;
+            pauseBtn.innerHTML = isPaused ? '<i class="fa-solid fa-play"></i> Resume' : '<i class="fa-solid fa-pause"></i> Pause';
+            pauseBtn.classList.toggle('active', isPaused);
+            if (isPaused) {
+                markPaused();
+            } else {
+                autoScroll = true;
+                markLive();
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+        });
+
+        terminal.addEventListener('scroll', () => {
+            if (isPaused) return;
+            const fromBottom = terminal.scrollHeight - terminal.scrollTop - terminal.clientHeight;
+            if (fromBottom > 50) {
+                autoScroll = false;
+                markPaused('USER SCROLL');
+            } else {
+                autoScroll = true;
+                markLive();
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            terminal.innerHTML = '';
+            counts.ALL = 0;
+            counts.INFO = 0;
+            counts.WARN = 0;
+            counts.ERROR = 0;
+            counts.DEBUG = 0;
+            updateCountBadges();
+        });
+
+        copyBtn.addEventListener('click', () => {
+            const visibleRows = terminal.querySelectorAll('.log-row:not(.hidden)');
+            const lines = Array.from(visibleRows).map((row) => {
+                const ts = row.querySelector('.log-ts')?.textContent || '';
+                const lvl = row.querySelector('.log-level-badge')?.textContent || '';
+                const comp = row.querySelector('.log-comp')?.textContent || '';
+                const msg = row.querySelector('.log-msg')?.textContent || '';
+                return `[${ts}] [${lvl}] ${comp} ${msg}`.trim();
+            });
+            navigator.clipboard.writeText(lines.join('\n')).then(() => {
+                const orig = copyBtn.innerHTML;
+                copyBtn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+                setTimeout(() => copyBtn.innerHTML = orig, 2000);
+            });
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            const fileSelect = document.getElementById('log-file-select');
+            const targetFile = fileSelect ? fileSelect.value : 'daemon.log';
+            window.location.href = '/api/v1/system/logs/download?file=' + encodeURIComponent(targetFile);
+        });
+
+        function confirmRestartDaemon() {
+            if (!confirm("Are you sure you want to restart the background daemon container? Ingestion and live streams will briefly pause for ~2 seconds.")) return;
+            var overlay = document.getElementById('restart-overlay');
+            var countdownEl = document.getElementById('restart-countdown');
+            if (overlay) overlay.style.display = 'flex';
+
+            fetch('/api/v1/system/restart', { method: 'POST' })
+                .catch(function() {});
+
+            var secondsLeft = 5;
+            var interval = setInterval(function() {
+                secondsLeft--;
+                if (countdownEl) {
+                    countdownEl.textContent = 'Reconnecting in ' + secondsLeft + ' seconds...';
+                }
+                if (secondsLeft <= 0) {
+                    clearInterval(interval);
+                    pollDaemonRestart();
+                }
+            }, 1000);
+        }
+
+        function pollDaemonRestart() {
+            var countdownEl = document.getElementById('restart-countdown');
+            if (countdownEl) countdownEl.textContent = 'Checking container status...';
+            var checkInterval = setInterval(function() {
+                fetch('/api/v1/system/logs/files')
+                    .then(function(r) {
+                        if (r.ok) {
+                            clearInterval(checkInterval);
+                            if (countdownEl) countdownEl.textContent = 'Reconnected! Refreshing page...';
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 500);
+                        }
+                    })
+                    .catch(function() {});
+            }, 1000);
+        }
+    </script>
+
+</body>
+
+</html>

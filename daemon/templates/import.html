@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import Data</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        /* Page-local styling */
+        .import-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-6);
+            align-items: start;
+        }
+        .config-row {
+            margin-bottom: var(--space-4);
+        }
+        .config-row label {
+            display: block;
+            margin-bottom: var(--space-1);
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.9em;
+        }
+        .status-box {
+            margin-top: var(--space-2);
+            padding: var(--space-2) var(--space-3);
+            background: var(--surface-inset);
+            border-radius: var(--radius-md);
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+
+<body>
+    {% include "sidebar.html" %}
+
+    <div class="container">
+        <header class="page-header"><h1 class="panel-h1">Import Data</h1></header>
+
+        <div class="import-grid">
+
+            <!-- COLUMN 1: Bulk Fetch -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="panel-h3" style="margin:0"><i class="fas fa-cloud-download-alt"></i> Bulk Fetch NightScout Data</h3>
+                </div>
+                <div class="card-body">
+                    <div class="hint" style="margin-bottom: var(--space-3);">
+                        This will re-pull all data in the range, potentially filling gaps. Any duplicates found
+                        will be discarded. No data is ever deleted.
+                    </div>
+
+                    <div class="config-row">
+                        <label for="bf-manual-start">Start Date</label>
+                        <input type="date" id="bf-manual-start" class="form-input">
+                    </div>
+                    <div class="config-row">
+                        <label for="bf-manual-end">End Date</label>
+                        <input type="date" id="bf-manual-end" class="form-input">
+                    </div>
+
+                    <div id="backfill-status" class="status-box" style="display:none;">
+                        <span id="backfill-msg">Ready</span>
+                    </div>
+
+                    <div style="display: flex; gap: var(--space-2); margin-top: var(--space-4);">
+                        <button type="button" class="btn btn-success" id="btn-bf-start"
+                            onclick="startManualBackfill()">
+                            <i class="fas fa-play"></i> Start Bulk Fetch
+                        </button>
+                        <button type="button" class="btn btn-danger" id="btn-bf-cancel" onclick="cancelBackfill()"
+                            style="display:none">
+                            <i class="fas fa-stop"></i> Stop Fetching
+                        </button>
+                        <button type="button" class="btn btn-secondary"
+                            onclick="resetBackfillRange()">Cancel</button>
+                    </div>
+
+                    <div class="hint" style="margin-top: var(--space-4);">
+                        Fetch pacing (delay between chunks, page size, chunk sizes) is configured on the
+                        <a href="/settings" class="panel-link">Settings</a> page.
+                    </div>
+                </div>
+            </div>
+
+            <!-- COLUMN 2: Bulk Import status -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="panel-h3" style="margin:0"><i class="fas fa-server"></i> Bulk Import</h3>
+                </div>
+                <div class="card-body">
+                    <div class="score-block" style="text-align: left;">
+                        <div class="score-label">Status</div>
+                        <div class="score-value" id="import-bf-status" style="font-size: 2em;">...</div>
+                        <div class="hint" id="import-bf-progress" style="margin-top: var(--space-2);">Loading...</div>
+                    </div>
+
+                    <div style="margin-top: var(--space-5);">
+                        <button type="button" class="btn btn-danger" id="btn-import-stop"
+                            onclick="confirmStopBackfill()">
+                            <i class="fas fa-stop-circle"></i> Stop Backfill
+                        </button>
+                    </div>
+
+                    <div class="hint" style="margin-top: var(--space-5); padding-top: var(--space-3); border-top: 1px solid var(--border-color);">
+                        This is a quick-glance view. A more complete status — polling
+                        heartbeat, watchdog health, and detailed sync logs — is shown on the
+                        <a href="/logs" class="panel-link">Status &amp; Logs</a> page.
+                    </div>
+                </div>
+            </div>
+
+        </div>
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+
+    <script>
+        // Toast notification (no blocking alert)
+        function showToast(msg, isError = false) {
+            const existing = document.getElementById('settings-toast');
+            if (existing) existing.remove();
+
+            const t = document.createElement('div');
+            t.id = 'settings-toast';
+            t.textContent = msg;
+            Object.assign(t.style, {
+                position: 'fixed', bottom: '24px', right: '24px',
+                background: isError ? 'var(--danger)' : 'var(--success)',
+                color: '#fff', padding: '10px 20px', borderRadius: '6px',
+                fontSize: '0.9em', fontWeight: 'bold',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.4)',
+                zIndex: '9999',
+                transition: 'opacity 0.4s'
+            });
+            document.body.appendChild(t);
+            setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 3000);
+        }
+
+        function resetBackfillRange() {
+            document.getElementById('bf-manual-start').value = '';
+            document.getElementById('bf-manual-end').value = '';
+        }
+
+        async function startManualBackfill() {
+            const start = document.getElementById('bf-manual-start').value;
+            const end = document.getElementById('bf-manual-end').value;
+            if (!start || !end) return showToast('Select a date range first.', true);
+
+            const r = await fetch('/backfill/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ start, end })
+            });
+            const res = await r.json();
+            if (res.status === 'ok') {
+                showToast('Bulk fetch started');
+                loadImportStatus();
+            } else {
+                showToast('Error: ' + res.message, true);
+            }
+        }
+
+        async function cancelBackfill() {
+            const r = await fetch('/backfill/cancel', { method: 'POST' });
+            const res = await r.json();
+            if (res.status === 'ok') showToast('Cancellation signal sent');
+            loadImportStatus();
+        }
+
+        // ----- Bulk Import status card (same shape as the Status & Logs page) -----
+        async function loadImportStatus() {
+            try {
+                const r = await fetch('/api/stats');
+                const data = await r.json();
+                const running = data.status.backfill.running;
+
+                const statusEl = document.getElementById('import-bf-status');
+                statusEl.innerText = running ? 'ACTIVE' : 'IDLE';
+                statusEl.className = 'stat-value ' + (running ? 'status-warn' : 'status-ok');
+                document.getElementById('import-bf-progress').innerText = data.status.backfill.progress || 'No active task';
+
+                // Keep the Bulk Fetch card's own Start/Stop buttons in sync with
+                // actual server state, not just whichever button was last clicked.
+                document.getElementById('btn-bf-start').style.display = running ? 'none' : '';
+                document.getElementById('btn-bf-cancel').style.display = running ? '' : 'none';
+            } catch (e) { console.error('Import status load error:', e); }
+        }
+
+        function confirmStopBackfill() {
+            fetch('/api/stats').then(r => r.json()).then(data => {
+                if (!data.status.backfill.running) {
+                    showToast('No backfill currently in progress.', true);
+                    return;
+                }
+                if (confirm('Stop the current backfill operation? It can be resumed later from wherever it left off.')) {
+                    cancelBackfill();
+                }
+            });
+        }
+
+        loadImportStatus();
+        setInterval(loadImportStatus, 10000);
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HbA1c - ns-monitor</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        @page {
+            size: landscape;
+            margin: 8mm 10mm;
+        }
+        @media print {
+            body {
+                background: #fff !important;
+                color: #000 !important;
+            }
+            .sidebar, .page-header, .panel-header-right, #custom-gmi-panel, .page-footer, .view-pill-container, .settings-menu-container {
+                display: none !important;
+            }
+            .container {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            .card {
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+            }
+            #hba1c-chart-node {
+                height: 550px !important;
+                width: 100% !important;
+            }
+        }
+        .custom-gmi-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(240px, 0.9fr);
+            gap: var(--space-5);
+            padding: var(--space-3);
+            align-items: start;
+        }
+        .custom-gmi-copy,
+        .custom-gmi-formulas {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        .custom-gmi-copy p,
+        .custom-gmi-formulas p {
+            margin: 0 0 var(--space-2);
+        }
+        .custom-gmi-formulas code {
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+        .custom-gmi-controls {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: var(--space-3);
+        }
+        .custom-gmi-controls label {
+            display: block;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+        .custom-gmi-controls input {
+            width: 100%;
+        }
+        .custom-gmi-actions {
+            grid-column: 1 / -1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .custom-gmi-status {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+        }
+        @media (max-width: 900px) {
+            .custom-gmi-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    {% include "sidebar.html" %}
+
+    <div class="container container-fluid">
+        <header class="page-header">
+            <h1 class="panel-h1">Longitudinal HbA1c</h1>
+            {% set has_compare = false %}
+            {% set long_term_presets = true %}
+            {% set date_state_namespace = 'hba1c' %}
+            {% include '_header_date_selector.html' %}
+        </header>
+
+        <div class="card" id="hba1c-panel">
+            <div class="panel-header">
+                <div class="panel-header-left">
+                    <h2 id="hba1c-chart-title-text">HbA1c & Estimated Series</h2>
+                </div>
+                <div class="panel-header-right">
+                    <span id="hba1c-date-range" class="text-muted" style="margin-right: 12px; font-size: 0.9em;"></span>
+                    <div class="view-pill-container">
+                        <button type="button" class="view-pill-btn" id="view-pill-btn" onclick="toggleViewDropdown(event)" title="Switch or manage views">
+                            <span id="active-view-label">Select View</span>
+                            <i class="fa-solid fa-chevron-down" style="margin-left: 6px; font-size: 0.75em; opacity: 0.7;"></i>
+                        </button>
+                        <div class="view-dropdown-popover" id="view-dropdown-popover" onclick="event.stopPropagation()">
+                            <div class="view-list" id="all-views-list"></div>
+                            <div class="view-save-section">
+                                <div id="view-save-prompt-row">
+                                    <button type="button" class="btn-save-view" onclick="showSaveViewInput()">
+                                        <i class="fa-solid fa-plus"></i> Save Current View...
+                                    </button>
+                                </div>
+                                <div id="view-save-input-row" style="display: none;" class="view-save-input-row">
+                                    <input type="text" id="new-view-name" placeholder="View name..." maxlength="25" onkeydown="if(event.key==='Enter') saveCurrentView(); if(event.key==='Escape') cancelSaveView();" />
+                                    <button type="button" class="btn-confirm-save" onclick="saveCurrentView()">Save</button>
+                                    <button type="button" class="btn-cancel-save" onclick="cancelSaveView()"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="panel-icon-btn" id="hba1c-print-btn" onclick="printHba1cPanel()" title="Print HbA1c Chart">
+                        <i class="fa-solid fa-print"></i>
+                    </button>
+                    <div class="settings-menu-container">
+                        <button type="button" class="panel-icon-btn" id="settings-trigger" onclick="toggleHba1cSettings(event)" title="Chart display settings">
+                            <i class="fa-solid fa-gear"></i>
+                        </button>
+                        <div class="settings-popover" id="settings-popover" onclick="event.stopPropagation()" style="min-width: 330px;">
+                            <div class="settings-popover-title">
+                                <span id="settings-popover-title">HbA1c Display Settings</span>
+                                <button type="button" class="btn-reset-axis" onclick="toggleHba1cSettings(event)">✕</button>
+                            </div>
+                            <div class="settings-row" style="margin-top: 8px;">
+                                <input type="text" id="hba1c-overlay-search" class="form-input form-input-full" placeholder="Search series...">
+                            </div>
+                            <div class="overlay-list-actions">
+                                <label class="overlay-list-toggle-all-label">
+                                    <input type="checkbox" id="hba1c-overlay-toggle-all" class="overlay-list-checkbox overlay-list-toggle-all">
+                                    <span>Select all</span>
+                                </label>
+                                <a href="/settings?tab=ranges&subtab=hba1c" class="btn-link">HbA1c Settings &rsaquo;</a>
+                            </div>
+                            <div class="overlay-list" id="hba1c-overlay-list"></div>
+                            <div class="settings-popover-title" style="margin-top: 14px; margin-bottom: 8px;">Axis Scale Limits (Min / Max)</div>
+                            <div id="hba1c-axis-bounds-controls"></div>
+                            <div class="settings-note" style="margin-top: 8px; font-size: 0.85em; color: var(--text-secondary);">Ticking series updates chart immediately. Click ✎ to customize line style, thickness, color, opacity, or save as global default.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Context Menu (Right Click on any View Tab) -->
+            <div class="tab-context-menu" id="tab-context-menu" onclick="event.stopPropagation()">
+                <div class="tab-context-header" id="tab-context-header">View Options</div>
+                <div class="tab-context-item" id="ctx-update" onclick="onContextUpdate()">
+                    <i class="fa-solid fa-floppy-disk"></i> Update with current setup
+                </div>
+                <div class="tab-context-item" id="ctx-duplicate" onclick="onContextDuplicate()">
+                    <i class="fa-solid fa-copy"></i> Duplicate as new view...
+                </div>
+                <div class="tab-context-item" id="ctx-rename" onclick="onContextRename()">
+                    <i class="fa-solid fa-pen-to-square"></i> Rename view...
+                </div>
+                <div class="tab-context-item danger" id="ctx-delete" onclick="onContextDelete()">
+                    <i class="fa-solid fa-trash"></i> Delete view
+                </div>
+            </div>
+            
+            <div class="agp-container" style="position: relative;">
+                <div class="axis-pillars-container" id="hba1c-axis-pillars"></div>
+                <div id="hba1c-chart-node" style="width: 100%; height: 520px;"></div>
+            </div>
+        </div>
+        
+        <div class="card" id="custom-gmi-panel">
+            <div class="panel-header">
+                <div class="panel-header-left">
+                    <h2>Custom GMI Parameters</h2>
+                </div>
+            </div>
+            <div class="custom-gmi-grid">
+                <div class="custom-gmi-copy">
+                    <p>GMI is a population estimate: people with the same average glucose can have different laboratory HbA1c results because of individual differences in red-cell lifespan and glycation.</p>
+                    <p>Best Fit uses the laboratory HbA1c results in the date range currently displayed, paired with the 90-day average glucose available for each result. It does not use your entire history unless that is the range you are viewing. You can also enter your own constants and select Apply to update the chart.</p>
+                    <p>HbA1c results must be entered in the <a href="/diary">Diary</a> to be included here.</p>
+                </div>
+                <div class="custom-gmi-formulas">
+                    <p><strong>Standard GMI</strong><br><code>GMI (%) = 3.31 + 0.4306 × mean glucose (mmol/L)</code></p>
+                    <p><strong>Standard eHbA1c</strong><br><code>eHbA1c (%) = (mean glucose (mmol/L) + 2.59) ÷ 1.59</code></p>
+                    <p><strong>Your Custom GMI</strong><br><code>HbA1c (%) = A + B × 90-day mean glucose (mmol/L)</code></p>
+                </div>
+                <div class="custom-gmi-controls">
+                    <div>
+                        <label for="gmi-const-a">Constant A (HbA1c % offset)</label>
+                        <input type="number" id="gmi-const-a" class="form-input" step="0.0001" value="{{ custom_gmi_constants.const_a }}">
+                    </div>
+                    <div>
+                        <label for="gmi-const-b">Constant B (HbA1c % per mmol/L)</label>
+                        <input type="number" id="gmi-const-b" class="form-input" step="0.0001" value="{{ custom_gmi_constants.const_b }}">
+                    </div>
+                    <div class="custom-gmi-actions">
+                    <button class="btn" onclick="applyCustomGMI()">Apply</button>
+                    <button class="btn btn-secondary" onclick="calculateBestFit()">Calculate Best Fit</button>
+                        <span id="custom-gmi-status" class="custom-gmi-status" aria-live="polite"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+    
+    <script>
+        window.RAW_HBA1C_DATA = {{ hba1c_records | tojson | safe }};
+    </script>
+    <script src="/static/js/ns-date-selector.js"></script>
+    <script src="/static/js/ns-view-manager.js"></script>
+    <script src="/static/js/ns-axis-pillars.js"></script>
+    <script src="/static/js/ns-chart-customizer.js"></script>
+    <script src="/static/js/registries/hba1c.js"></script>
+    <script src="/static/js/ns-orchestrator.js"></script>
+
+    <script>
+        var HBA1C_PAGE = 'hba1c';
+        var _activeMetrics = (window.NS_HBA1C_DEFAULTS && window.NS_HBA1C_DEFAULTS.defaultActive) ? window.NS_HBA1C_DEFAULTS.defaultActive.slice() : ['hba1c_lab', 'gmi_90d', 'ehba1c_90d'];
+        var _hba1cLivePreviewOverrides = null;
+        var HBA1C_DEBUG_ENABLED = false;
+        var _hba1cDebugLines = [];
+        if (HBA1C_DEBUG_ENABLED) {
+            try { _hba1cDebugLines = JSON.parse(sessionStorage.getItem('ns_hba1c_debug_trace') || '[]'); } catch (ignore) {}
+        }
+
+        function hba1cTrace(event, detail) {
+            if (!HBA1C_DEBUG_ENABLED) return;
+            var line = {
+                at: new Date().toISOString().slice(11, 23),
+                event: event,
+                detail: detail || {}
+            };
+            _hba1cDebugLines.push(line);
+            _hba1cDebugLines = _hba1cDebugLines.slice(-150);
+            sessionStorage.setItem('ns_hba1c_debug_trace', JSON.stringify(_hba1cDebugLines));
+            console.info('[HbA1c trace]', line);
+            var output = document.getElementById('hba1c-debug-output');
+            if (output) {
+                output.textContent = _hba1cDebugLines.map(function(entry) {
+                    return entry.at + '  ' + entry.event + '  ' + JSON.stringify(entry.detail);
+                }).join('\n');
+                output.scrollTop = output.scrollHeight;
+            }
+        }
+
+        window.copyHba1cDebugTrace = function(event) {
+            if (event) event.preventDefault();
+            var text = _hba1cDebugLines.map(function(entry) { return JSON.stringify(entry); }).join('\n');
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).catch(function() {});
+            }
+            hba1cTrace('trace copied');
+        };
+
+        if (HBA1C_DEBUG_ENABLED) {
+            window.addEventListener('error', function(event) {
+                hba1cTrace('window error', { message: event.message, source: event.filename, line: event.lineno });
+            });
+            window.addEventListener('unhandledrejection', function(event) {
+                hba1cTrace('unhandled rejection', { reason: String(event.reason) });
+            });
+        }
+        
+        window.getActiveMetrics = function() {
+            return _activeMetrics;
+        };
+
+        window.setActiveMetrics = function(arr) {
+            if (Array.isArray(arr)) {
+                _activeMetrics = arr.slice();
+            }
+        };
+
+        function setCustomGmiStatus(message, isError) {
+            var status = document.getElementById('custom-gmi-status');
+            if (!status) return;
+            status.textContent = message || '';
+            status.style.color = isError ? 'var(--danger)' : 'var(--text-secondary)';
+        }
+
+        function readCustomGmiConstants() {
+            var constA = parseFloat(document.getElementById('gmi-const-a').value);
+            var constB = parseFloat(document.getElementById('gmi-const-b').value);
+            if (!Number.isFinite(constA) || !Number.isFinite(constB)) return null;
+            return { const_a: constA, const_b: constB };
+        }
+
+        function renderCustomGmiWithCurrentConstants() {
+            var metrics = window.getActiveMetrics ? window.getActiveMetrics().slice() : [];
+            if (metrics.indexOf('custom_gmi') === -1) {
+                metrics.push('custom_gmi');
+                window.setActiveMetrics(metrics);
+                updateHba1cSettingsUi();
+            }
+            if (renderCurrentHba1c) renderCurrentHba1c();
+            else window.onDateChange(document.getElementById('start_date').value, document.getElementById('end_date').value);
+        }
+
+        function applyCustomGMI() {
+            var constants = readCustomGmiConstants();
+            if (!constants) {
+                setCustomGmiStatus('Enter valid numeric constants before applying.', true);
+                return;
+            }
+            hba1cTrace('custom GMI applied', constants);
+            renderCustomGmiWithCurrentConstants();
+            setCustomGmiStatus('Saving personalised model…');
+            fetch('/api/v1/hba1c_custom_gmi', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(constants)
+            })
+                .then(function(response) {
+                    if (!response.ok) throw new Error('HTTP ' + response.status);
+                    return response.json();
+                })
+                .then(function() {
+                    setCustomGmiStatus('Personalised model saved and plotted.');
+                })
+                .catch(function(error) {
+                    console.error('Failed to save Custom GMI constants:', error);
+                    setCustomGmiStatus('The chart updated, but the personalised model could not be saved.', true);
+                });
+        }
+
+        function calculateBestFit() {
+            var startDate = document.getElementById('start_date').value;
+            var endDate = document.getElementById('end_date').value;
+            setCustomGmiStatus('Calculating from valid lab / 90-day-average pairs in the displayed range…');
+            fetch('/api/v1/hba1c_custom_gmi/pairs?' + new URLSearchParams({
+                start_date: startDate,
+                end_date: endDate
+            }).toString())
+                .then(function(response) {
+                    if (!response.ok) throw new Error('HTTP ' + response.status);
+                    return response.json();
+                })
+                .then(function(payload) {
+                    var points = payload.data || [];
+                    if (points.length < 2) {
+                        throw new Error('At least two lab results with an exact corresponding 90-day average are required.');
+                    }
+                    var sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+                    points.forEach(function(point) {
+                        var x = parseFloat(point.mean_mmol_90d);
+                        var y = parseFloat(point.hba1c_percent);
+                        sumX += x;
+                        sumY += y;
+                        sumXY += x * y;
+                        sumX2 += x * x;
+                    });
+                    var n = points.length;
+                    var denominator = n * sumX2 - sumX * sumX;
+                    if (Math.abs(denominator) < 1e-9) {
+                        throw new Error('The matched 90-day glucose values have no usable variation.');
+                    }
+                    var slope = (n * sumXY - sumX * sumY) / denominator;
+                    var intercept = (sumY - slope * sumX) / n;
+                    document.getElementById('gmi-const-a').value = intercept.toFixed(4);
+                    document.getElementById('gmi-const-b').value = slope.toFixed(4);
+                    setCustomGmiStatus('Best fit calculated from ' + n + ' historical pairs. Applying…');
+                    applyCustomGMI();
+                })
+                .catch(function(error) {
+                    console.error('Failed to calculate Custom GMI best fit:', error);
+                    setCustomGmiStatus(error.message || 'Could not calculate the personalised model.', true);
+                });
+        }
+
+        var HBA1C_AXIS_INFO = {
+            group: 'hba1c', name: 'HbA1c / GMI (%)', decimals: 1,
+            defaultMin: 4.0, defaultMax: 14.0, color: '#e74c3c'
+        };
+
+        function getHba1cBounds() {
+            if (window.NSAxisPillars && typeof NSAxisPillars.getEffectiveBounds === 'function') {
+                return NSAxisPillars.getEffectiveBounds(HBA1C_AXIS_INFO);
+            }
+            return { min: 4.0, max: 14.0 };
+        }
+
+        function updateHba1cAxisPillars() {
+            if (!window.NSAxisPillars) return;
+            var container = document.getElementById('hba1c-axis-pillars');
+            if (!container) return;
+            if (container.firstChild) return;
+            
+            var bounds = getHba1cBounds();
+            var pillar = NSAxisPillars.createPillar(HBA1C_AXIS_INFO, 8, 20, 52, 440);
+            pillar.style.zIndex = '15';
+            container.appendChild(pillar);
+        }
+
+        function updateHba1cAxisBoundsUi() {
+            var container = document.getElementById('hba1c-axis-bounds-controls');
+            if (!container) return;
+            var min = NSAxisPillars.getCustomBound('hba1c', 'min');
+            var max = NSAxisPillars.getCustomBound('hba1c', 'max');
+            container.innerHTML = '<div class="axis-bounds-row"><span style="color:#e74c3c;font-weight:600;">HbA1c / GMI (%)</span><div class="axis-bounds-inputs"><input type="number" step="0.1" min="4" max="20" class="axis-bound-input" placeholder="Min" value="' + (min !== null ? min : '') + '"><span style="color:#666;">–</span><input type="number" step="0.1" min="4" max="20" class="axis-bound-input" placeholder="Max" value="' + (max !== null ? max : '') + '"><button type="button" class="btn-reset-axis" title="Reset axis to auto">↺</button></div></div>';
+            var inputs = container.querySelectorAll('input');
+            inputs[0].onchange = function() { NSAxisPillars.setCustomBound('hba1c', 'min', this.value, true); };
+            inputs[1].onchange = function() { NSAxisPillars.setCustomBound('hba1c', 'max', this.value, true); };
+            container.querySelector('button').onclick = function() { NSAxisPillars.resetBound('hba1c'); };
+        }
+
+        function applyHba1cAxisBoundsToChart() {
+            if (!chartInstance) {
+                hba1cTrace('axis redraw skipped', { reason: 'chart unavailable' });
+                return;
+            }
+            var bounds = getHba1cBounds();
+            hba1cTrace('axis redraw requested', bounds);
+            // Keep the complete HbA1c option in lockstep with the adjusted
+            // axis, as Patterns and Trends do. Partial setOption updates can
+            // leave Safari's canvas with old display-list geometry.
+            if (renderCurrentHba1c) renderCurrentHba1c();
+            else chartInstance.setOption({ yAxis: [{ min: bounds.min, max: bounds.max }] });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            if (HBA1C_DEBUG_ENABLED) {
+                document.getElementById('hba1c-debug-panel').hidden = false;
+                hba1cTrace('debug enabled', { href: window.location.href, userAgent: navigator.userAgent });
+            }
+            if (window.NSAxisPillars) {
+                NSAxisPillars.init({
+                    clamp: { hba1c: { min: 4.0, max: 20.0 } },
+                    storageKey: 'ns_hba1c_yaxis_bounds',
+                    onLiveUpdate: function() {
+                        // Match Patterns/Trends/Trace: adjust the existing
+                        // chart synchronously rather than fetching on drag.
+                        hba1cTrace('axis live update');
+                        applyHba1cAxisBoundsToChart();
+                    },
+                    onCommit: function() {
+                        hba1cTrace('axis committed');
+                        if (window.NSViews) NSViews.markViewDirty();
+                        applyHba1cAxisBoundsToChart();
+                        updateHba1cAxisBoundsUi();
+                    }
+                });
+            }
+
+            if (window.NSViews) {
+                NSViews.init({
+                    page: HBA1C_PAGE,
+                    activeViewKey: 'ns_hba1c_active_view',
+                    defaultViews: [
+                        {
+                            id: 'hba1c_default',
+                            name: 'Standard HbA1c View',
+                            isDefault: true,
+                            metrics: ['hba1c_lab', 'gmi_90d', 'ehba1c_90d']
+                        }
+                    ],
+                    titleElId: 'hba1c-chart-title-text',
+                    defaultTitle: 'HbA1c & Estimated Series',
+                    settingsPopoverId: 'settings-popover',
+                    settingsBtnId: 'settings-trigger',
+                    captureState: function() {
+                        var bounds = window.NSAxisPillars ? NSAxisPillars.getAllBounds() : null;
+                        return {
+                            metrics: window.getActiveMetrics(),
+                            bounds: bounds
+                        };
+                    },
+                    applyState: function(view) {
+                        var payload = view.payload || view;
+                        if (payload.metrics) {
+                            window.setActiveMetrics(payload.metrics);
+                        }
+                        if (payload.bounds && window.NSAxisPillars) {
+                            NSAxisPillars.setAllBounds(payload.bounds);
+                        }
+                        updateHba1cSettingsUi();
+                        updateHba1cAxisPillars();
+                        if (renderCurrentHba1c) renderCurrentHba1c();
+                        else window.onDateChange(document.getElementById('start_date').value, document.getElementById('end_date').value);
+                    }
+                });
+            }
+            updateHba1cAxisBoundsUi();
+
+            var renderInitialHba1c = function() {
+                window.onDateChange(
+                    document.getElementById('start_date').value,
+                    document.getElementById('end_date').value
+                );
+            };
+            if (window.NSChartCustomizer) {
+                // Same startup order as Patterns, Trends and Trace.
+                NSChartCustomizer.loadGlobalSettings(HBA1C_PAGE, renderInitialHba1c);
+            } else {
+                renderInitialHba1c();
+            }
+        });
+
+        function toggleHba1cSettings(event) {
+            if (event) event.stopPropagation();
+            const popover = document.getElementById('settings-popover');
+            if (popover) {
+                const opening = !popover.classList.contains('active');
+                if (opening) {
+                    const viewDropdown = document.getElementById('view-dropdown-popover');
+                    if (viewDropdown) viewDropdown.classList.remove('active');
+                } else {
+                    if (window.NSChartCustomizer && typeof window.NSChartCustomizer.closeStylePopover === 'function') {
+                        NSChartCustomizer.closeStylePopover();
+                    }
+                }
+                updateHba1cSettingsUi();
+                popover.classList.toggle('active');
+            }
+        }
+
+        function updateHba1cSettingsUi() {
+            updateHba1cAxisBoundsUi();
+            const activeIds = window.getActiveMetrics ? window.getActiveMetrics() : [];
+            const searchEl = document.getElementById('hba1c-overlay-search');
+            const searchTerm = searchEl ? searchEl.value.toLowerCase() : '';
+
+            const toggleAllEl = document.getElementById('hba1c-overlay-toggle-all');
+            if (toggleAllEl) {
+                const totalCount = NS_HBA1C_REGISTRY.length;
+                const activeCount = activeIds.length;
+                if (activeCount === totalCount && totalCount > 0) {
+                    toggleAllEl.checked = true;
+                    toggleAllEl.classList.remove('is-partial');
+                } else if (activeCount > 0) {
+                    toggleAllEl.checked = true;
+                    toggleAllEl.classList.add('is-partial');
+                } else {
+                    toggleAllEl.checked = false;
+                    toggleAllEl.classList.remove('is-partial');
+                }
+            }
+
+            if (window.NSChartCustomizer) {
+                NSChartCustomizer.renderPopoverChecklist('hba1c-overlay-list', {
+                    page: HBA1C_PAGE,
+                    registry: NS_HBA1C_REGISTRY,
+                    activeIds: activeIds,
+                    searchTerm: searchTerm,
+                    onToggle: function(metricId, isChecked) {
+                        hba1cTrace('series toggled', { metricId: metricId, enabled: isChecked });
+                        let metrics = window.getActiveMetrics ? window.getActiveMetrics() : [];
+                        if (isChecked && !metrics.includes(metricId)) metrics.push(metricId);
+                        if (!isChecked && metrics.includes(metricId)) metrics = metrics.filter(m => m !== metricId);
+                        if (window.setActiveMetrics) window.setActiveMetrics(metrics);
+                        if (window.NSViews) NSViews.markViewDirty();
+                        // Visibility is a projection of data already held for
+                        // this range. Re-render it synchronously; do not route
+                        // through the fetch/cache layer.
+                        if (renderCurrentHba1c) renderCurrentHba1c();
+                        else window.onDateChange(document.getElementById('start_date').value, document.getElementById('end_date').value);
+                    },
+                    onEdit: function(metricId, iconEl) {
+                        const m = NS_HBA1C_REGISTRY.find(item => item.id === metricId);
+                        if (!m) return;
+                        let activeView = window.NSViews ? window.NSViews.getActiveView() : null;
+                        if (!activeView && window.NSViews && typeof window.NSViews.getAllViews === 'function') {
+                            const all = window.NSViews.getAllViews();
+                            if (all && all.length) activeView = all[0];
+                        }
+                        const viewOverrides = (activeView && (activeView.styles || (activeView.payload && activeView.payload.styles))) || {};
+                        NSChartCustomizer.openStylePopover(iconEl, {
+                            page: HBA1C_PAGE,
+                            metricId: metricId,
+                            registryItem: m,
+                            viewOverrides: viewOverrides,
+                            mode: 'view',
+                            onPreview: function(mid, previewStyle) {
+                                hba1cTrace('style preview', { metricId: mid, active: !!previewStyle });
+                                if (previewStyle) {
+                                    if (!_hba1cLivePreviewOverrides) _hba1cLivePreviewOverrides = {};
+                                    _hba1cLivePreviewOverrides[mid] = previewStyle;
+                                } else if (_hba1cLivePreviewOverrides) {
+                                    delete _hba1cLivePreviewOverrides[mid];
+                                }
+                                // The provider data is already cached for the
+                                // current range, so this redraw is immediate.
+                                if (renderCurrentHba1c) renderCurrentHba1c();
+                                else window.onDateChange(document.getElementById('start_date').value, document.getElementById('end_date').value);
+                            },
+                            onSaveView: function(mid, updatedStyle) {
+                                hba1cTrace('style saved to view', { metricId: mid });
+                                _hba1cLivePreviewOverrides = null;
+                                var curView = window.NSViews ? NSViews.getActiveView() : activeView;
+                                if (!curView && window.NSViews && typeof window.NSViews.getAllViews === 'function') {
+                                    var views = window.NSViews.getAllViews();
+                                    if (views && views.length) curView = views[0];
+                                }
+                                if (curView) {
+                                    if (!curView.styles) curView.styles = {};
+                                    curView.styles[mid] = updatedStyle;
+                                    if (!curView.payload) curView.payload = {};
+                                    curView.payload.styles = curView.styles;
+                                    if (window.NSViews && typeof window.NSViews.saveActiveView === 'function') {
+                                        window.NSViews.saveActiveView();
+                                    } else if (window.NSViews) {
+                                        NSViews.markViewDirty();
+                                    }
+                                }
+                                updateHba1cSettingsUi();
+                                if (renderCurrentHba1c) renderCurrentHba1c();
+                                else window.onDateChange(document.getElementById('start_date').value, document.getElementById('end_date').value);
+                            },
+                            onSaveGlobal: function(mid, updatedStyle, cascadeIds) {
+                                hba1cTrace('style saved globally', { metricId: mid });
+                                _hba1cLivePreviewOverrides = null;
+                                var curView = window.NSViews ? NSViews.getActiveView() : activeView;
+                                if (curView && cascadeIds && cascadeIds.includes(parseInt(curView.id, 10))) {
+                                    if (curView.styles) delete curView.styles[mid];
+                                    if (curView.payload && curView.payload.styles) delete curView.payload.styles[mid];
+                                }
+                                updateHba1cSettingsUi();
+                                if (renderCurrentHba1c) renderCurrentHba1c();
+                                else window.onDateChange(document.getElementById('start_date').value, document.getElementById('end_date').value);
+                            },
+                            onRestoreView: function(mid) {
+                                hba1cTrace('style restored for view', { metricId: mid });
+                                _hba1cLivePreviewOverrides = null;
+                                var curView = window.NSViews ? NSViews.getActiveView() : activeView;
+                                if (curView) {
+                                    if (curView.styles) delete curView.styles[mid];
+                                    if (curView.payload && curView.payload.styles) delete curView.payload.styles[mid];
+                                    if (window.NSViews && typeof window.NSViews.saveActiveView === 'function') {
+                                        window.NSViews.saveActiveView();
+                                    }
+                                }
+                                updateHba1cSettingsUi();
+                                if (renderCurrentHba1c) renderCurrentHba1c();
+                            },
+                            onAfterRestoreGlobal: function(mid) {
+                                hba1cTrace('global style restored', { metricId: mid });
+                                _hba1cLivePreviewOverrides = null;
+                                updateHba1cSettingsUi();
+                                if (renderCurrentHba1c) renderCurrentHba1c();
+                            }
+                        });
+                    }
+                });
+            }
+        }
+
+        document.getElementById('hba1c-overlay-search')?.addEventListener('input', function() {
+            updateHba1cSettingsUi();
+        });
+
+        document.getElementById('hba1c-overlay-toggle-all')?.addEventListener('change', function(e) {
+            const isChecked = e.target.checked;
+            hba1cTrace('all series toggled', { enabled: isChecked });
+            const newActive = isChecked ? NS_HBA1C_REGISTRY.map(m => m.id) : [];
+            if (window.setActiveMetrics) window.setActiveMetrics(newActive);
+            if (window.NSViews) NSViews.markViewDirty();
+            updateHba1cSettingsUi();
+            if (renderCurrentHba1c) renderCurrentHba1c();
+            else window.onDateChange(document.getElementById('start_date').value, document.getElementById('end_date').value);
+        });
+
+        document.addEventListener('click', function(e) {
+            const popover = document.getElementById('settings-popover');
+            const trigger = document.getElementById('settings-trigger');
+            if (!popover || !popover.classList.contains('active')) return;
+            if (popover.contains(e.target) || (trigger && trigger.contains(e.target))) return;
+            if (e.target.closest && e.target.closest('.metric-style-popover')) return;
+            popover.classList.remove('active');
+            if (window.NSChartCustomizer && typeof window.NSChartCustomizer.closeStylePopover === 'function') {
+                NSChartCustomizer.closeStylePopover();
+            }
+        });
+
+        function printHba1cPanel() {
+            var settingsPopover = document.getElementById('settings-popover');
+            if (settingsPopover) settingsPopover.classList.remove('active');
+            var viewDropdown = document.getElementById('view-dropdown-popover');
+            if (viewDropdown) viewDropdown.classList.remove('active');
+            window.print();
+        }
+
+        let chartInstance = null;
+        var hba1cRenderRequest = 0;
+        // Captures the current range's fetched data as a synchronous renderer,
+        // exactly like the data buffers used by Patterns, Trends and Trace.
+        var renderCurrentHba1c = null;
+        var _hba1cQueuedDateRange = null;
+        var _hba1cDateRenderPending = false;
+
+        // The common selector broadcasts its state change before it invokes a
+        // page hook.  Listen to that state change directly, then coalesce the
+        // legacy hook which follows it in the same turn.  A cached provider
+        // response must still pass through onDateChange and setOption.
+        function queueHba1cDateRender(startStr, endStr, source) {
+            _hba1cQueuedDateRange = { start: startStr, end: endStr, source: source };
+            hba1cTrace('date refresh queued', _hba1cQueuedDateRange);
+            if (_hba1cDateRenderPending) return;
+            _hba1cDateRenderPending = true;
+            window.setTimeout(function() {
+                var range = _hba1cQueuedDateRange;
+                _hba1cQueuedDateRange = null;
+                _hba1cDateRenderPending = false;
+                if (!range || !range.start || !range.end) return;
+                hba1cTrace('date refresh dispatched', range);
+                window.onDateChange(range.start, range.end);
+            }, 0);
+        }
+
+        window.addEventListener('ns-date-change', function(event) {
+            var detail = event.detail || {};
+            hba1cTrace('shared date event', detail);
+            queueHba1cDateRender(detail.startDate, detail.endDate, 'shared event');
+        });
+
+        // HbA1c uses its own persistent date namespace. These explicit hooks
+        // match Patterns/Trends while keeping their date ranges independent.
+        window.syncAndSubmit = function() {
+            hba1cTrace('date selector submitted', {
+                start: document.getElementById('start_date').value,
+                end: document.getElementById('end_date').value
+            });
+            queueHba1cDateRender(
+                document.getElementById('start_date').value,
+                document.getElementById('end_date').value,
+                'syncAndSubmit'
+            );
+        };
+        window.onDateOrPresetChange = window.syncAndSubmit;
+        
+        window.onDateChange = function(startStr, endStr) {
+            hba1cTrace('date render requested', { start: startStr, end: endStr });
+            if (!chartInstance) {
+                chartInstance = echarts.init(document.getElementById('hba1c-chart-node'), null, { renderer: 'canvas' });
+                chartInstance.on('finished', function() {
+                    var option = chartInstance.getOption();
+                    var axis = option.xAxis && option.xAxis[0] ? option.xAxis[0] : {};
+                    hba1cTrace('echarts finished', {
+                        requestId: hba1cRenderRequest,
+                        range: {
+                            min: axis.min,
+                            max: axis.max
+                        }
+                    });
+                });
+                hba1cTrace('chart initialized');
+                window.addEventListener('resize', function() {
+                    if (chartInstance) {
+                        chartInstance.resize();
+                        updateHba1cAxisPillars();
+                    }
+                });
+            }
+            chartInstance.showLoading();
+            
+            if (window.updateTriggerText) window.updateTriggerText();
+            
+            var overlayProvider = NS_HBA1C_REGISTRY.find(function(item) { return item.id === 'gmi_90d'; }).provider;
+            var labProvider = NS_HBA1C_REGISTRY.find(function(item) { return item.id === 'hba1c_lab'; }).provider;
+            var requestId = ++hba1cRenderRequest;
+            hba1cTrace('data requests dispatched', { requestId: requestId });
+            Promise.all([
+                NSOrchestrator.fetch(overlayProvider, { start_date: startStr, end_date: endStr }),
+                NSOrchestrator.fetch(labProvider, { start_date: startStr, end_date: endStr })
+            ])
+                .then(function(results) {
+                    // Do not let an older Safari range request repaint later.
+                    if (requestId !== hba1cRenderRequest) {
+                        hba1cTrace('stale data ignored', { requestId: requestId, currentRequestId: hba1cRenderRequest });
+                        return;
+                    }
+                    hba1cTrace('data requests resolved', {
+                        requestId: requestId,
+                        overlayRows: (results[0].data || []).length,
+                        labRows: (results[1].data || []).length
+                    });
+                    renderCurrentHba1c = function() {
+                    hba1cTrace('cached render started', { requestId: requestId, activeMetrics: window.getActiveMetrics() });
+                    var overlayData = results[0].data || [];
+                    var enteredConstants = readCustomGmiConstants();
+                    var constA = enteredConstants ? enteredConstants.const_a : 3.31;
+                    var constB = enteredConstants ? enteredConstants.const_b : 0.0239;
+                    
+                    overlayData.forEach(function(row) {
+                        if (row.mean_mmol_90d) {
+                            row.custom_gmi_val = Math.round((constA + (constB * row.mean_mmol_90d)) * 10) / 10;
+                        } else {
+                            row.custom_gmi_val = null;
+                        }
+                    });
+                    
+                    var inlineData = results[1].data || [];
+                    
+                    var filteredLabData = inlineData.filter(function(d) {
+                        if (!d.date) return false;
+                        return d.date >= startStr && d.date <= endStr;
+                    });
+                    var filteredOverlayData = overlayData.filter(function(d) {
+                        if (!d.date) return false;
+                        return d.date >= startStr && d.date <= endStr;
+                    });
+                    
+                    var activeIds = window.getActiveMetrics ? window.getActiveMetrics() : NS_HBA1C_DEFAULTS.defaultActive;
+                    var activeView = window.NSViews ? window.NSViews.getActiveView() : null;
+                    var baseViewOverrides = (activeView && (activeView.styles || (activeView.payload && activeView.payload.styles))) || {};
+                    var viewOverrides = _hba1cLivePreviewOverrides
+                        ? Object.assign({}, baseViewOverrides, _hba1cLivePreviewOverrides)
+                        : baseViewOverrides;
+                    
+                    var seriesList = [];
+                    var legendItems = [];
+                    
+                    activeIds.forEach(function(metricId) {
+                        var item = NS_HBA1C_REGISTRY.find(m => m.id === metricId);
+                        if (!item) return;
+                        
+                        var style = (window.NSChartCustomizer && NSChartCustomizer.getResolvedStyle)
+                            ? NSChartCustomizer.getResolvedStyle(HBA1C_PAGE, metricId, item.style, viewOverrides)
+                            : Object.assign({}, item.style, viewOverrides[metricId] || {});
+                        
+                        var color = style.color || item.style.color || '#333';
+                        var renderType = style.renderType || item.renderType || 'line';
+                        var lineType = style.lineType || item.style.lineType || 'solid';
+                        var weight = style.defaultWeight || style.weight || item.style.defaultWeight || 2;
+                        var opacity = (style.opacity !== undefined) ? parseFloat(style.opacity) : 1.0;
+                        var markerType = style.markerType || item.style.symbol || 'circle';
+                        var legendStyle = Object.assign({}, style, {
+                            renderType: renderType,
+                            color: color,
+                            defaultWeight: weight,
+                            markerType: markerType
+                        });
+                        legendItems.push({
+                            name: item.label,
+                            icon: (window.NSChartCustomizer && NSChartCustomizer.getLegendIcon)
+                                ? NSChartCustomizer.getLegendIcon(legendStyle)
+                                : undefined,
+                            itemStyle: { color: color }
+                        });
+                        
+                        if (metricId === 'hba1c_lab') {
+                            var labType = renderType === 'line' ? 'line' : 'scatter';
+                            seriesList.push({
+                                name: item.label,
+                                type: labType,
+                                data: filteredLabData.map(d => [d.date, parseFloat(d.hba1c_percent)]),
+                                symbol: markerType === 'none' ? 'circle' : markerType,
+                                symbolSize: (style.symbolSize || weight * 3) || 10,
+                                itemStyle: {
+                                    color: color,
+                                    opacity: opacity
+                                },
+                                lineStyle: labType === 'line' ? { color: color, width: weight, type: lineType, opacity: opacity } : undefined,
+                                showSymbol: true,
+                                z: 10
+                            });
+                        } else {
+                            var key = item.dataKey;
+                            var sType = renderType === 'area' ? 'line' : (renderType === 'scatter' ? 'scatter' : renderType);
+                            var areaStyle = renderType === 'area' ? { opacity: style.fillOpacity !== undefined ? style.fillOpacity : 0.22, color: style.fillColor || color } : undefined;
+                            
+                            seriesList.push({
+                                name: item.label,
+                                type: sType,
+                                data: filteredOverlayData.filter(d => d[key] != null).map(d => [d.date, parseFloat(d[key])]),
+                                smooth: (style.smooth !== undefined && style.smooth !== 'off') ? true : false,
+                                connectNulls: true,
+                                areaStyle: areaStyle,
+                                lineStyle: {
+                                    color: color,
+                                    width: weight,
+                                    type: lineType,
+                                    opacity: opacity
+                                },
+                                itemStyle: { color: color },
+                                symbol: (markerType && markerType !== 'none') ? markerType : 'none',
+                                symbolSize: weight * 3,
+                                showSymbol: (markerType && markerType !== 'none') ? true : false,
+                                z: 5
+                            });
+                        }
+                    });
+
+                    // Add target zone mark area (4.5% - 7.0%)
+                    seriesList.push({
+                        name: '_target_zones',
+                        type: 'line',
+                        data: [],
+                        silent: true,
+                        symbol: 'none',
+                        z: 0,
+                        markArea: {
+                            silent: true,
+                            itemStyle: { color: 'rgba(39, 174, 96, 0.08)' },
+                            data: [[{ yAxis: 4.5 }, { yAxis: 7.0 }]]
+                        }
+                    });
+                    
+                    var rangeTextEl = document.getElementById('hba1c-date-range');
+                    if (rangeTextEl) {
+                        rangeTextEl.textContent = (window.formatDMY ? window.formatDMY(startStr) : startStr) + ' – ' + (window.formatDMY ? window.formatDMY(endStr) : endStr);
+                    }
+                    
+                    var bounds = getHba1cBounds();
+
+                    chartInstance.hideLoading();
+                    chartInstance.setOption({
+                        animation: false,
+                        backgroundColor: '#ffffff',
+                        title: { text: 'HbA1c & Estimated Series', show: false },
+                        tooltip: {
+                            trigger: 'axis',
+                            backgroundColor: 'rgba(34, 39, 46, 0.95)',
+                            borderColor: '#444c56',
+                            borderWidth: 1,
+                            textStyle: { color: '#adbac7', fontSize: 11 },
+                            formatter: function(params) {
+                                if (!params || !params.length) return '';
+                                var dateTitle = window.formatDMY ? window.formatDMY(params[0].axisValue || params[0].name) : (params[0].axisValue || params[0].name);
+                                var html = '<div style="font-weight:700; margin-bottom:4px; border-bottom:1px solid #444c56; padding-bottom:2px;">' + dateTitle + '</div>';
+                                params.forEach(function(p) {
+                                    if (p.seriesName !== '_target_zones' && p.value != null) {
+                                        var val = Array.isArray(p.value) ? p.value[1] : p.value;
+                                        if (val != null) {
+                                            html += '<div style="margin:2px 0;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + p.color + ';margin-right:6px;"></span>' + p.seriesName + ': <b>' + (typeof val === 'number' ? val.toFixed(1) : val) + ' %</b></div>';
+                                        }
+                                    }
+                                });
+                                return html;
+                            }
+                        },
+                        legend: {
+                            type: 'scroll',
+                            bottom: 5,
+                            data: legendItems,
+                            selectedMode: false,
+                            itemGap: 14,
+                            itemWidth: 16,
+                            itemHeight: 10,
+                            inactiveColor: '#768390',
+                            inactiveBorderColor: '#768390',
+                            textStyle: { color: '#333333', fontSize: 11 }
+                        },
+                        grid: {
+                            left: '76px',
+                            right: '3%',
+                            bottom: '60px',
+                            top: '20px',
+                            containLabel: false
+                        },
+                        xAxis: {
+                            type: 'time',
+                            min: startStr,
+                            max: endStr,
+                            axisLine: { lineStyle: { color: '#888888' } },
+                            axisTick: { lineStyle: { color: '#888888' } },
+                            axisLabel: { color: '#555555', fontSize: 11 },
+                            splitLine: { show: true, lineStyle: { color: '#e8e8e8', type: 'dashed', width: 1 } }
+                        },
+                        yAxis: {
+                            type: 'value',
+                            name: 'HbA1c / GMI (%)',
+                            nameLocation: 'middle',
+                            nameRotate: 90,
+                            nameGap: 48,
+                            nameTextStyle: { color: '#333333', fontSize: 12, fontWeight: 600 },
+                            min: bounds && bounds.min !== null ? bounds.min : 4.0,
+                            max: bounds && bounds.max !== null ? bounds.max : 14.0,
+                            axisLine: { show: true, lineStyle: { color: '#888888' } },
+                            axisLabel: { color: '#555555', fontSize: 11, formatter: '{value} %' },
+                            splitLine: { show: true, lineStyle: { color: '#e8e8e8', type: 'dashed', width: 1 } }
+                        },
+                        series: seriesList
+                    }, true);
+                    hba1cTrace('echarts setOption completed', {
+                        requestId: requestId,
+                        seriesCount: seriesList.length,
+                        range: { start: startStr, end: endStr },
+                        bounds: bounds
+                    });
+
+                    updateHba1cAxisPillars();
+                    };
+                    renderCurrentHba1c();
+                })
+                .catch(err => {
+                    if (requestId !== hba1cRenderRequest) {
+                        hba1cTrace('stale request failed', { requestId: requestId, error: String(err) });
+                        return;
+                    }
+                    hba1cTrace('data request failed', { requestId: requestId, error: String(err) });
+                    console.error("Failed to fetch HbA1c overlay", err);
+                    chartInstance.hideLoading();
+                });
+        };
+    </script>
+</body>
+</html>

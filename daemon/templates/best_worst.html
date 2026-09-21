@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Best / Worst Period Search - ns-monitor</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <style>
+        .bw-card {
+            padding: 20px 22px 24px;
+        }
+
+        .bw-form {
+            display: grid;
+            grid-template-columns: auto auto 1fr;
+            align-items: center;
+            column-gap: 8px;
+            row-gap: 12px;
+            font-size: 1.02rem;
+            line-height: 2.1;
+        }
+
+        .bw-prefix {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            grid-column: 1;
+        }
+
+        .bw-connector {
+            grid-column: 2;
+            justify-self: end;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .bw-group {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            grid-column: 3;
+        }
+
+        .bw-hint {
+            font-size: .84rem;
+            color: var(--text-secondary);
+            margin-left: 4px;
+        }
+
+        .bw-filter-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(255, 255, 255, .07);
+            font-size: .92rem;
+            color: var(--text-color);
+            transition: opacity 0.15s ease;
+        }
+
+        .bw-filter-row.is-disabled {
+            opacity: 0.5;
+        }
+
+        .bw-filter-row.is-disabled input[type="number"],
+        .bw-filter-row.is-disabled #bw-dedup-suffix {
+            pointer-events: none;
+        }
+
+        .bw-filter-row.is-1d {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        .bw-dedup-1d-hint {
+            font-size: .84rem;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 900px) {
+            .bw-form {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .bw-connector {
+                justify-self: auto;
+                text-align: left;
+            }
+
+            .bw-hint {
+                width: 100%;
+                margin-left: 0;
+            }
+        }
+
+        .bw-summary {
+            margin: 20px 0 10px;
+            font-size: .95rem;
+            color: var(--text-color);
+        }
+
+        /* The ranked statistic -- bolded in both the header and every cell. */
+        .bw-sel {
+            font-weight: 700;
+            color: #fff;
+        }
+        .panel-table th.bw-sel {
+            color: var(--accent);
+        }
+
+        .bw-rank {
+            color: var(--text-secondary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .bw-notes {
+            margin: 14px 0 0;
+            font-size: .84rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        #bw-empty.empty-state {
+            margin-top: 18px;
+        }
+
+        .bw-dim {
+            color: var(--text-secondary);
+            opacity: .55;
+        }
+        .panel-table td.bw-dim {
+            font-variant-numeric: tabular-nums;
+        }
+    </style>
+</head>
+
+<body>
+    {% include "sidebar.html" %}
+
+    <div class="container">
+        <header class="page-header">
+            <h1 class="panel-h1">Best / Worst Period Search</h1>
+        </header>
+
+        <div class="card bw-card">
+            <div class="bw-form">
+                <div class="bw-prefix">
+                    <span>Find the</span>
+                    <select id="bw-direction" class="form-select">
+                        <option value="highest">highest</option>
+                        <option value="lowest">lowest</option>
+                        <option value="longest">longest period where</option>
+                    </select>
+
+                    <span id="bw-fixed-wrap" style="display: inline-flex; align-items: center; gap: 8px;">
+                        <select id="bw-stat" class="form-select">
+                            <option value="tir">TIR</option>
+                            <option value="titr">TITR</option>
+                            <option value="tar">TAR</option>
+                            <option value="tbr">TBR</option>
+                            <option value="avg_bg">Avg BG</option>
+                            <option value="gmi">GMI</option>
+                            <option value="cv">CV</option>
+                            <option value="tdd">TDD</option>
+                            <option value="carbs">Carbs</option>
+                        </select>
+                        <span>over</span>
+                        <select id="bw-period" class="form-select">
+                            <option value="1">1 day</option>
+                            <option value="2">2 days</option>
+                            <option value="3">3 days</option>
+                            <option value="7" selected>7 days</option>
+                            <option value="14">14 days</option>
+                            <option value="30">30 days</option>
+                            <option value="60">60 days</option>
+                            <option value="90">90 days</option>
+                        </select>
+                    </span>
+
+                    <span id="bw-longest-wrap" style="display: none; align-items: center; gap: 8px;">
+                        <select id="bw-longest-metric" class="form-select">
+                            <option value="titr" selected>TITR</option>
+                            <option value="tir">TIR</option>
+                            <option value="bg">BG</option>
+                            <option value="tar">TAR</option>
+                            <option value="tbr">TBR</option>
+                            <option value="avg_bg">Avg BG</option>
+                            <option value="cv">CV</option>
+                            <option value="tdd">TDD</option>
+                            <option value="carbs">Carbs</option>
+                        </select>
+                        <select id="bw-longest-op" class="form-select">
+                            <option value=">=" selected>&ge;</option>
+                            <option value=">">&gt;</option>
+                            <option value="=">=</option>
+                            <option value="<=">&le;</option>
+                            <option value="<">&lt;</option>
+                        </select>
+                        <input type="number" id="bw-longest-thresh" class="form-input form-input-sm" style="width: 75px; text-align: center;" step="1" value="100">
+                        <span id="bw-longest-unit" style="font-weight: 500;">%</span>
+                    </span>
+                </div>
+                <span class="bw-connector">between</span>
+                <div class="bw-group">
+                    <input type="date" id="bw-start" class="form-input">
+                    <span>and</span>
+                    <input type="date" id="bw-end" class="form-input">
+                    <button id="bw-search" class="btn btn-primary">Search</button>
+                </div>
+
+                <span class="bw-connector" style="grid-column: 2;">or</span>
+                <div class="bw-group" style="grid-column: 3;">
+                    <select id="bw-preset" class="form-select">
+                        <option value="">Custom Range...</option>
+                        <option value="7">Last 7 Days</option>
+                        <option value="14">Last 14 Days</option>
+                        <option value="30">Last 30 Days</option>
+                        <option value="60">Last 60 Days</option>
+                        <option value="90">Last 90 Days</option>
+                        <option value="180">Last 180 Days</option>
+                        <option value="" disabled>&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;</option>
+                        <option value="prev_1m">Previous Month</option>
+                        <option value="prev_3m">Previous 3 Months</option>
+                        <option value="prev_6m">Previous 6 Months</option>
+                        <option value="prev_12m">Previous 12 Months</option>
+                        <option value="" disabled>&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;</option>
+                        <option value="all_time">All of Time</option>
+                    </select>
+                    <span class="hint bw-hint">Day-count presets end yesterday. Dates stay editable.</span>
+                </div>
+            </div>
+
+            <div class="bw-filter-row" id="bw-dedup-row">
+                <label class="checkbox-label" for="bw-dedup-enable" style="margin-bottom: 0;">
+                    <input type="checkbox" id="bw-dedup-enable">
+                    <span>Do not include results that share</span>
+                </label>
+                <input type="number" id="bw-dedup-pct" class="form-input form-input-sm" min="0" max="100" value="50" style="width: 65px; text-align: center;">
+                <span id="bw-dedup-suffix">% of days with prior results</span>
+                <span class="hint bw-dedup-1d-hint" id="bw-dedup-1d-hint" style="display: none; margin-left: 8px;">(not applicable for 1-day periods)</span>
+            </div>
+
+            <div id="bw-error" class="error-banner" style="display:none; margin-top: 14px;"></div>
+
+            <div id="bw-results" style="display:none;">
+                <p id="bw-summary" class="bw-summary"></p>
+                <div class="card table-card" style="margin-bottom: 0;">
+                    <table class="panel-table" id="bw-table">
+                        <thead id="bw-thead">
+                            <tr>
+                                <th style="width:40px;">#</th>
+                                <th>Period</th>
+                                <th class="num" data-stat="tir">TIR %</th>
+                                <th class="num" data-stat="titr">TITR %</th>
+                                <th class="num" data-stat="tar">TAR %</th>
+                                <th class="num" data-stat="tbr">TBR %</th>
+                                <th class="num" data-stat="avg_bg">Avg BG</th>
+                                <th class="num" data-stat="gmi">GMI %</th>
+                                <th class="num" data-stat="cv">CV %</th>
+                                <th class="num" data-stat="tdd">TDD U</th>
+                                <th class="num" data-stat="carbs">Carbs g</th>
+                                <th class="num bw-dim">Coverage</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bw-tbody"></tbody>
+                    </table>
+                </div>
+                <p id="bw-notes" class="bw-notes"></p>
+            </div>
+
+            <div id="bw-empty" class="empty-state" style="display:none;"></div>
+        </div>
+
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+
+    <script>
+        (function () {
+            'use strict';
+
+            var STAT_LABELS = {
+                tir: 'TIR', titr: 'TITR', avg_bg: 'Avg BG', gmi: 'GMI', cv: 'CV',
+                tdd: 'TDD', carbs: 'Carbs', tar: 'TAR', tbr: 'TBR', bg: 'BG'
+            };
+
+            var METRIC_DEFAULTS = {
+                titr: { unit: '%', step: '1', defaultThresh: 100, defaultOp: '>=' },
+                tir: { unit: '%', step: '1', defaultThresh: 100, defaultOp: '>=' },
+                bg: { unit: 'mmol/L', step: '0.1', defaultThresh: 7.8, defaultOp: '<=' },
+                tar: { unit: '%', step: '1', defaultThresh: 5, defaultOp: '<=' },
+                tbr: { unit: '%', step: '1', defaultThresh: 1, defaultOp: '<=' },
+                avg_bg: { unit: 'mmol/L', step: '0.1', defaultThresh: 6.5, defaultOp: '<=' },
+                cv: { unit: '%', step: '1', defaultThresh: 36, defaultOp: '<=' },
+                tdd: { unit: 'U', step: '0.5', defaultThresh: 50, defaultOp: '<=' },
+                carbs: { unit: 'g', step: '5', defaultThresh: 100, defaultOp: '>=' }
+            };
+
+            var elDirection = document.getElementById('bw-direction');
+            var elFixedWrap = document.getElementById('bw-fixed-wrap');
+            var elLongestWrap = document.getElementById('bw-longest-wrap');
+            var elStat = document.getElementById('bw-stat');
+            var elPeriod = document.getElementById('bw-period');
+            var elLongestMetric = document.getElementById('bw-longest-metric');
+            var elLongestOp = document.getElementById('bw-longest-op');
+            var elLongestThresh = document.getElementById('bw-longest-thresh');
+            var elLongestUnit = document.getElementById('bw-longest-unit');
+            var elStart = document.getElementById('bw-start');
+            var elEnd = document.getElementById('bw-end');
+            var elPreset = document.getElementById('bw-preset');
+            var elSearch = document.getElementById('bw-search');
+            var elError = document.getElementById('bw-error');
+            var elResults = document.getElementById('bw-results');
+            var elSummary = document.getElementById('bw-summary');
+            var elThead = document.getElementById('bw-thead');
+            var elTbody = document.getElementById('bw-tbody');
+            var elNotes = document.getElementById('bw-notes');
+            var elEmpty = document.getElementById('bw-empty');
+            var elDedupRow = document.getElementById('bw-dedup-row');
+            var elDedupEnable = document.getElementById('bw-dedup-enable');
+            var elDedupPct = document.getElementById('bw-dedup-pct');
+            var elDedup1dHint = document.getElementById('bw-dedup-1d-hint');
+
+            function updateModeUi() {
+                var isLongest = elDirection.value === 'longest';
+                if (isLongest) {
+                    elFixedWrap.style.display = 'none';
+                    elLongestWrap.style.display = 'inline-flex';
+                    elDedupRow.style.display = 'none';
+                } else {
+                    elFixedWrap.style.display = 'inline-flex';
+                    elLongestWrap.style.display = 'none';
+                    elDedupRow.style.display = '';
+                    updateDedupUi();
+                }
+            }
+
+            function updateLongestMetricUi() {
+                var m = elLongestMetric.value;
+                var def = METRIC_DEFAULTS[m] || { unit: '', step: '1', defaultThresh: 100, defaultOp: '>=' };
+                elLongestUnit.textContent = def.unit;
+                elLongestThresh.step = def.step;
+            }
+
+            function onLongestMetricChanged() {
+                var m = elLongestMetric.value;
+                var def = METRIC_DEFAULTS[m];
+                if (def) {
+                    elLongestUnit.textContent = def.unit;
+                    elLongestThresh.step = def.step;
+                    elLongestThresh.value = def.defaultThresh;
+                    elLongestOp.value = def.defaultOp;
+                }
+            }
+
+            function updateDedupUi() {
+                if (elDirection.value === 'longest') {
+                    elDedupRow.style.display = 'none';
+                    return;
+                }
+                var is1d = elPeriod.value === '1';
+                if (is1d) {
+                    elDedupRow.classList.add('is-1d');
+                    elDedupEnable.disabled = true;
+                    elDedupPct.disabled = true;
+                    elDedup1dHint.style.display = '';
+                } else {
+                    elDedupRow.classList.remove('is-1d');
+                    elDedupEnable.disabled = false;
+                    elDedup1dHint.style.display = 'none';
+                    var enabled = elDedupEnable.checked;
+                    elDedupRow.classList.toggle('is-disabled', !enabled);
+                    elDedupPct.disabled = !enabled;
+                }
+            }
+
+            function localDateStr(d) {
+                return d.getFullYear() + '-'
+                    + String(d.getMonth() + 1).padStart(2, '0') + '-'
+                    + String(d.getDate()).padStart(2, '0');
+            }
+
+            function displayDate(iso) {
+                if (!iso) return '--';
+                var dStr = String(iso).split('T')[0].split(' ')[0];
+                var p = dStr.split('-');
+                if (p.length < 3) return iso;
+                return p[2] + '/' + p[1] + '/' + p[0].slice(2);
+            }
+
+            function displayDateTime(iso) {
+                if (!iso) return '--';
+                var clean = String(iso).replace('T', ' ').trim();
+                var parts = clean.split(' ');
+                var dPart = displayDate(parts[0]);
+                if (parts.length > 1 && parts[1]) {
+                    var tParts = parts[1].split(':');
+                    return dPart + ' ' + tParts[0] + ':' + tParts[1];
+                }
+                return dPart;
+            }
+
+            function applyPreset(preset) {
+                if (!preset) return;
+                var now = new Date();
+                var start, end;
+                var months = { prev_1m: 1, prev_3m: 3, prev_6m: 6, prev_12m: 12 };
+                if (preset === 'all_time') {
+                    var earliest = '{{ earliest_cgm_date or "" }}';
+                    end = new Date();
+                    end.setDate(end.getDate() - 1);
+                    elEnd.value = localDateStr(end);
+                    if (earliest) {
+                        elStart.value = earliest;
+                    } else {
+                        fetch('/api/v1/earliest_cgm_date')
+                            .then(function (res) { return res.json(); })
+                            .then(function (data) {
+                                if (data && data.earliest_date) {
+                                    elStart.value = data.earliest_date;
+                                }
+                            })
+                            .catch(function () {});
+                    }
+                    return;
+                }
+                if (months[preset]) {
+                    start = new Date(now.getFullYear(), now.getMonth() - months[preset], 1);
+                    end = new Date(now.getFullYear(), now.getMonth(), 0);
+                } else {
+                    end = new Date();
+                    end.setDate(end.getDate() - 1); // always ends yesterday
+                    start = new Date(end);
+                    start.setDate(start.getDate() - parseInt(preset, 10) + 1);
+                }
+                elStart.value = localDateStr(start);
+                elEnd.value = localDateStr(end);
+            }
+
+            function showError(msg) {
+                elError.textContent = msg;
+                elError.style.display = '';
+                elResults.style.display = 'none';
+                elEmpty.style.display = 'none';
+            }
+
+            function clearError() {
+                elError.style.display = 'none';
+                elError.textContent = '';
+            }
+
+            function fmt(v, stat) {
+                if (v === null || v === undefined) return '--';
+                var twoDecimals = (stat === 'avg_bg' || stat === 'gmi');
+                return twoDecimals ? v.toFixed(2) : v.toFixed(1);
+            }
+
+            function render(payload) {
+                var meta = payload.meta;
+                var rows = payload.results || [];
+                var stat = meta.statistic;
+                var mode = meta.mode || (meta.direction === 'longest' ? 'longest' : 'fixed_period');
+
+                elThead.innerHTML = '';
+                elTbody.innerHTML = '';
+
+                if (!rows.length) {
+                    elResults.style.display = 'none';
+                    elEmpty.style.display = '';
+                    if (mode === 'longest') {
+                        elEmpty.textContent = 'No continuous period met the criteria ('
+                            + (STAT_LABELS[stat] || stat) + ' ' + (meta.operator || '') + ' ' + (meta.threshold !== undefined ? meta.threshold : '')
+                            + ') within the selected date range.';
+                    } else {
+                        elEmpty.textContent = 'No window in that range met the '
+                            + meta.min_coverage + '% sensor-coverage cut-off with a full '
+                            + meta.period_days + '-day history. '
+                            + '(' + meta.windows_tested + ' tested, '
+                            + meta.excluded_low_coverage + ' below coverage, '
+                            + meta.excluded_incomplete + ' incomplete.)';
+                    }
+                    return;
+                }
+
+                if (mode === 'longest') {
+                    var type = meta.type || (stat === 'bg' ? 'bg_continuous' : 'daily_metric');
+                    if (type === 'bg_continuous') {
+                        elThead.innerHTML = '<tr>'
+                            + '<th style="width:40px;">#</th>'
+                            + '<th>Duration</th>'
+                            + '<th>Time Range</th>'
+                            + '<th class="num">Avg BG</th>'
+                            + '<th class="num">Min BG</th>'
+                            + '<th class="num">Max BG</th>'
+                            + '<th class="num">TITR %</th>'
+                            + '<th class="num">TIR %</th>'
+                            + '<th class="num bw-dim">Readings</th>'
+                            + '</tr>';
+
+                        rows.forEach(function (r) {
+                            var tr = document.createElement('tr');
+                            var dStr = r.duration_str || r.duration_formatted || (r.duration_days ? r.duration_days + ' days' : '--');
+                            var sTime = r.start_time || r.period_start;
+                            var eTime = r.end_time || r.period_end;
+                            var rCount = (r.reading_count !== undefined && r.reading_count !== null) ? r.reading_count : (r.readings_count || '--');
+                            var titrVal = (r.titr_pct !== undefined && r.titr_pct !== null) ? r.titr_pct : r.titr;
+                            var tirVal = (r.tir_pct !== undefined && r.tir_pct !== null) ? r.tir_pct : r.tir;
+
+                            var cells = '<td class="bw-rank">' + r.rank + '</td>'
+                                + '<td class="bw-sel">' + dStr + '</td>'
+                                + '<td>' + displayDateTime(sTime) + ' &ndash; ' + displayDateTime(eTime) + '</td>'
+                                + '<td class="num">' + fmt(r.avg_bg, 'avg_bg') + '</td>'
+                                + '<td class="num">' + fmt(r.min_bg, 'avg_bg') + '</td>'
+                                + '<td class="num">' + fmt(r.max_bg, 'avg_bg') + '</td>'
+                                + '<td class="num">' + (titrVal !== null && titrVal !== undefined ? fmt(titrVal, 'titr') + '%' : '--') + '</td>'
+                                + '<td class="num">' + (tirVal !== null && tirVal !== undefined ? fmt(tirVal, 'tir') + '%' : '--') + '</td>'
+                                + '<td class="num bw-dim">' + rCount + '</td>';
+                            tr.innerHTML = cells;
+                            elTbody.appendChild(tr);
+                        });
+                    } else {
+                        elThead.innerHTML = '<tr>'
+                            + '<th style="width:40px;">#</th>'
+                            + '<th>Duration</th>'
+                            + '<th>Period Dates</th>'
+                            + '<th class="num" data-stat="tir">TIR %</th>'
+                            + '<th class="num" data-stat="titr">TITR %</th>'
+                            + '<th class="num" data-stat="tar">TAR %</th>'
+                            + '<th class="num" data-stat="tbr">TBR %</th>'
+                            + '<th class="num" data-stat="avg_bg">Avg BG</th>'
+                            + '<th class="num" data-stat="cv">CV %</th>'
+                            + '<th class="num" data-stat="tdd">TDD U</th>'
+                            + '<th class="num" data-stat="carbs">Carbs g</th>'
+                            + '<th class="num bw-dim">Coverage</th>'
+                            + '</tr>';
+
+                        var heads = elThead.querySelectorAll('th[data-stat]');
+                        for (var h = 0; h < heads.length; h++) {
+                            heads[h].classList.toggle('bw-sel', heads[h].getAttribute('data-stat') === stat);
+                        }
+
+                        var longestDailyOrder = ['tir', 'titr', 'tar', 'tbr', 'avg_bg', 'cv', 'tdd', 'carbs'];
+                        rows.forEach(function (r) {
+                            var tr = document.createElement('tr');
+                            var cells = '<td class="bw-rank">' + r.rank + '</td>'
+                                + '<td class="bw-sel">' + r.duration_str + '</td>'
+                                + '<td>' + displayDate(r.period_start) + ' &ndash; ' + displayDate(r.period_end) + '</td>';
+                            longestDailyOrder.forEach(function (k) {
+                                cells += '<td class="num' + (k === stat ? ' bw-sel' : '') + '">'
+                                    + fmt(r[k], k) + (k === 'tir' || k === 'titr' || k === 'tar' || k === 'tbr' || k === 'cv' ? '%' : '') + '</td>';
+                            });
+                            cells += '<td class="num bw-dim">' + fmt(r.coverage, 'coverage') + '%</td>';
+                            tr.innerHTML = cells;
+                            elTbody.appendChild(tr);
+                        });
+                    }
+
+                    var unitStr = (METRIC_DEFAULTS[stat] && METRIC_DEFAULTS[stat].unit) ? ' ' + METRIC_DEFAULTS[stat].unit : '';
+                    elSummary.textContent = 'Top ' + rows.length + ' longest periods where '
+                        + (STAT_LABELS[stat] || stat) + ' ' + meta.operator + ' '
+                        + meta.threshold + unitStr + ', ranked 1st to ' + rows.length + 'th.';
+
+                    var notesHtml = '';
+                    if (type === 'bg_continuous') {
+                        notesHtml += '&bull; Evaluated directly against continuous 5-minute CGM readings with a 15-minute gap tolerance for sensor packet drops.<br>';
+                    } else {
+                        notesHtml += '&bull; Evaluated on consecutive calendar days meeting the specified criteria.<br>';
+                    }
+                    notesHtml += '&bull; <strong>Coverage:</strong> The percentage of expected 5-minute CGM readings captured by the sensor during the period (100% = 288 readings/day).';
+                    elNotes.innerHTML = notesHtml;
+
+                } else {
+                    // Fixed Period Mode (highest / lowest)
+                    elThead.innerHTML = '<tr>'
+                        + '<th style="width:40px;">#</th>'
+                        + '<th>Period</th>'
+                        + '<th class="num" data-stat="tir">TIR %</th>'
+                        + '<th class="num" data-stat="titr">TITR %</th>'
+                        + '<th class="num" data-stat="tar">TAR %</th>'
+                        + '<th class="num" data-stat="tbr">TBR %</th>'
+                        + '<th class="num" data-stat="avg_bg">Avg BG</th>'
+                        + '<th class="num" data-stat="gmi">GMI %</th>'
+                        + '<th class="num" data-stat="cv">CV %</th>'
+                        + '<th class="num" data-stat="tdd">TDD U</th>'
+                        + '<th class="num" data-stat="carbs">Carbs g</th>'
+                        + '<th class="num bw-dim">Coverage</th>'
+                        + '</tr>';
+
+                    var fixedHeads = elThead.querySelectorAll('th[data-stat]');
+                    for (var fh = 0; fh < fixedHeads.length; fh++) {
+                        fixedHeads[fh].classList.toggle('bw-sel', fixedHeads[fh].getAttribute('data-stat') === stat);
+                    }
+
+                    var fixedOrder = ['tir', 'titr', 'tar', 'tbr', 'avg_bg', 'gmi', 'cv', 'tdd', 'carbs'];
+                    rows.forEach(function (r) {
+                        var tr = document.createElement('tr');
+                        var cells = '<td class="bw-rank">' + r.rank + '</td>'
+                            + '<td>' + displayDate(r.period_start) + ' &ndash; ' + displayDate(r.period_end) + '</td>';
+                        fixedOrder.forEach(function (k) {
+                            cells += '<td class="num' + (k === stat ? ' bw-sel' : '') + '">'
+                                + fmt(r[k], k) + '</td>';
+                        });
+                        cells += '<td class="num bw-dim">' + fmt(r.coverage, 'coverage') + '%</td>';
+                        tr.innerHTML = cells;
+                        elTbody.appendChild(tr);
+                    });
+
+                    elSummary.textContent = 'Top ' + rows.length + ' '
+                        + meta.direction + ' ' + (STAT_LABELS[stat] || stat) + ' over '
+                        + meta.period_days + (meta.period_days === 1 ? ' day' : ' days')
+                        + ', ranked 1st to ' + rows.length + 'th.';
+
+                    var dedupNote = '';
+                    if (meta.max_overlap_pct !== null && meta.max_overlap_pct !== undefined) {
+                        dedupNote = '<br>&bull; De-duplication active: results sharing &ge; '
+                            + meta.max_overlap_pct + '% of days with higher-ranked periods were excluded.';
+                    }
+
+                    elNotes.innerHTML =
+                        '&bull; ' + meta.windows_eligible + ' of ' + meta.windows_tested
+                        + ' candidate windows were eligible (fully contained within the selected date range) &mdash; '
+                        + meta.excluded_low_coverage + ' excluded for sensor coverage below '
+                        + meta.min_coverage + '%, ' + meta.excluded_incomplete
+                        + ' for an incomplete history.<br>'
+                        + '&bull; <strong>CV Baseline:</strong> Candidate windows start on or after the 14th day of recorded history so daily CV statistics have a full 14-day trailing baseline.<br>'
+                        + '&bull; <strong>Coverage:</strong> The percentage of expected 5-minute CGM readings captured by the sensor during the period (100% = 288 readings/day). Periods below ' + meta.min_coverage + '% sensor coverage are excluded.<br>'
+                        + '&bull; Windows may overlap &mdash; adjacent periods share days unless the de-duplication filter is enabled.<br>'
+                        + '&bull; CV is the mean of the daily trailing-14-day CV across the window '
+                        + '(never a daily CV), so CVs are comparable across period lengths.'
+                        + dedupNote;
+                }
+
+                elEmpty.style.display = 'none';
+                elResults.style.display = '';
+            }
+
+            function search() {
+                clearError();
+                var start = elStart.value;
+                var end = elEnd.value;
+                if (!start || !end) { showError('Please set both a from and a to date.'); return; }
+                if (start > end) { showError('The \u2018from\u2019 date must not be after the \u2018to\u2019 date.'); return; }
+
+                var isLongest = elDirection.value === 'longest';
+                var params;
+
+                if (isLongest) {
+                    var threshVal = parseFloat(elLongestThresh.value);
+                    if (isNaN(threshVal)) {
+                        showError('Please enter a valid numeric threshold.');
+                        return;
+                    }
+                    params = new URLSearchParams({
+                        direction: 'longest',
+                        stat: elLongestMetric.value,
+                        op: elLongestOp.value,
+                        threshold: threshVal,
+                        start: start,
+                        end: end
+                    });
+                } else {
+                    params = new URLSearchParams({
+                        stat: elStat.value,
+                        period: elPeriod.value,
+                        direction: elDirection.value,
+                        start: start,
+                        end: end
+                    });
+
+                    if (elPeriod.value !== '1' && elDedupEnable.checked) {
+                        var pctVal = parseFloat(elDedupPct.value);
+                        if (isNaN(pctVal)) pctVal = 50;
+                        pctVal = Math.max(0, Math.min(100, pctVal));
+                        params.set('max_overlap_pct', pctVal);
+                    }
+                }
+
+                elSearch.disabled = true;
+                elSearch.textContent = 'Searching...';
+                fetch('/api/v1/sandbox/best_worst_period?' + params.toString())
+                    .then(function (res) { return res.json().then(function (j) { return { ok: res.ok, body: j }; }); })
+                    .then(function (r) {
+                        if (!r.ok || r.body.error) { showError(r.body.error || 'Search failed.'); return; }
+                        render(r.body);
+                    })
+                    .catch(function (e) { showError('Search failed: ' + e.message); })
+                    .finally(function () {
+                        elSearch.disabled = false;
+                        elSearch.textContent = 'Search';
+                    });
+            }
+
+            var STORE = {
+                direction: 'ns_bw_direction',
+                stat: 'ns_bw_stat',
+                period: 'ns_bw_period',
+                longest_metric: 'ns_bw_longest_metric',
+                longest_op: 'ns_bw_longest_op',
+                longest_thresh: 'ns_bw_longest_thresh',
+                start: 'ns_bw_start',
+                end: 'ns_bw_end',
+                preset: 'ns_bw_preset',
+                dedup_enable: 'ns_bw_dedup_enable',
+                dedup_pct: 'ns_bw_dedup_pct'
+            };
+
+            function saveState() {
+                try {
+                    localStorage.setItem(STORE.direction, elDirection.value);
+                    localStorage.setItem(STORE.stat, elStat.value);
+                    localStorage.setItem(STORE.period, elPeriod.value);
+                    localStorage.setItem(STORE.longest_metric, elLongestMetric.value);
+                    localStorage.setItem(STORE.longest_op, elLongestOp.value);
+                    localStorage.setItem(STORE.longest_thresh, elLongestThresh.value);
+                    localStorage.setItem(STORE.start, elStart.value);
+                    localStorage.setItem(STORE.end, elEnd.value);
+                    localStorage.setItem(STORE.preset, elPreset.value);
+                    localStorage.setItem(STORE.dedup_enable, elDedupEnable.checked ? '1' : '0');
+                    localStorage.setItem(STORE.dedup_pct, elDedupPct.value);
+                } catch (e) {}
+            }
+
+            function restoreSelect(el, key) {
+                var v = null;
+                try { v = localStorage.getItem(key); } catch (e) { return false; }
+                if (v === null) return false;
+                for (var i = 0; i < el.options.length; i++) {
+                    if (el.options[i].value === v && !el.options[i].disabled) {
+                        el.value = v;
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            function restoreState() {
+                restoreSelect(elDirection, STORE.direction);
+                restoreSelect(elStat, STORE.stat);
+                restoreSelect(elPeriod, STORE.period);
+                restoreSelect(elLongestMetric, STORE.longest_metric);
+                restoreSelect(elLongestOp, STORE.longest_op);
+
+                try {
+                    var lThresh = localStorage.getItem(STORE.longest_thresh);
+                    if (lThresh !== null && lThresh !== '') elLongestThresh.value = lThresh;
+                } catch (err3) {}
+
+                var s = null, e = null;
+                try {
+                    s = localStorage.getItem(STORE.start);
+                    e = localStorage.getItem(STORE.end);
+                } catch (err) {}
+
+                try {
+                    var dEn = localStorage.getItem(STORE.dedup_enable);
+                    if (dEn !== null) elDedupEnable.checked = (dEn === '1');
+                    var dPct = localStorage.getItem(STORE.dedup_pct);
+                    if (dPct !== null && dPct !== '') elDedupPct.value = dPct;
+                } catch (err2) {}
+
+                var savedPreset = restoreSelect(elPreset, STORE.preset) ? elPreset.value : null;
+                if (savedPreset) {
+                    applyPreset(savedPreset);
+                    return true;
+                }
+                if (s && e) {
+                    elStart.value = s;
+                    elEnd.value = e;
+                    elPreset.value = '';
+                    return true;
+                }
+                return false;
+            }
+
+            elPreset.addEventListener('change', function () {
+                applyPreset(elPreset.value);
+                saveState();
+            });
+            elStart.addEventListener('change', function () { elPreset.value = ''; saveState(); });
+            elEnd.addEventListener('change', function () { elPreset.value = ''; saveState(); });
+            elDirection.addEventListener('change', function () {
+                updateModeUi();
+                saveState();
+            });
+            elStat.addEventListener('change', saveState);
+            elPeriod.addEventListener('change', function () {
+                updateDedupUi();
+                saveState();
+            });
+            elLongestMetric.addEventListener('change', function () {
+                onLongestMetricChanged();
+                saveState();
+            });
+            elLongestOp.addEventListener('change', saveState);
+            elLongestThresh.addEventListener('change', saveState);
+            elLongestThresh.addEventListener('input', saveState);
+            elDedupEnable.addEventListener('change', function () {
+                updateDedupUi();
+                saveState();
+            });
+            elDedupPct.addEventListener('change', saveState);
+            elDedupPct.addEventListener('input', saveState);
+            elSearch.addEventListener('click', search);
+
+            if (!restoreState()) {
+                elPreset.value = '90';
+                applyPreset('90');
+            }
+            updateModeUi();
+            updateLongestMetricUi();
+        })();
+    </script>
+</body>
+</html>
+

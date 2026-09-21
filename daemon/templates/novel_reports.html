@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Novel Reports - ns-monitor</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css?v=26aug-1">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        .compare-section.is-disabled {
+            opacity: 0.7;
+        }
+        .compare-section.is-disabled .date-pill {
+            background: var(--surface-inset, #181818);
+            border-color: var(--border-color, #333);
+        }
+        .compare-section.is-disabled .pill-date-input,
+        .compare-section.is-disabled .step-btn,
+        .compare-section.is-disabled select {
+            cursor: not-allowed;
+            opacity: 0.65;
+            pointer-events: none;
+        }
+
+        /* ---- Single-family components (Advanced Analytics / Novel
+           Reports / Clinical Reports / Omnipod family only) --
+           deliberately NOT in ns-shared.css, see its own section 17
+           "NOT INCLUDED, DELIBERATELY" note for why. ---- */
+        /* Poincare's chart is generated server-side at a fixed square
+           figsize (6x6in @ 100dpi, see main.py's advanced_metrics_poincare())
+           -- deliberately square, not a bug (no ax.set_aspect('equal') is
+           set, so widening the figure would visually skew the SD1/SD2
+           ellipse geometry this chart exists to show accurately). Capped
+           to roughly the image's own rendered size and centred, instead of
+           stretching full-width, so the surface-inset background doesn't
+           show as bars either side of a narrower image. */
+        .image-container {
+            width: 100%;
+            max-width: 560px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            background: var(--surface-inset);
+            border-radius: 4px;
+            overflow: hidden;
+            min-height: 480px;
+            position: relative;
+        }
+        .image-container img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+        .chart-container {
+            min-height: 250px;
+            width: 100%;
+        }
+        .kin-stat {
+            font-size: 2em;
+            font-weight: bold;
+            margin: var(--space-2) 0;
+            color: var(--accent);
+        }
+        .kin-description {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            margin-top: var(--space-2);
+        }
+    </style>
+</head>
+<body>
+    {% include "sidebar.html" %}
+
+    <div class="container">
+        {% set has_compare = true %}
+        <header class="page-header">
+            <h1 class="panel-h1">Novel Reports</h1>
+            {% include "_header_date_selector.html" %}
+        </header>
+
+        <!-- PANEL TABS -->
+        <!-- Radar/BG Dist/GRI removed 23 Aug 2026 (Harry's call) -- Novel
+             Reports keeps Poincare/J-Index/CONGA/Smoothness; those three
+             live on Clinical Reports instead. Poincare is now first + the
+             default tab (was Radar). See STATUS.md for the split notes. -->
+        <div class="tab-bar">
+            <button type="button" class="tab-item active" id="tab-poincare" onclick="switchTab('poincare')">Poincar&eacute;</button>
+            <button type="button" class="tab-item" id="tab-jindex" onclick="switchTab('jindex')">J-Index</button>
+            <button type="button" class="tab-item" id="tab-conga" onclick="switchTab('conga')">CONGA</button>
+            <button type="button" class="tab-item" id="tab-smoothness" onclick="switchTab('smoothness')">Rate of Change</button>
+        </div>
+
+        <!-- 1. POINCARE PLOT (was "2." -- now first/default; Radar removed) -->
+        <div class="card split-card tab-panel" id="panel-poincare">
+            <div class="col-left">
+                <h2 class="panel-h2">Ellipse Geometry Fit</h2>
+                <p><strong>SD1 (Short-term):</strong> <span id="p-sd1" class="metric-better score-value score-value--inline">-</span> <span class="text-muted">mmol/L</span></p>
+                <p><strong>SD2 (Long-term):</strong> <span id="p-sd2" class="metric-better score-value score-value--inline">-</span> <span class="text-muted">mmol/L</span></p>
+                <p><strong>SD1 / SD2 Ratio:</strong> <span id="p-ratio" class="score-value score-value--inline" style="color: var(--accent);">-</span></p>
+                <hr class="divider">
+                <div class="kin-description" style="font-size: 0.8em; margin-top: 15px;">
+                    <strong>SD1: Short-term Variability</strong> (Reading-to-reading spikes)
+                    <ul class="panel-list">
+                        <li><span style="color: var(--success);">Excellent (&lt; 1.0 mmol/L):</span> Highly stable, smooth trend lines with minimal erratic jumps.</li>
+                        <li><span style="color: var(--warning);">Moderate (1.0 to 1.6 mmol/L):</span> Average variability expected in standard Type 1 diabetes management.</li>
+                        <li><span style="color: var(--danger);">High (&gt; 1.6 mmol/L):</span> Erratic control with rapid, unpredictable spikes and crashes.</li>
+                    </ul>
+                </div>
+                <div class="kin-description" style="font-size: 0.8em; margin-top: 15px;">
+                    <strong>SD2: Long-term Variability</strong> (Overarching daily swings)
+                    <ul class="panel-list">
+                        <li><span style="color: var(--success);">Excellent (&lt; 3.0 mmol/L):</span> Tightly bound long-term ranges without prolonged excursions.</li>
+                        <li><span style="color: var(--warning);">Moderate (3.0 to 4.0 mmol/L):</span> Standard variability, reflecting expected post-meal rises or gentle swings.</li>
+                        <li><span style="color: var(--danger);">High (&gt; 4.0 mmol/L):</span> Sub-optimal control with massive, sweeping highs and lows throughout the day.</li>
+                    </ul>
+                </div>
+                <div class="kin-description" style="font-size: 0.8em; margin-top: 15px;">
+                    <strong>SD1 / SD2 Ratio</strong> (Predictability)
+                    <ul class="panel-list">
+                        <li><span style="color: var(--success);">Excellent (&lt; 0.2):</span> Smooth, predictable curves. The overall trend (SD2) happens gently without jagged, short-term noise (SD1).</li>
+                        <li><span style="color: var(--danger);">High / Sub-optimal (Higher values):</span> A jagged, chaotic glucose profile. Rapid, short-term spikes dominate the overall curve, making dosing difficult.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="col-right">
+                <div class="image-container">
+                    <div class="loading-overlay" id="poincare-loading">Loading dynamics...</div>
+                    <img id="poincare-image" src="" alt="Poincaré Plot">
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- 3. J-INDEX: THE GLYCAEMIC DISTRESS SCORE (50/50 AUDIT) -->
+        <div class="card split-card tab-panel" id="panel-jindex" style="align-items: flex-start; display: none;">
+            <div class="col-50 col-split-gap-right">
+                <h2 class="panel-h2">J-Index: The Glycaemic Distress Score</h2>
+                <p><strong>This Period:</strong> <span id="kin-j-index" class="score-value score-value--inline">-</span></p>
+                <p><strong>Comparison Period:</strong> <span id="kin-j-prev" class="score-value score-value--inline">-</span></p>
+                <p><span id="kin-j-change" class="score-value score-value--inline">-</span></p>
+                
+                <div class="kin-description" style="color: var(--text-color);">
+                    The J-Index is a "weighted" metabolic stress metric designed to solve the primary flaw of standard averages: the fact that a high glucose level is significantly more dangerous when it is also volatile. In standard clinical reports, a Mean Glucose and a Standard Deviation (SD) are treated as two separate, linear values. The J-Index acknowledges their interaction by squaring their sum:
+                </div>
+                <div style="text-align: center; margin: 15px 0; color: var(--text-color);">
+                    J = 0.324 × (Mean + SD)²
+                </div>
+                <div style="font-size: 0.8em; color: var(--text-secondary); text-align: center; margin-bottom: 20px;">
+                    (Note: The 0.324 constant is the unit-standardised multiplier for mmol/L data.)
+                </div>
+                
+                <div class="kin-description" style="color: var(--text-color);">
+                    By squaring the values, the J-Index creates a <strong>Risk Gradient</strong>. If your average glucose rises slightly, the score increases. If your variability increases slightly, the score increases. But if both rise together, the score skyrockets. This makes it an incredibly sensitive "early-warning system" for systemic failure. It represents the total "friction" your body and your loop are experiencing.
+                </div>
+
+                <div style="margin-top: 25px;">
+                    <table style="font-size: 0.8em; border: 1px solid var(--border-color);">
+                        <tr style="background: var(--surface-inset);"><th style="padding: 5px;">Score</th><th style="padding: 5px;">Rating</th><th style="padding: 5px;">Clinical Context</th></tr>
+                        <tr><td>&lt;20</td><td style="color: var(--success);">Excellent</td><td>Optimal "steady state." Minimal system tension.</td></tr>
+                        <tr><td>20–30</td><td style="color: var(--accent);">Good</td><td>High performance; your loop is well-tuned with only minor daily blips.</td></tr>
+                        <tr><td>30–45</td><td style="color: var(--warning);">Sub-optimal</td><td>Systemic tension. The "ride" is getting rough; you are likely over-correcting.</td></tr>
+                        <tr><td>&gt;45</td><td style="color: var(--danger);">Shocking</td><td>Unstable "rollercoaster" control. High risk of severe crashes and reactive highs.</td></tr>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="col-50 col-split-divider">
+                <h3 class="panel-heading-sm">Troubleshooting a Rising J-Index</h3>
+
+                <div style="font-size: 0.85em; color: var(--text-color); margin-top: 5px;">
+                    <p><strong>Step 1: The "Why" (Mean vs. SD)</strong><br>
+                    Is the J-Index rising because your Mean moved or because your SD moved?</p>
+                    <ul style="margin-top: 5px; margin-bottom: 15px; padding-left: 20px;">
+                        <li>If <strong>Mean is up, SD is stable</strong>: You have a "baseline shift" (illness, site failure, activity change).</li>
+                        <li>If <strong>SD is up, Mean is stable</strong>: You have "increased chaos." Look at the kinematics.</li>
+                    </ul>
+
+                    <p><strong>Step 2: The "When" (<a href="#" class="panel-link" onclick="switchTab('conga'); return false;">Look at CONGA</a>)</strong><br>
+                    Pull up the 24-Hour Reproducibility Profile. Look for the "Chaos Windows"&mdash;the peaks on the graph. If a rise correlates with a specific peak, adjust that specific window (e.g., Breakfast ICR).</p>
+
+                    <p><strong>Step 3: The "How" (<a href="#" class="panel-link" onclick="switchTab('smoothness'); return false;">Look at Rate of Change/Kurtosis</a>)</strong><br>
+                    <strong>Low/Falling Kurtosis</strong>: If the "mountain" is flattening, your loop is "hunting" or over-reacting. Check AAPS "Max SMB" or "Max Basal" limits.</p>
+
+                    <p><strong>Step 4: The Loop Efficiency Audit</strong><br>
+                    If J-Index and <strong>Manual Bolus %</strong> are both rising, you are likely "rage-bolusing." This manual interference increases volatility and penalises the score.</p>
+                </div>
+                
+                <div class="kin-description" style="margin-top: 20px; font-weight: bold; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                    Summary Logic:<br>
+                    J-Index tells you <span style="color: var(--accent);">that</span> there is a problem.<br>
+                    CONGA tells you <span style="color: var(--success);">when</span> the problem is happening.<br>
+                    ROC Kurtosis tells you <span style="color: var(--accent);">how</span> the loop is reacting to it.
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. KINEMATICS: CONGA PROFILE -->
+        <div class="card split-card tab-panel" id="panel-conga" style="display: none;">
+            <div class="col-30">
+                <h2 class="panel-h2">Conga</h2>
+                <div class="score-stack">
+                    <div class="score-block">
+                        <div class="score-value" id="kin-conga-1">-</div>
+                        <span class="score-label">CONGA-1 (1h)</span>
+                    </div>
+                    <div class="score-block">
+                        <div class="score-value" id="kin-conga-2">-</div>
+                        <span class="score-label">CONGA-2 (2h)</span>
+                    </div>
+                    <div class="score-block">
+                        <div class="score-value" id="kin-conga-4">-</div>
+                        <span class="score-label">CONGA-4 (4h)</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-70">
+                <!-- Per Harry (24 Aug 2026): unlike Poincare/Smoothness's title-left/
+                     date-right header, this one has the date centred at the top and
+                     the title text centred at the bottom, under the chart. -->
+                <div id="conga-date-range" class="text-muted chart-date-range"></div>
+                <div id="conga-chart" class="chart-container"></div>
+                <h3 class="panel-h3 chart-title-footer">24-Hour Reproducibility Profile</h3>
+            </div>
+            <!-- Explanation moved out of col-30 and below the score+chart row,
+                 full width, as 2 columns -- per Harry (24 Aug 2026). Relies on
+                 .split-card's flex-wrap: wrap -- flex: 0 0 100% has no room
+                 left in the col-30+col-70 row, so it wraps onto its own line. -->
+            <div class="split-card-full-row">
+                <div class="kin-description panel-text col-50 col-split-gap-right">
+                    CONGA-n measures how consistently your glucose returns to a similar level n hours later, at each time of day. For example, CONGA-2 compares every 11:00 reading across the period to what your glucose was at the corresponding 09:00 two hours earlier &mdash; a peak at 11:00 in the chart means those 2-hour swings are typically bigger at that time than at others. That chart is a 24-hour modal-day profile, built from many time-of-day buckets; the Single numerical result you get per timeframe pools every reading in the whole period into one figure instead, with no time-of-day structure, so it won't always match the chart's peaks exactly.
+                </div>
+                <div class="kin-description panel-text col-50 col-split-divider">
+                    <p style="margin-top: 0;"><strong>What each timeframe measures:</strong></p>
+                    <ul class="panel-list">
+                        <li><strong>CONGA-1 (1h):</strong> short-term, moment-to-moment swings &mdash; a high value usually points to fast carbs or a rapid crash (insulin stacking, exercise).</li>
+                        <li><strong>CONGA-2 (2h):</strong> roughly matches a typical post-meal cycle &mdash; the size of the swing from a pre-meal baseline up to, and back down from, its peak.</li>
+                        <li><strong>CONGA-4 (4h):</strong> longer recovery and basal stability &mdash; whether glucose settles back to baseline within a normal insulin action window, or drifts because basal rates don't quite match.</li>
+                    </ul>
+                    <p style="margin-top: 12px;">CONGA needs at least 2 days selected to calculate anything &mdash; with only 1 day, each time-of-day slot has just one reading, with nothing yet to compare it to.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. ROC VELOCITY SMOOTHNESS -->
+        <div class="card split-card tab-panel" id="panel-smoothness" style="display: none;">
+            <div class="col-30">
+                <h2 class="panel-h2">Rate of Change/Kurtosis</h2>
+                <div style="display: flex; align-items: baseline; gap: 15px;">
+                    <span id="kin-kurtosis" class="kin-stat" style="color: var(--accent);">-</span>
+                </div>
+                <div class="kin-description panel-text" style="font-size: 0.8em; margin-top: 15px; color: var(--text-color);">
+                    <strong>ROC Velocity Smoothness:</strong> This histogram tracks the "vibration" of your glucose. Each bar represents how often your glucose was moving at a specific speed. A tall, narrow peak at the 0.00 mark is the gold standard; it means your loop is successfully holding you at a standstill. If the bars are spreading out to the left and right, your glucose is in constant motion, indicating "sawtooth" turbulence and a less stable system.
+                </div>
+            </div>
+            <div class="col-70">
+                <!-- Custom 2-row legend (replaces ApexCharts' built-in one) --
+                     a CSS grid so the date column aligns regardless of the
+                     "This Period" / "Comparison Period" label lengths. -->
+                <div id="kurtosis-legend" class="chart-legend-grid"></div>
+                <div id="kurtosis-chart" style="height: 410px; width: 100%;"></div>
+                <!-- Per Harry (24 Aug 2026): title moved to centred bottom,
+                     matching CONGA's layout. Dates aren't repeated here --
+                     the legend's "This Period" row already shows the
+                     primary range. -->
+                <h3 class="panel-h3 chart-title-footer">Rate of Change/Kurtosis (mmol/L/min)</h3>
+            </div>
+        </div>
+
+<!-- BG Distribution and GRI Risk Grid panels removed 23 Aug 2026 -- both
+     moved to Clinical Reports (BG Dist stays there permanently; GRI has no
+     independent data path of its own, it read off Radar's own fetch, so it
+     could only ever live wherever Radar lives). -->
+
+
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+
+    <script src="/static/js/ns-date-selector.js"></script>
+    <script>
+        const todayStr = "{{ today_local }}";
+
+        function formatLocal(d) {
+            return d.getFullYear() + '-'
+                + String(d.getMonth() + 1).padStart(2, '0') + '-'
+                + String(d.getDate()).padStart(2, '0');
+        }
+
+        function parseLocal(dateStr) {
+            if (!dateStr) return new Date();
+            const [y, m, d] = dateStr.split('-').map(Number);
+            return new Date(y, m - 1, d);
+        }
+
+        const MONTH_PRESET_SPANS = { prev_1m: 1, prev_3m: 3, prev_6m: 6, prev_12m: 12 };
+
+        function applyPreset(daysParam) {
+            let preset = daysParam !== undefined ? daysParam.toString() : document.getElementById('date-preset').value;
+
+            const now = new Date();
+            let start, end;
+
+            if (preset === 'today') {
+                start = new Date();
+                end = new Date();
+                document.getElementById('include-today').checked = true;
+            } else if (preset === 'yesterday') {
+                start = new Date(); start.setDate(start.getDate() - 1);
+                end = new Date(start);
+                document.getElementById('include-today').checked = false;
+            } else if (preset in MONTH_PRESET_SPANS) {
+                const n = MONTH_PRESET_SPANS[preset];
+                start = new Date(now.getFullYear(), now.getMonth() - n, 1);
+                end = new Date(now.getFullYear(), now.getMonth(), 0);
+            } else {
+                if (!preset) preset = "7"; // default to 7 if empty/custom
+                const includeToday = document.getElementById('include-today').checked;
+                end = new Date();
+                if (!includeToday) end.setDate(end.getDate() - 1);
+
+                const span = (preset === 'last2') ? 2 : (preset === 'last3') ? 3 : parseInt(preset, 10);
+                start = new Date(end);
+                start.setDate(start.getDate() - span + 1);
+            }
+
+            if (start && end) {
+                const sStr = formatLocal(start);
+                const eStr = formatLocal(end);
+
+                document.getElementById('start_date').value = sStr;
+                document.getElementById('end_date').value = eStr;
+
+                recomputeComparisonIfPreset();
+                syncAndSubmit();
+            }
+        }
+
+        function onPresetChange() {
+            const val = document.getElementById('date-preset').value;
+            localStorage.setItem('ns_date_preset', val);
+            applyPreset(val);
+        }
+
+        function syncInputs() {
+            const sVal = document.getElementById('start_date').value;
+            const eVal = document.getElementById('end_date').value;
+
+            // Clear preset selection when manually changing dates
+            document.getElementById('date-preset').value = "";
+
+            // Update "Include Today" status based on end date
+            const isToday = (eVal === todayStr);
+            document.getElementById('include-today').checked = isToday;
+
+            recomputeComparisonIfPreset();
+            syncAndSubmit();
+        }
+
+        function onIncludeTodayChange() {
+            const isChecked = document.getElementById('include-today').checked;
+            const preset = document.getElementById('date-preset').value;
+
+            // Include Today has no effect on calendar month presets
+            if (preset in MONTH_PRESET_SPANS) {
+                return;
+            }
+
+            if (preset === 'today' && !isChecked) {
+                document.getElementById('date-preset').value = 'yesterday';
+                localStorage.setItem('ns_date_preset', 'yesterday');
+                applyPreset('yesterday');
+                return;
+            }
+
+            if (preset === 'yesterday' && isChecked) {
+                document.getElementById('date-preset').value = 'today';
+                localStorage.setItem('ns_date_preset', 'today');
+                applyPreset('today');
+                return;
+            }
+
+            const startVal = document.getElementById('start_date').value;
+            const endVal = document.getElementById('end_date').value;
+            if (!startVal || !endVal) return;
+
+            const start = parseLocal(startVal);
+            const end = parseLocal(endVal);
+
+            if (isChecked) {
+                // Advance dates by +1 day up to today (no future dates)
+                if (endVal < todayStr) {
+                    start.setDate(start.getDate() + 1);
+                    end.setDate(end.getDate() + 1);
+                }
+            } else {
+                // Retard dates by 1 day
+                start.setDate(start.getDate() - 1);
+                end.setDate(end.getDate() - 1);
+            }
+
+            document.getElementById('start_date').value = formatLocal(start);
+            document.getElementById('end_date').value = formatLocal(end);
+
+            recomputeComparisonIfPreset();
+            syncAndSubmit();
+        }
+
+        function shiftPeriod(direction) {
+            const startVal = document.getElementById('start_date').value;
+            const endVal = document.getElementById('end_date').value;
+            const currentPreset = document.getElementById('date-preset').value;
+
+            if (!startVal || !endVal) return;
+
+            const start = parseLocal(startVal);
+            const end = parseLocal(endVal);
+
+            let sStr, eStr, newPreset;
+
+            if (currentPreset in MONTH_PRESET_SPANS) {
+                const n = MONTH_PRESET_SPANS[currentPreset];
+                const anchorIndex = end.getFullYear() * 12 + end.getMonth() + 1;
+                const newAnchorIndex = anchorIndex + direction * n;
+                const newAnchorYear = Math.floor(newAnchorIndex / 12);
+                const newAnchorMonth = ((newAnchorIndex % 12) + 12) % 12;
+
+                const newStart = new Date(newAnchorYear, newAnchorMonth - n, 1);
+                const newEnd = new Date(newAnchorYear, newAnchorMonth, 0);
+
+                sStr = formatLocal(newStart);
+                eStr = formatLocal(newEnd);
+                newPreset = currentPreset;
+            } else {
+                const spanDays = Math.round((end - start) / 86400000) + 1;
+                start.setDate(start.getDate() + direction * spanDays);
+                end.setDate(end.getDate() + direction * spanDays);
+                sStr = formatLocal(start);
+                eStr = formatLocal(end);
+                newPreset = '';
+            }
+
+            document.getElementById('start_date').value = sStr;
+            document.getElementById('end_date').value = eStr;
+
+            document.getElementById('date-preset').value = newPreset;
+
+            const isToday = (eStr === todayStr);
+            document.getElementById('include-today').checked = isToday;
+
+            recomputeComparisonIfPreset();
+            syncAndSubmit();
+        }
+
+
+
+        let loadSeqId = 0;
+        let lastKinData = null; // most recent /kinematics response, cached to re-render ApexCharts on tab switch
+        async function syncAndSubmit() {
+            const start = document.getElementById('start_date').value;
+            const end = document.getElementById('end_date').value;
+            if (!start || !end) return;
+
+            const cid = ++loadSeqId;
+            document.getElementById('poincare-loading').style.display = 'flex';
+            
+            const paramsObj = { start_date: start, end_date: end };
+
+            // If "Compare to" is enabled, pass its dates through as an explicit
+            // override of the comparison period -- consumed server-side by
+            // database.resolve_comparison_period(), used by spider/GRI and by
+            // the kinematics endpoint (J-Index/kurtosis/BG distribution).
+            const compareToggle = document.getElementById('compare-toggle');
+            if (compareToggle && compareToggle.checked) {
+                const lpStart = document.getElementById('start_date-lastperiod').value;
+                const lpEnd = document.getElementById('end_date-lastperiod').value;
+                if (lpStart && lpEnd) {
+                    paramsObj.prev_start_date = lpStart;
+                    paramsObj.prev_end_date = lpEnd;
+                }
+            }
+
+            const params = new URLSearchParams(paramsObj).toString();
+            updateTriggerText();
+            try { window.history.replaceState(null, '', '?' + params); } catch (e) {}
+
+            // Store choices
+            localStorage.setItem('ns_date_start', start);
+            localStorage.setItem('ns_date_end', end);
+
+            try {
+                // Fetch Poincare Data (was "2." -- Radar/GRI's shared fetch
+                // block removed entirely, nothing else on this page reads it)
+                const resPoincare = await fetch(`/api/v1/advanced_metrics/poincare_data?${params}`);
+                const dataPoincare = await resPoincare.json();
+                if (cid === loadSeqId && dataPoincare.status === 'success') {
+                    document.getElementById('p-sd1').innerText = dataPoincare.sd1;
+                    document.getElementById('p-sd2').innerText = dataPoincare.sd2;
+                    document.getElementById('p-ratio').innerText = dataPoincare.ratio;
+                }
+
+                // Load Poincare Image
+                if (cid === loadSeqId) {
+                    const cb = Date.now();
+                    const pImg = document.getElementById('poincare-image');
+                    pImg.src = `/api/v1/advanced_metrics/poincare_chart?${params}&cb=${cb}`;
+                    pImg.onload = pImg.onerror = () => { if (cid === loadSeqId) document.getElementById('poincare-loading').style.display = 'none'; };
+                }
+
+                // Fetch Kinematics (feeds J-Index/CONGA/Smoothness -- all kept)
+                const resKin = await fetch(`/api/v1/experimental/kinematics?${params}`);
+                const dataKin = await resKin.json();
+                if (cid === loadSeqId && dataKin.status === 'success') {
+                    // Same excellent/good/sub-optimal/shocking thresholds
+                    // apply to both periods -- a Comparison Period score of
+                    // 50 is still "Shocking" even though it's just there as
+                    // a reference point, not the one being actively judged.
+                    const jIndexColor = (v) => v < 20 ? 'var(--success)' : v < 30 ? 'var(--accent)' : v < 45 ? 'var(--warning)' : 'var(--danger)';
+
+                    const jVal = dataKin.j_index;
+                    const jEl = document.getElementById('kin-j-index');
+                    if (jEl) {
+                        jEl.innerText = jVal;
+                        jEl.style.color = jIndexColor(jVal);
+                    }
+
+                    const jPrevVal = dataKin.j_prev;
+                    const jPrevEl = document.getElementById('kin-j-prev');
+                    if (jPrevEl) {
+                        jPrevEl.innerText = jPrevVal;
+                        jPrevEl.style.color = jIndexColor(jPrevVal);
+                    }
+
+                    const jChg = dataKin.j_change;
+                    const jChgEl = document.getElementById('kin-j-change');
+                    if (jChgEl) {
+                        jChgEl.innerText = (jChg > 0 ? '+' : '') + jChg + '%';
+                        jChgEl.className = jChg <= 0 ? 'metric-better' : 'metric-worse';
+                    }
+
+                    if (document.getElementById('kin-kurtosis')) document.getElementById('kin-kurtosis').innerText = Number(dataKin.kurtosis).toFixed(2);
+                    // These three are the pooled-period CONGA_n (SD of BG_t - BG_(t-n)
+                    // across every reading in the selected range) -- a different
+                    // computation from the chart below it, which buckets by time-of-day
+                    // instead (see renderCongaChart). kin-conga-1/4 were previously never
+                    // wired up here -- only kin-conga-2 was, leaving them permanently "-".
+                    if (document.getElementById('kin-conga-1')) document.getElementById('kin-conga-1').innerText = dataKin.conga_summaries['1h'];
+                    if (document.getElementById('kin-conga-2')) document.getElementById('kin-conga-2').innerText = dataKin.conga_summaries['2h'];
+                    if (document.getElementById('kin-conga-4')) document.getElementById('kin-conga-4').innerText = dataKin.conga_summaries['4h'];
+
+                    lastKinData = dataKin; // cached for re-render on tab switch (see switchTab)
+
+                    // Only render ApexCharts for whichever tab is currently visible --
+                    // building one into a display:none container sizes it to zero and
+                    // it won't fix itself later. switchTab() re-renders from
+                    // lastKinData when the user navigates to a not-yet-rendered tab.
+                    const activeTabEl = document.querySelector('.tab-item.active');
+                    const activeTab = activeTabEl ? activeTabEl.id.replace('tab-', '') : 'poincare';
+                    try {
+                        if (activeTab === 'smoothness') renderKurtosisChart(dataKin.velocity_hist);
+                        if (activeTab === 'conga') renderCongaChart(dataKin.conga_profile);
+                    } catch (chartErr) {
+                        console.error("Chart rendering error:", chartErr);
+                    }
+                }
+            } catch (err) {
+                console.error("Async load failure:", err);
+            }
+        }
+
+        // ─── Toast (matches the Settings page's pattern) ─────────────────
+        // showToast/toggleSpiderEdit/cancelSpiderEdit/saveSpiderThresholds
+        // (Radar's "Edit Ranges" editor) and renderBgDistributionChart all
+        // removed 23 Aug 2026 -- confirmed via grep before deleting that none
+        // had any caller outside Radar/BG Dist, which are both gone now.
+        let kurtosisChart = null;
+        function renderKurtosisChart(data) {
+            const el = document.querySelector("#kurtosis-chart");
+            if (!kurtosisChart) {
+                kurtosisChart = echarts.init(el, null, { renderer: 'canvas' });
+                window.addEventListener('resize', () => kurtosisChart && kurtosisChart.resize());
+            }
+            const bins = (data.bins || []).map(b => b.toFixed(2));
+            const sList = [];
+            sList.push({
+                name: 'This Period',
+                type: 'bar',
+                data: data.current || [],
+                itemStyle: { color: '#3498db', opacity: 0.8, borderRadius: 2 }
+            });
+            if (data.previous && data.previous.length) {
+                sList.push({
+                    name: 'Comparison Period',
+                    type: 'bar',
+                    data: data.previous,
+                    itemStyle: { color: '#e67e22', opacity: 0.8, borderRadius: 2 }
+                });
+            }
+            kurtosisChart.setOption({
+                animation: false,
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                legend: { data: sList.map(s => s.name), textStyle: { color: '#e0e0e0' }, top: 0, right: 10 },
+                grid: { top: 35, bottom: 45, left: 50, right: 20 },
+                xAxis: { type: 'category', data: bins, name: 'mmol/L/min', axisLabel: { color: '#888', rotate: -45 } },
+                yAxis: { type: 'value', name: 'Frequency (%)', axisLabel: { color: '#888', formatter: '{value}%' }, splitLine: { lineStyle: { color: '#333' } } },
+                series: sList
+            }, true);
+            kurtosisChart.resize();
+        }
+
+        let congaChart = null;
+        function renderCongaChart(data) {
+            const container = document.querySelector("#conga-chart");
+            const startVal = document.getElementById('start_date').value;
+            const endVal = document.getElementById('end_date').value;
+            const congaRangeEl = document.getElementById('conga-date-range');
+            if (congaRangeEl) congaRangeEl.textContent = `${formatDMY(startVal)} – ${formatDMY(endVal)}`;
+
+            if (startVal && endVal) {
+                const spanDays = Math.round((new Date(endVal) - new Date(startVal)) / 86400000) + 1;
+                if (spanDays < 2) {
+                    if (congaChart) { congaChart.dispose(); congaChart = null; }
+                    container.innerHTML = '<div style="display:flex; align-items:center; justify-content:center; height:280px; box-sizing: border-box;">'
+                        + '<div class="empty-state">'
+                        + '<div class="empty-state-title">Select at least 2 days to see time-of-day patterns.</div>'
+                        + '<div class="empty-state-subtitle">(This chart compares variability across days at each time of day -- a single day has nothing to compare against.)</div>'
+                        + '</div></div>';
+                    return;
+                }
+            }
+
+            container.innerHTML = '';
+            if (!congaChart) {
+                congaChart = echarts.init(container, null, { renderer: 'canvas' });
+                window.addEventListener('resize', () => congaChart && congaChart.resize());
+            }
+            congaChart.setOption({
+                animation: false,
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+                legend: { data: ['CONGA-1', 'CONGA-2', 'CONGA-4'], textStyle: { color: '#e0e0e0' }, top: 0, right: 10 },
+                grid: { top: 35, bottom: 40, left: 50, right: 20 },
+                xAxis: {
+                    type: 'category',
+                    data: data.labels,
+                    axisLabel: { color: '#888', interval: 35 } // Show every 3h
+                },
+                yAxis: { type: 'value', name: 'mmol/L', axisLabel: { color: '#888' }, splitLine: { lineStyle: { color: '#333' } } },
+                series: [
+                    { name: 'CONGA-1', type: 'line', data: data.values_1h, smooth: true, symbol: 'none', lineStyle: { color: '#00e676', width: 2 } },
+                    { name: 'CONGA-2', type: 'line', data: data.values_2h, smooth: true, symbol: 'none', lineStyle: { color: '#3498db', width: 2 } },
+                    { name: 'CONGA-4', type: 'line', data: data.values_4h, smooth: true, symbol: 'none', lineStyle: { color: '#9b59b6', width: 2 } }
+                ]
+            }, true);
+        }
+
+        // ─── GRI Risk Grid (19 Aug 2026) ────────────────────────────────
+        // Diagonal-isobar background: GRI = (3.0*X) + (1.6*Y), banded at the
+        // 20/40/60/80 cutoffs. Drawn as many thin stacked columns rather than
+        // analytic polygons -- since the boundaries are straight lines, fine
+        // columns look identical to true polygons and the code stays simple.
+        function griZoneColor(score) {
+            if (score <= 20) return '#2ecc71';
+            if (score <= 40) return '#c8e666';
+            if (score <= 60) return '#f5a623';
+            if (score <= 80) return '#f2705c';
+            return '#c0392b';
+        }
+
+        // renderGriGrid removed 23 Aug 2026 -- GRI moved to Clinical
+        // Reports along with Radar (see tab bar comment above for why).
+
+
+        // ─── "Compare to" checkbox: auto (default) vs manual override ─────
+        // Comparison is always computed for panels that support it -- this
+        // checkbox toggles between the auto-derived default (immediately
+        // preceding period, same length) and a manually-chosen override.
+        function updateComparisonUiState() {
+            const isChecked = document.getElementById('compare-toggle').checked;
+            const compareSection = document.querySelector('.compare-section');
+            const presetSel = document.getElementById('date-preset-lastperiod');
+            const startInput = document.getElementById('start_date-lastperiod');
+            const endInput = document.getElementById('end_date-lastperiod');
+            const stepPrev = document.getElementById('step-btn-prev-lp');
+            const stepNext = document.getElementById('step-btn-next-lp');
+
+            if (compareSection) compareSection.classList.toggle('is-disabled', !isChecked);
+            if (presetSel) presetSel.disabled = !isChecked;
+            if (startInput) startInput.disabled = !isChecked;
+            if (endInput) endInput.disabled = !isChecked;
+            if (stepPrev) stepPrev.disabled = !isChecked;
+            if (stepNext) stepNext.disabled = !isChecked;
+
+            if (!isChecked) {
+                // When unticked, populate inputs with the auto-derived default comparison dates
+                const pStart = document.getElementById('start_date').value;
+                const pEnd = document.getElementById('end_date').value;
+                if (pStart && pEnd) {
+                    const auto = computeAutoPreviousPeriod(pStart, pEnd);
+                    if (startInput) startInput.value = auto.start;
+                    if (endInput) endInput.value = auto.end;
+
+                    const [sy, sm, sd] = pStart.split('-').map(Number);
+                    const [ey, em, ed] = pEnd.split('-').map(Number);
+                    const s = new Date(sy, sm - 1, sd);
+                    const e = new Date(ey, em - 1, ed);
+                    const span = Math.round((e - s) / 86400000) + 1;
+                    const validOptions = ['1', '2', '3', '7', '14', '30', '60', '90', '180'];
+                    if (presetSel) {
+                        presetSel.value = validOptions.includes(span.toString()) ? span.toString() : '';
+                    }
+                }
+            }
+        }
+
+        function onCompareToggleChange() {
+            const checked = document.getElementById('compare-toggle').checked;
+            localStorage.setItem('ns_compare_enabled', checked ? 'true' : 'false');
+
+            updateComparisonUiState();
+
+            if (checked) {
+                const lpPreset = document.getElementById('date-preset-lastperiod').value;
+                if (lpPreset) {
+                    applyPresetLastPeriod(lpPreset, false);
+                } else if (!document.getElementById('start_date-lastperiod').value) {
+                    seedLastPeriodFromAuto();
+                }
+            }
+            syncAndSubmit();
+        }
+
+        // Pure date math for "the period immediately before this one, same
+        // length" -- the same default database.resolve_comparison_period()
+        // applies server-side when no override is given. Shared by
+        // seedLastPeriodFromAuto() (writes it into the override fields) and
+        // getComparisonPeriodDates() (just reads it for display, doesn't
+        // touch the override fields) so the two can't drift apart.
+        function computeAutoPreviousPeriod(startStr, endStr) {
+            const [sy, sm, sd] = startStr.split('-').map(Number);
+            const [ey, em, ed] = endStr.split('-').map(Number);
+            const s = new Date(sy, sm - 1, sd);
+            const e = new Date(ey, em - 1, ed);
+            const span = Math.round((e - s) / 86400000) + 1;
+            const prevEnd = new Date(s);
+            prevEnd.setDate(prevEnd.getDate() - 1);
+            const prevStart = new Date(prevEnd);
+            prevStart.setDate(prevStart.getDate() - span + 1);
+            return { start: formatLocal(prevStart), end: formatLocal(prevEnd) };
+        }
+
+        function seedLastPeriodFromAuto() {
+            const start = document.getElementById('start_date').value;
+            const end = document.getElementById('end_date').value;
+            if (!start || !end) return;
+            const auto = computeAutoPreviousPeriod(start, end);
+            document.getElementById('start_date-lastperiod').value = auto.start;
+            document.getElementById('end_date-lastperiod').value = auto.end;
+            persistLastPeriod();
+        }
+
+        // The actual comparison period currently in effect, regardless of
+        // whether "Compare to" is ticked -- ticked uses the manual override,
+        // unticked mirrors the same auto-default the server resolves via
+        // database.resolve_comparison_period(). For display only.
+        function getComparisonPeriodDates() {
+            const compareToggle = document.getElementById('compare-toggle');
+            if (compareToggle && compareToggle.checked) {
+                const lpStart = document.getElementById('start_date-lastperiod').value;
+                const lpEnd = document.getElementById('end_date-lastperiod').value;
+                if (lpStart && lpEnd) return { start: lpStart, end: lpEnd };
+            }
+            const start = document.getElementById('start_date').value;
+            const end = document.getElementById('end_date').value;
+            if (!start || !end) return null;
+            return computeAutoPreviousPeriod(start, end);
+        }
+
+        function persistLastPeriod() {
+            localStorage.setItem('ns_compare_start', document.getElementById('start_date-lastperiod').value);
+            localStorage.setItem('ns_compare_end', document.getElementById('end_date-lastperiod').value);
+            localStorage.setItem('ns_compare_preset', document.getElementById('date-preset-lastperiod').value);
+        }
+
+        function onPresetChangeLastPeriod() {
+            const val = document.getElementById('date-preset-lastperiod').value;
+            localStorage.setItem('ns_compare_preset', val);
+            applyPresetLastPeriod(val);
+        }
+
+        function applyPresetLastPeriod(presetParam, triggerSync = true) {
+            const preset = presetParam !== undefined ? presetParam.toString() : document.getElementById('date-preset-lastperiod').value;
+            if (!preset) return; // Custom Range
+
+            const startVal = document.getElementById('start_date').value;
+            if (!startVal) return;
+            const pStart = parseLocal(startVal);
+
+            let compStart, compEnd;
+
+            if (preset in MONTH_PRESET_SPANS) {
+                const n = MONTH_PRESET_SPANS[preset];
+                // Prior whole calendar month end (last day of month before pStart's month)
+                compEnd = new Date(pStart.getFullYear(), pStart.getMonth(), 0);
+                compStart = new Date(pStart.getFullYear(), pStart.getMonth() - n, 1);
+            } else {
+                const days = parseInt(preset, 10);
+                if (isNaN(days)) return;
+                // Relative to the day before primary range start
+                compEnd = new Date(pStart.getFullYear(), pStart.getMonth(), pStart.getDate() - 1);
+                compStart = new Date(compEnd.getFullYear(), compEnd.getMonth(), compEnd.getDate() - days + 1);
+            }
+
+            if (compStart && compEnd) {
+                document.getElementById('start_date-lastperiod').value = formatLocal(compStart);
+                document.getElementById('end_date-lastperiod').value = formatLocal(compEnd);
+                persistLastPeriod();
+                if (triggerSync) syncAndSubmit();
+            }
+        }
+
+        function recomputeComparisonIfPreset() {
+            const compareToggle = document.getElementById('compare-toggle');
+            if (compareToggle && compareToggle.checked) {
+                const lpPreset = document.getElementById('date-preset-lastperiod').value;
+                if (lpPreset) {
+                    applyPresetLastPeriod(lpPreset, false);
+                }
+            } else {
+                updateComparisonUiState();
+            }
+        }
+
+        function syncInputsLastPeriod() {
+            document.getElementById('date-preset-lastperiod').value = "";
+            persistLastPeriod();
+            syncAndSubmit();
+        }
+
+        const MONTH_PRESET_SPANS_LP = MONTH_PRESET_SPANS;
+        function shiftPeriodLastPeriod(direction) {
+            const startVal = document.getElementById('start_date-lastperiod').value;
+            const endVal = document.getElementById('end_date-lastperiod').value;
+            const currentPreset = document.getElementById('date-preset-lastperiod').value;
+
+            if (!startVal || !endVal) return;
+
+            const start = parseLocal(startVal);
+            const end = parseLocal(endVal);
+
+            let sStr, eStr, newPreset;
+
+            if (currentPreset in MONTH_PRESET_SPANS_LP) {
+                const n = MONTH_PRESET_SPANS_LP[currentPreset];
+                const anchorIndex = end.getFullYear() * 12 + end.getMonth() + 1;
+                const newAnchorIndex = anchorIndex + direction * n;
+                const newAnchorYear = Math.floor(newAnchorIndex / 12);
+                const newAnchorMonth = ((newAnchorIndex % 12) + 12) % 12;
+
+                const newStart = new Date(newAnchorYear, newAnchorMonth - n, 1);
+                const newEnd = new Date(newAnchorYear, newAnchorMonth, 0);
+
+                sStr = formatLocal(newStart);
+                eStr = formatLocal(newEnd);
+                newPreset = currentPreset;
+            } else {
+                const spanDays = Math.round((end - start) / 86400000) + 1;
+                start.setDate(start.getDate() + direction * spanDays);
+                end.setDate(end.getDate() + direction * spanDays);
+                sStr = formatLocal(start);
+                eStr = formatLocal(end);
+                newPreset = '';
+            }
+
+            document.getElementById('start_date-lastperiod').value = sStr;
+            document.getElementById('end_date-lastperiod').value = eStr;
+            document.getElementById('date-preset-lastperiod').value = newPreset;
+            persistLastPeriod();
+            syncAndSubmit();
+        }
+
+        // ─── Panel tabs ────────────────────────────────────────────────
+        // Radar/BG Dist/GRI removed from TAB_IDS -- see the tab bar comment
+        // above. Default fallback changed 'radar' -> 'poincare' (Harry's
+        // call) in both places below. The old spider-edit-form defensive
+        // reset removed too -- that element no longer exists on this page.
+        const TAB_IDS = ['poincare', 'jindex', 'conga', 'smoothness'];
+        function switchTab(tab) {
+            closeDatePopover();
+
+            TAB_IDS.forEach(t => {
+                const panel = document.getElementById('panel-' + t);
+                if (panel) panel.style.display = (t === tab) ? 'flex' : 'none';
+                const btn = document.getElementById('tab-' + t);
+                if (btn) btn.classList.toggle('active', t === tab);
+            });
+            localStorage.setItem('adv_active_tab', tab);
+
+            // ApexCharts panels size themselves off the container at creation
+            // time -- re-render from cached data so a tab that wasn't visible
+            // during the last data fetch shows a correctly-sized chart rather
+            // than whatever it rendered as (or didn't) while hidden.
+            if (lastKinData) {
+                if (tab === 'smoothness') renderKurtosisChart(lastKinData.velocity_hist);
+                if (tab === 'conga') renderCongaChart(lastKinData.conga_profile);
+            }
+            setTimeout(() => {
+                if (kurtosisChart) kurtosisChart.resize();
+                if (congaChart) congaChart.resize();
+            }, 50);
+        }
+
+        window.syncAndSubmit = syncAndSubmit;
+        window.onDateOrPresetChange = syncAndSubmit;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const savedTab = localStorage.getItem('adv_active_tab');
+            switchTab(TAB_IDS.includes(savedTab) ? savedTab : 'poincare');
+            syncAndSubmit();
+        });
+    </script>
+</body>
+</html>

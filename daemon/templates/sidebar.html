@@ -1,0 +1,578 @@
+<!-- sidebar.html - Converted to Top Header Navigation (Option 2: Stripe / Datadog Layout) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="/static/css/ns-shared.css">
+
+<style>
+    /* =========================================================================
+       Top Header Navigation (Option 2)
+       --top-nav-height defined in ns-shared.css :root
+       ========================================================================= */
+    body {
+        padding-top: calc(var(--top-nav-height) + 12px) !important;
+        padding-left: 20px !important;
+        padding-right: 20px !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+        transition: none !important;
+    }
+
+    body.sb-body-collapsed {
+        padding-left: 20px !important;
+    }
+
+    /* Top Navigation Bar */
+    .top-navbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: var(--top-nav-height);
+        background: var(--card-bg, #161b22);
+        border-bottom: 1px solid var(--border-color, #30363d);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        z-index: 10000;
+        box-sizing: border-box;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    }
+
+    .nav-left-group {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        min-width: 0;
+    }
+
+    .nav-brand {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-color, #e6edf3);
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 0.98rem;
+        letter-spacing: -0.01em;
+        white-space: nowrap;
+        padding: 4px 6px;
+        border-radius: var(--radius-sm, 4px);
+        transition: opacity 0.15s;
+    }
+    .nav-brand:hover {
+        color: #ffffff;
+        opacity: 0.9;
+    }
+    .nav-brand i {
+        color: var(--accent, #2f81f7);
+        font-size: 1.15rem;
+    }
+
+    /* BG Score Pill */
+    .bg-nav-pill {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        background: var(--surface-raised, #21262d);
+        border: 1px solid var(--border-color, #30363d);
+        border-radius: var(--radius-sm, 4px);
+        padding: 3px 8px;
+        white-space: nowrap;
+    }
+    .bg-nav-pill .bg-value {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--text-color, #e6edf3);
+        white-space: nowrap;
+    }
+    .bg-nav-pill .bg-delta {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--success, #2ecc71);
+        white-space: nowrap;
+    }
+    .bg-nav-pill .bg-time {
+        font-size: 0.72rem;
+        color: var(--text-secondary, #8b949e);
+        white-space: nowrap;
+    }
+
+    /* Center Navigation Links */
+    .nav-center-links {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex: 1;
+        margin: 0 16px;
+        overflow: visible;
+    }
+
+    .nav-link-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 11px;
+        border-radius: var(--radius-sm, 4px);
+        color: var(--text-color, #c9d1d9);
+        text-decoration: none;
+        font-size: 0.88rem;
+        font-weight: 500;
+        white-space: nowrap;
+        transition: background 0.12s, color 0.12s;
+    }
+    .nav-link-item:hover {
+        background: var(--surface-hover, #262c36);
+        color: #ffffff;
+    }
+    .nav-link-item.active {
+        background: rgba(47, 129, 247, 0.12);
+        color: var(--accent, #2f81f7);
+        font-weight: 600;
+    }
+    .nav-link-item i,
+    .nav-link-item svg {
+        font-size: 0.9em;
+        opacity: 0.8;
+    }
+    .nav-link-item.active i,
+    .nav-link-item.active svg {
+        opacity: 1;
+        color: var(--accent, #2f81f7);
+    }
+
+    /* Dropdown Menus */
+    .nav-dropdown {
+        position: relative;
+        display: inline-block;
+    }
+    .nav-dropdown-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 11px;
+        border-radius: var(--radius-sm, 4px);
+        color: var(--text-color, #c9d1d9);
+        text-decoration: none;
+        font-size: 0.88rem;
+        font-weight: 500;
+        cursor: pointer;
+        background: none;
+        border: none;
+        transition: background 0.12s, color 0.12s;
+    }
+    .nav-dropdown-trigger:hover,
+    .nav-dropdown:hover .nav-dropdown-trigger {
+        background: var(--surface-hover, #262c36);
+        color: #ffffff;
+    }
+    .nav-dropdown-trigger.active {
+        color: var(--accent, #2f81f7);
+        font-weight: 600;
+    }
+    .nav-dropdown-trigger .caret {
+        font-size: 0.68em;
+        opacity: 0.7;
+        transition: transform 0.15s;
+    }
+    .nav-dropdown:hover .nav-dropdown-trigger .caret {
+        transform: rotate(180deg);
+    }
+
+    .nav-dropdown-menu {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        margin-top: 4px;
+        background: var(--card-bg, #161b22);
+        border: 1px solid var(--border-color, #30363d);
+        border-radius: var(--radius-md, 6px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+        min-width: 200px;
+        padding: 6px;
+        z-index: 10001;
+    }
+    .nav-dropdown-menu::before {
+        content: '';
+        position: absolute;
+        top: -10px;
+        left: 0;
+        right: 0;
+        height: 10px;
+        display: block;
+    }
+    .nav-dropdown:hover .nav-dropdown-menu,
+    .nav-dropdown.open .nav-dropdown-menu {
+        display: block;
+    }
+
+    .nav-dropdown-header {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary, #8b949e);
+        padding: 6px 8px 3px;
+    }
+
+    .nav-dropdown-divider {
+        height: 1px;
+        background: var(--border-color, #30363d);
+        margin: 4px 0;
+    }
+
+    .nav-dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px;
+        border-radius: var(--radius-sm, 4px);
+        color: var(--text-color, #c9d1d9);
+        text-decoration: none;
+        font-size: 0.85rem;
+        transition: background 0.12s, color 0.12s;
+        white-space: nowrap;
+    }
+    .nav-dropdown-item:hover {
+        background: var(--surface-hover, #262c36);
+        color: #ffffff;
+    }
+    .nav-dropdown-item.active {
+        background: rgba(47, 129, 247, 0.15);
+        color: var(--accent, #2f81f7);
+        font-weight: 600;
+    }
+    .nav-dropdown-item i {
+        width: 16px;
+        text-align: center;
+        color: var(--text-secondary, #8b949e);
+        font-size: 0.9em;
+    }
+    .nav-dropdown-item.active i {
+        color: var(--accent, #2f81f7);
+    }
+
+    /* Right Utility Actions */
+    .nav-right-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+    }
+
+    .btn-nav-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 10px;
+        background: var(--surface-raised, #21262d);
+        border: 1px solid var(--border-color, #30363d);
+        border-radius: var(--radius-sm, 4px);
+        color: var(--text-color, #c9d1d9);
+        text-decoration: none;
+        font-size: 0.84rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .btn-nav-action:hover {
+        background: var(--surface-hover, #262c36);
+        color: #ffffff;
+        border-color: #58a6ff;
+    }
+
+    /* Mobile Hamburger */
+    .nav-mobile-toggle {
+        display: none;
+        background: none;
+        border: none;
+        color: var(--text-color, #e6edf3);
+        font-size: 1.15rem;
+        padding: 6px 8px;
+        cursor: pointer;
+        border-radius: var(--radius-sm, 4px);
+    }
+    .nav-mobile-toggle:hover {
+        background: var(--surface-hover, #262c36);
+    }
+
+    @media (max-width: 900px) {
+        .nav-center-links {
+            display: none;
+        }
+        .nav-mobile-toggle {
+            display: block;
+        }
+    }
+
+    @media print {
+        .top-navbar,
+        .nav-dropdown-menu,
+        .btn-nav-action {
+            display: none !important;
+        }
+        body,
+        body.sb-body-collapsed {
+            padding-top: 0 !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+            margin: 0 auto !important;
+        }
+    }
+</style>
+
+<nav class="top-navbar" id="top-navbar">
+    <!-- Left: Brand + Telemetry -->
+    <div class="nav-left-group">
+        <a href="/dashboard" class="nav-brand" title="ns-monitor Home">
+            <i class="fa-solid fa-wave-square"></i>
+            <span>ns-monitor</span>
+        </a>
+
+        <!-- Live BG Metric Pill -->
+        <div class="bg-nav-pill" id="bg-panel">
+            <span class="score-value score-value--inline bg-value" id="bg-value">--</span>
+            <span class="score-delta bg-delta" id="bg-delta"></span>
+            <span class="score-label bg-time" id="bg-time"></span>
+        </div>
+    </div>
+
+    <!-- Center: Primary Workspaces (Top Prominence) + Contextual Dropdowns -->
+    <div class="nav-center-links" id="nav-center-links">
+        <a href="/dashboard" class="nav-link-item {{ 'active' if request.path in ['/', '/dashboard'] else '' }}" title="Home Dashboard">
+            <i class="fa-solid fa-gauge-high"></i><span>Home</span>
+        </a>
+        <a href="/patterns" class="nav-link-item {{ 'active' if request.path in ['/patterns', '/interactive'] else '' }}" title="24h Modal Patterns (AGP)">
+            <i class="fa-solid fa-chart-line"></i><span>Patterns</span>
+        </a>
+        <a href="/trends" class="nav-link-item {{ 'active' if request.path in ['/trends', '/timeline'] else '' }}" title="Trends Timeline">
+            <i class="fa-solid fa-timeline"></i><span>Trends</span>
+        </a>
+        <a href="/trace" class="nav-link-item {{ 'active' if request.path in ['/trace', '/daily'] else '' }}" title="Continuous Trace">
+            <svg class="nav-icon-svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h3l2.5-4.5 2.5 11.5 3.5-16 3 13 2.5-7 1.5 3h1.5"/></svg><span>Trace</span>
+        </a>
+        <a href="/calendar" class="nav-link-item {{ 'active' if request.path == '/calendar' else '' }}" title="Monthly Calendar">
+            <i class="fa-solid fa-calendar-days"></i><span>Calendar</span>
+        </a>
+        <a href="/diary" class="nav-link-item {{ 'active' if request.path.startswith('/diary') else '' }}" title="Diary &amp; Notes Studio">
+            <i class="fa-solid fa-book-medical"></i><span>Diary</span>
+        </a>
+
+        <!-- Reports & Clinical Dropdown (formerly Therapy, now including Lab) -->
+        <div class="nav-dropdown">
+            <button type="button" class="nav-dropdown-trigger {{ 'active' if request.path in ['/profiles', '/omnipod', '/cgm', '/hba1c', '/clinical_reports', '/clinical-reports', '/carpet_plot', '/carpet-plot', '/summary_table', '/summary-table', '/best_worst', '/best-worst', '/novel_reports', '/novel-reports', '/sandbox'] else '' }}">
+                <i class="fa-solid fa-file-lines"></i>
+                <span>Reports</span>
+                <i class="fa-solid fa-chevron-down caret"></i>
+            </button>
+            <div class="nav-dropdown-menu">
+                <div class="nav-dropdown-header">Device &amp; Regimen</div>
+                <a href="/profiles" class="nav-dropdown-item {{ 'active' if request.path == '/profiles' else '' }}">
+                    <i class="fa-solid fa-sliders"></i><span>Basal Profiles</span>
+                </a>
+                <a href="/omnipod" class="nav-dropdown-item {{ 'active' if request.path == '/omnipod' else '' }}">
+                    <i class="fa-solid fa-syringe"></i><span>Omnipod</span>
+                </a>
+                <a href="/cgm" class="nav-dropdown-item {{ 'active' if request.path == '/cgm' else '' }}">
+                    <i class="fa-solid fa-chart-line"></i><span>CGM</span>
+                </a>
+                <a href="/hba1c" class="nav-dropdown-item {{ 'active' if request.path == '/hba1c' else '' }}">
+                    <i class="fa-solid fa-vial"></i><span>HbA1c</span>
+                </a>
+                <div class="nav-dropdown-divider"></div>
+                <div class="nav-dropdown-header">Reports &amp; Analytics</div>
+                <a href="/clinical_reports" class="nav-dropdown-item {{ 'active' if request.path in ['/clinical_reports', '/clinical-reports'] else '' }}">
+                    <i class="fa-solid fa-file-medical"></i><span>Other Reports</span>
+                </a>
+                <a href="/carpet_plot" class="nav-dropdown-item {{ 'active' if request.path in ['/carpet_plot', '/carpet-plot'] else '' }}">
+                    <i class="fa-solid fa-table-cells"></i><span>Carpet Plot</span>
+                </a>
+                <a href="/summary_table" class="nav-dropdown-item {{ 'active' if request.path in ['/summary_table', '/summary-table'] else '' }}">
+                    <i class="fa-solid fa-table"></i><span>Summary Table</span>
+                </a>
+                <a href="/best_worst" class="nav-dropdown-item {{ 'active' if request.path in ['/best_worst', '/best-worst'] else '' }}">
+                    <i class="fa-solid fa-ranking-star"></i><span>Best &amp; Worst Days</span>
+                </a>
+                <div class="nav-dropdown-divider"></div>
+                <div class="nav-dropdown-header">Lab</div>
+                <a href="/novel_reports" class="nav-dropdown-item {{ 'active' if request.path in ['/novel_reports', '/novel-reports'] else '' }}">
+                    <i class="fa-solid fa-vial"></i><span>Novel Reports</span>
+                </a>
+                <a href="/sandbox" class="nav-dropdown-item {{ 'active' if request.path == '/sandbox' else '' }}">
+                    <i class="fa-solid fa-flask-vial"></i><span>Sandbox Studio</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Operations & Platform Dropdown -->
+        <div class="nav-dropdown">
+            <button type="button" class="nav-dropdown-trigger {{ 'active' if request.path in ['/import', '/export', '/maintenance', '/sanity_check', '/logs', '/settings', '/config'] else '' }}">
+                <i class="fa-solid fa-database"></i>
+                <span>Operations</span>
+                <i class="fa-solid fa-chevron-down caret"></i>
+            </button>
+            <div class="nav-dropdown-menu" style="right: 0; left: auto;">
+                <div class="nav-dropdown-header">Data Management</div>
+                <a href="/import" class="nav-dropdown-item {{ 'active' if request.path == '/import' else '' }}">
+                    <i class="fa-solid fa-file-import"></i><span>Import Data</span>
+                </a>
+                <a href="/export" class="nav-dropdown-item {{ 'active' if request.path == '/export' else '' }}">
+                    <i class="fa-solid fa-file-export"></i><span>Export Data</span>
+                </a>
+                <a href="/maintenance" class="nav-dropdown-item {{ 'active' if request.path in ['/maintenance', '/sanity_check'] else '' }}">
+                    <i class="fa-solid fa-screwdriver-wrench"></i><span>Maintenance &amp; Gaps</span>
+                </a>
+
+                <div class="nav-dropdown-divider"></div>
+                <div class="nav-dropdown-header">Engine &amp; Platform</div>
+                <a href="/logs" class="nav-dropdown-item {{ 'active' if request.path == '/logs' else '' }}">
+                    <i class="fa-solid fa-heart-pulse"></i><span>Status &amp; Logs</span>
+                </a>
+                <a href="/settings" class="nav-dropdown-item {{ 'active' if request.path in ['/settings', '/config'] else '' }}">
+                    <i class="fa-solid fa-gear"></i><span>System Settings</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Nightscout Source Link (flows on as last menu item) -->
+        <a href="{{ nightscout_site_url or '#' }}" target="_blank" rel="noopener noreferrer" class="btn-nav-action" title="Open Nightscout Source">
+            <i class="fa-solid fa-droplet" style="color:#e74c3c;"></i>
+            <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.75em;opacity:0.7;"></i>
+        </a>
+    </div>
+
+    <!-- Right: Mobile Drawer Toggle -->
+    <div class="nav-right-group">
+        <!-- Mobile Drawer Toggle -->
+        <button type="button" class="nav-mobile-toggle" id="nav-mobile-toggle" title="Toggle Menu">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+    </div>
+</nav>
+
+<!-- Legacy DOM hooks kept for backwards compatibility with any existing page scripts -->
+<div id="hamburger-btn" style="display:none !important;"></div>
+<div id="nav-menu" style="display:none !important;"></div>
+<div id="sb-toggle-btn" style="display:none !important;"></div>
+
+<script>
+    // ---- BG Telemetry Panel Polling ----
+    (function () {
+        var MGDL_PER_MMOL = 18.0182;
+        var POLL_INTERVAL_MS = 15000;
+
+        var valueEl = document.getElementById('bg-value');
+        var deltaEl = document.getElementById('bg-delta');
+        var timeEl = document.getElementById('bg-time');
+
+        var lastReadingAt = null;
+
+        function toMmol(mgdl) {
+            return mgdl / MGDL_PER_MMOL;
+        }
+
+        function formatTimeAgo(readingDate) {
+            if (!readingDate) return '';
+            var diffSec = Math.max(0, Math.round((Date.now() - readingDate.getTime()) / 1000));
+            if (diffSec < 60) return 'just now';
+            var mins = Math.floor(diffSec / 60);
+            if (mins < 60) return mins + ' min ago';
+            var hrs = Math.floor(mins / 60);
+            return hrs + 'h ' + (mins % 60) + 'm ago';
+        }
+
+        function setNeutral(isNeutral) {
+            if (valueEl) valueEl.classList.toggle('metric-neutral', isNeutral);
+            if (deltaEl) deltaEl.classList.toggle('metric-neutral', isNeutral);
+        }
+
+        function render(data) {
+            if (!valueEl) return;
+            if (!data || data.sg === null || data.sg === undefined) {
+                valueEl.textContent = '--';
+                if (deltaEl) deltaEl.textContent = '';
+                if (timeEl) timeEl.textContent = 'no data';
+                setNeutral(true);
+                lastReadingAt = null;
+                return;
+            }
+
+            valueEl.textContent = toMmol(data.sg).toFixed(1);
+
+            if (deltaEl) {
+                if (data.delta === null || data.delta === undefined) {
+                    deltaEl.textContent = '';
+                } else {
+                    var deltaMmol = toMmol(data.delta);
+                    var sign = deltaMmol > 0 ? '+' : '';
+                    deltaEl.textContent = sign + deltaMmol.toFixed(1);
+                }
+            }
+
+            lastReadingAt = data.ts_utc ? new Date(data.ts_utc) : null;
+            if (timeEl) timeEl.textContent = formatTimeAgo(lastReadingAt);
+
+            var hasNoDelta = (data.delta === null || data.delta === undefined);
+            setNeutral(!!data.is_stale || hasNoDelta);
+        }
+
+        function poll() {
+            fetch('/api/latest')
+                .then(function (r) { return r.json(); })
+                .then(render)
+                .catch(function () {
+                    // Retain last known value on error
+                });
+        }
+
+        poll();
+        setInterval(poll, POLL_INTERVAL_MS);
+
+        setInterval(function () {
+            if (lastReadingAt && timeEl) {
+                timeEl.textContent = formatTimeAgo(lastReadingAt);
+            }
+        }, 1000);
+
+        // Dropdown touch/click toggle support
+        var dropdowns = document.querySelectorAll('.nav-dropdown');
+        dropdowns.forEach(function (dd) {
+            var trigger = dd.querySelector('.nav-dropdown-trigger, .btn-nav-action');
+            if (trigger) {
+                trigger.addEventListener('click', function (e) {
+                    var isOpen = dd.classList.contains('open');
+                    dropdowns.forEach(function (other) { other.classList.remove('open'); });
+                    if (!isOpen) {
+                        dd.classList.add('open');
+                        e.stopPropagation();
+                    }
+                });
+            }
+        });
+
+        document.addEventListener('click', function () {
+            dropdowns.forEach(function (dd) { dd.classList.remove('open'); });
+        });
+
+        // Mobile drawer toggle
+        var mobToggle = document.getElementById('nav-mobile-toggle');
+        var centerLinks = document.getElementById('nav-center-links');
+        if (mobToggle && centerLinks) {
+            mobToggle.addEventListener('click', function (e) {
+                var isShown = centerLinks.style.display === 'flex';
+                centerLinks.style.display = isShown ? 'none' : 'flex';
+                if (!isShown) {
+                    centerLinks.style.position = 'absolute';
+                    centerLinks.style.top = '58px';
+                    centerLinks.style.left = '0';
+                    centerLinks.style.right = '0';
+                    centerLinks.style.background = 'var(--card-bg)';
+                    centerLinks.style.flexDirection = 'column';
+                    centerLinks.style.padding = '12px';
+                    centerLinks.style.borderBottom = '1px solid var(--border-color)';
+                }
+                e.stopPropagation();
+            });
+        }
+    })();
+</script>

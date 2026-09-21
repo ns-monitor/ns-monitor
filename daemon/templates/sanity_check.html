@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Maintenance</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <style>
+        /* Page-local styling */
+        .controls-row {
+            display: flex;
+            gap: var(--space-4);
+            align-items: flex-end;
+            margin-bottom: var(--space-3);
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .control-group label {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+
+        .description {
+            color: var(--text-secondary);
+            margin-bottom: var(--space-4);
+            line-height: 1.5;
+            font-size: 0.9em;
+        }
+
+        /* Collapsible Details */
+        details {
+            background-color: var(--card-bg);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-3);
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        summary {
+            padding: var(--space-3) var(--space-4);
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
+            background-color: var(--surface-raised);
+            color: var(--text-color);
+        }
+
+        summary:hover {
+            background-color: var(--surface-hover);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::after {
+            content: "+";
+            font-size: 1.2em;
+            color: var(--text-secondary);
+        }
+
+        details[open] summary::after {
+            content: "−";
+        }
+
+        th.sortable {
+            cursor: pointer;
+            position: relative;
+            padding-right: 25px;
+        }
+
+        th.sortable:hover {
+            color: var(--accent);
+        }
+
+        th.sortable::after {
+            content: '↕';
+            position: absolute;
+            right: 8px;
+            opacity: 0.3;
+        }
+
+        th.sortable.asc::after {
+            content: '↑';
+            opacity: 1;
+        }
+
+        th.sortable.desc::after {
+            content: '↓';
+            opacity: 1;
+        }
+
+        .details-content {
+            padding: var(--space-4);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .refresh-row {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: var(--space-3);
+        }
+
+        .page-summary {
+            color: var(--text-secondary);
+            margin-bottom: var(--space-5);
+            font-style: italic;
+            border-left: 4px solid var(--accent);
+            padding-left: var(--space-3);
+            font-size: 0.95em;
+        }
+
+        /* Retention UI */
+        .retention-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        @media (max-width: 800px) {
+            .retention-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .storage-bar-container {
+            height: 40px;
+            background: #444;
+            border-radius: 20px;
+            overflow: hidden;
+            display: flex;
+            margin: 20px 0;
+            border: 1px solid #555;
+            position: relative;
+        }
+
+        .storage-bar-tier1 {
+            background: var(--accent);
+            transition: width 0.3s;
+            position: relative;
+            color: var(--accent-foreground);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .storage-bar-tier2 {
+            background: var(--success);
+            transition: width 0.3s;
+            position: relative;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .storage-bar-free {
+            background: #333;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+            color: #888;
+            white-space: nowrap;
+        }
+
+        .retention-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .retention-card h3 {
+            margin-top: 0;
+            color: var(--accent);
+            font-size: 1.1em;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .size-info {
+            font-size: 0.8em;
+            color: #aaa;
+            font-weight: normal;
+        }
+
+        .slider-group {
+            margin: 20px 0;
+        }
+
+        .slider-group label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .projection-box {
+            background: rgba(46, 204, 113, 0.1);
+            border: 1px dashed var(--success);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .projection-box p {
+            margin: 0;
+        }
+
+        .commit-btn-container {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .retention-enable-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(52, 152, 219, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(52, 152, 219, 0.3);
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider-toggle {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #555;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider-toggle:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider-toggle {
+            background-color: var(--success);
+        }
+
+        input:checked+.slider-toggle:before {
+            transform: translateX(26px);
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            margin: 10% auto;
+            padding: 30px;
+            border: 1px solid #e74c3c;
+            width: 90%;
+            max-width: 450px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .modal-btns {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 25px;
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+        }
+
+        .btn-cancel {
+            background-color: #555;
+        }
+    </style>
+</head>
+
+<body>
+    {% include "sidebar.html" %}
+    <div class="container">
+        <header class="page-header"><h1 class="panel-h1">Database Maintenance</h1></header>
+
+        <div class="page-summary">
+            Manage your database health, check data completeness, and configure long-term retention policies.<br>
+            Optimizing your data lifecycle ensures the system remains responsive as history grows.
+        </div>
+
+        <!-- Segment 1: Database Statistics -->
+        <details id="seg-stats">
+            <summary>Database Statistics</summary>
+            <div class="details-content">
+                <div class="refresh-row">
+                    <button type="button" onclick="loadDbStats()" id="btn-refresh-stats" class="btn btn-success">Refresh Table Stats</button>
+                </div>
+                <table id="db-stats-table" class="panel-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" onclick="sortStats(0)">Table</th>
+                            <th class="sortable" onclick="sortStats(1)">Type</th>
+                            <th class="sortable" onclick="sortStats(2)">Row Count</th>
+                            <th class="sortable" onclick="sortStats(3)">Disk Size</th>
+                            <th class="sortable" onclick="sortStats(4)">First Record</th>
+                            <th class="sortable" onclick="sortStats(5)">Latest Record</th>
+                        </tr>
+                    </thead>
+                    <tbody id="db-stats-body">
+                        <tr>
+                            <td colspan="6">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </details>
+
+        <!-- Segment 2: Daily Record Counts -->
+        <details id="seg-counts">
+            <summary>Daily Record Counts</summary>
+            <div class="details-content">
+                <div class="description">
+                    Identify missing data by comparing daily record counts against the average. <br>
+                    It highlights days where counts drop below thresholds, indicating potential backfill gaps.
+                </div>
+
+                <div class="controls-row">
+                    <div class="control-group">
+                        <label for="sc-start">Date Range</label>
+                        <div style="display: flex; align-items: center; gap: var(--space-2);">
+                            <input type="date" id="sc-start" class="form-input">
+                            <span style="color: var(--text-secondary);">to</span>
+                            <input type="date" id="sc-end" class="form-input">
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="thresh-warn">Warning Threshold %</label>
+                        <input type="number" id="thresh-warn" class="form-input" value="10" min="1" max="99" style="width: 80px;">
+                    </div>
+
+                    <div class="control-group">
+                        <label for="thresh-err">Alert Threshold %</label>
+                        <input type="number" id="thresh-err" class="form-input" value="20" min="1" max="99" style="width: 80px;">
+                    </div>
+
+                    <div class="control-group">
+                        <button type="button" onclick="fetchData()" id="btn-run" class="btn btn-success">Run Analysis</button>
+                    </div>
+                </div>
+
+                <div id="loading-msg" style="display: none; color: var(--text-secondary); margin-bottom: var(--space-2);">Querying database...
+                </div>
+
+                <table id="results-table" class="panel-table" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>CGM Count <span class="hint" id="avg-cgm"></span></th>
+                            <th>Treatments <span class="hint" id="avg-treat"></span></th>
+                            <th>Device Status <span class="hint" id="avg-device"></span></th>
+                            <th>Sync Status</th>
+                            <th style="text-align: right;">
+                                <button type="button" id="repair-all-btn" onclick="repairAll()" class="btn btn-danger"
+                                    style="display:none; padding: 4px 12px; font-size: 0.85em;">
+                                    Repair All Range
+                                </button>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-body"></tbody>
+                </table>
+            </div>
+        </details>
+
+        <!-- Segment 3: Data Retention -->
+        <details id="seg-retention">
+            <summary>Data Retention</summary>
+            <div class="details-content">
+                <div id="retention-draft-banner" style="display:none; margin-bottom: var(--space-3); padding: 10px 14px; background: rgba(241, 196, 15, 0.15); border: 1px solid #f1c40f; border-radius: var(--radius-sm); align-items: center; justify-content: space-between; gap: 10px;">
+                    <span style="display:inline-flex; align-items:center; gap:8px;"><i class="fa-solid fa-triangle-exclamation" style="color: #f1c40f;"></i> <span>You have unsaved retention draft changes from a previous session.</span></span>
+                    <div style="display: inline-flex; gap: 8px;">
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="restoreRetentionDraft()" style="padding: 3px 8px; font-size: 0.85em;">Resume Draft</button>
+                        <button type="button" class="btn btn-sm btn-cancel" onclick="discardRetentionDraft()" style="padding: 3px 8px; font-size: 0.85em;">Discard</button>
+                    </div>
+                </div>
+
+                <div class="retention-enable-row">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="retention-enabled" onchange="toggleRetentionUI()">
+                        <span class="slider-toggle"></span>
+                    </label>
+                    <div style="flex-grow: 1;">
+                        <strong style="display:block;">Enabled</strong>
+                        <span class="hint" id="trim-msg">Pruning logic is active. Automated background tasks triggered at 3am every day will enforce these rules.</span>
+                    </div>
+                </div>
+
+                <div class="storage-bar-container">
+                    <div id="bar-tier1" class="storage-bar-tier1" style="width: 0%"></div>
+                    <div id="bar-tier2" class="storage-bar-tier2" style="width: 0%"></div>
+                    <div id="bar-free" class="storage-bar-free"></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: -10px; font-size: 0.85em; color: var(--text-secondary); margin-bottom: var(--space-3);">
+                    <span><span style="color:var(--accent)">●</span> Raw Nightscout Logs</span>
+                    <span><span style="color:var(--success)">●</span> Clinical History</span>
+                    <span>Free Space</span>
+                </div>
+
+                <div class="retention-grid">
+                    <!-- Tier 1 -->
+                    <div class="retention-card">
+                        <h3>Raw Nightscout Logs
+                            <div class="size-info">Existing Size: <strong id="t1-size-label">- MB</strong></div>
+                        </h3>
+                        <p class="hint">The raw files downloaded from Nightscout (treatments.json, devicestatus.json, entries.json). Clinical data is already automatically extracted from these files, and remain safe in Tier 2 Clinical History.</p>
+                        <div class="slider-group">
+                            <label>Retention: <strong id="t1-days-val">-</strong></label>
+                            <input type="range" id="t1-slider" min="0" max="16" value="3" oninput="updateProjection()">
+                        </div>
+                        <div class="hint">Predicted Size: <strong id="t1-proj-label">- MB</strong></div>
+                        <div class="hint" style="margin-top:auto;">Historical Growth: <strong id="t1-growth-label">-</strong> <span style="color: var(--text-secondary); font-size: 0.85em;">(avg/month over last 3 months)</span></div>
+                    </div>
+
+                    <!-- Tier 2 -->
+                    <div class="retention-card">
+                        <h3>Clinical History
+                            <div class="size-info">Existing Size: <strong id="t2-size-label">- MB</strong></div>
+                        </h3>
+                        <p class="hint">CGM readings, Insulin and Carbohydrates. Powers all charts and longitudinal analysis.</p>
+                        <div class="slider-group">
+                            <label>Retention: <strong id="t2-days-val">-</strong></label>
+                            <input type="range" id="t2-slider" min="0" max="21" value="11" oninput="updateProjection()">
+                        </div>
+                        <div class="hint">Predicted Size: <strong id="t2-proj-label">- MB</strong></div>
+                        <div class="hint" style="margin-top:auto;">Historical Growth: <strong id="t2-growth-label">-</strong> <span style="color: var(--text-secondary); font-size: 0.85em;">(avg/month over last 3 months)</span></div>
+                    </div>
+                </div>
+
+                <div class="projection-box">
+                    <p id="projection-msg">Based on your selection, the system will maintain approximately <strong id="projected-total">- MB</strong> of history.</p>
+                    <div id="savings-msg" style="color: var(--success); font-weight: bold; display:none;">Estimated nightly reduction: <span id="savings-val">- MB</span></div>
+                </div>
+
+                <div class="commit-btn-container" style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-4);">
+                    <button type="button" class="btn btn-secondary" onclick="resetRetentionForm()">Reset Form</button>
+                    <div class="hint">Policy changes effect at 03:00 AM server time.</div>
+                    <button type="button" class="btn btn-success" onclick="showCommitModal()">Save &amp; Apply</button>
+                </div>
+            </div>
+        </details>
+
+        <!-- Segment 4: Basal History Rebuild -->
+        <details id="seg-basal">
+            <summary>Basal History Rebuild</summary>
+            <div class="details-content">
+                <div class="description">
+                    Rebuild the permanent basal insulin records for all historical data. This computes the 5-minute
+                    base profile rates and temp basal impacts for every day in the database.<br>
+                    Use this if historical basal/TDD data appears missing or incorrect.
+                </div>
+
+                <div style="display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap;">
+                    <button type="button" onclick="startBasalRebuild()" id="btn-basal-rebuild" class="btn btn-success">
+                        Rebuild Basal History
+                    </button>
+                    <span id="basal-rebuild-progress" style="color: var(--text-secondary);"></span>
+                </div>
+
+                <div id="basal-rebuild-info" style="margin-top: var(--space-3);">
+                    <table class="panel-table">
+                        <tbody>
+                            <tr>
+                                <td style="font-weight: bold; width: 200px;">Status</td>
+                                <td id="basal-status-val">—</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">Total Rows Computed</td>
+                                <td id="basal-rows-val">—</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">Last Completed</td>
+                                <td id="basal-last-val">—</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </details>
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+
+    <!-- Modal -->
+    <div id="commit-modal" class="modal">
+        <div class="modal-content">
+            <h2 style="color: var(--danger); margin-top: 0;">Confirm Retention Change</h2>
+            <p>You are about to change the nightly data lifecycle policy. This will affect data processed at 03:00 AM.</p>
+            <div class="modal-btns">
+                <button type="button" class="btn btn-danger" onclick="commitRetention()">I am really sure</button>
+                <button type="button" class="btn btn-secondary" onclick="closeCommitModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize currentData globally
+        window.currentData = null;
+
+        // Non-destructive key migration for legacy sanity check keys
+        function migrateSanityKeys() {
+            try {
+                if (localStorage.getItem('sanity_local_state') !== null) {
+                    if (localStorage.getItem('ns_sanity_local_state') === null) {
+                        localStorage.setItem('ns_sanity_local_state', localStorage.getItem('sanity_local_state'));
+                    }
+                    localStorage.removeItem('sanity_local_state');
+                }
+                if (localStorage.getItem('retention_settings') !== null) {
+                    if (localStorage.getItem('ns_sanity_retention_draft') === null) {
+                        localStorage.setItem('ns_sanity_retention_draft', localStorage.getItem('retention_settings'));
+                    }
+                    localStorage.removeItem('retention_settings');
+                }
+            } catch (e) {
+                console.warn('Migration error in sanity check:', e);
+            }
+        }
+
+        // Initialize and Persist
+        function init() {
+            migrateSanityKeys();
+            const saved = JSON.parse(localStorage.getItem('ns_sanity_local_state') || '{}');
+
+            // End Date
+            const d = new Date();
+            document.getElementById('sc-end').value = saved.end || d.toISOString().split('T')[0];
+
+            // Start Date
+            d.setDate(d.getDate() - 30);
+            document.getElementById('sc-start').value = saved.start || d.toISOString().split('T')[0];
+
+            // Thresholds
+            if (saved.warn) document.getElementById('thresh-warn').value = saved.warn;
+            if (saved.err) document.getElementById('thresh-err').value = saved.err;
+        }
+
+        function saveState() {
+            const state = {
+                start: document.getElementById('sc-start').value,
+                end: document.getElementById('sc-end').value,
+                warn: document.getElementById('thresh-warn').value,
+                err: document.getElementById('thresh-err').value
+            };
+            localStorage.setItem('ns_sanity_local_state', JSON.stringify(state));
+        }
+
+        // Listen for changes
+        function attachListeners() {
+            const ids = ['sc-start', 'sc-end', 'thresh-warn', 'thresh-err'];
+            ids.forEach(id => {
+                document.getElementById(id).addEventListener('input', () => {
+                    saveState();
+                    if (id.startsWith('thresh')) renderTable();
+                });
+            });
+        }
+
+        init();
+        attachListeners();
+
+        async function loadDbStats() {
+            const btn = document.getElementById('btn-refresh-stats');
+            btn.disabled = true;
+            btn.innerText = "Loading...";
+
+            try {
+                const sr = await fetch('/api/stats?db_stats=true');
+                const sData = await sr.json();
+                const tbody2 = document.getElementById('db-stats-body');
+                tbody2.innerHTML = '';
+                sData.db_stats.forEach(row => {
+                    const tr2 = document.createElement('tr');
+                    const formatLocalTime = (isoStr) => {
+                        if (!isoStr || isoStr === "-" || isoStr === "None") return "-";
+                        return new Date(isoStr).toLocaleString();
+                    };
+                    const first = formatLocalTime(row.first_record);
+                    const last = formatLocalTime(row.last_record);
+                    tr2.innerHTML = `<td>${row.table}</td><td>${row.relation_type}</td><td>${row.rows.toLocaleString()}</td><td data-size-bytes="${row.size_bytes}">${row.size}</td><td class="hint">${first}</td><td class="hint">${last}</td>`;
+                    tbody2.appendChild(tr2);
+                });
+            } catch (e) {
+                console.error("Error loading db stats", e);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Refresh Table Stats";
+            }
+        }
+        loadDbStats();
+
+        let sortCol = -1;
+        let sortAsc = true;
+
+        function sortStats(n) {
+            const table = document.getElementById("db-stats-table");
+            const tbody = document.getElementById("db-stats-body");
+            const rows = Array.from(tbody.rows);
+            const headers = table.querySelectorAll("th");
+
+            if (sortCol === n) sortAsc = !sortAsc;
+            else {
+                sortCol = n;
+                sortAsc = true;
+            }
+
+            // Update header classes
+            headers.forEach((th, i) => {
+                th.classList.remove("asc", "desc");
+                if (i === n) th.classList.add(sortAsc ? "asc" : "desc");
+            });
+
+            const sortedRows = rows.sort((a, b) => {
+                let x = a.cells[n].innerText;
+                let y = b.cells[n].innerText;
+
+                // Numeric sorting for row count
+                if (n === 2) {
+                    const parseVal = (v) => parseInt(v.replace(/,/g, '')) || 0;
+                    return sortAsc ? parseVal(x) - parseVal(y) : parseVal(y) - parseVal(x);
+                }
+
+                // Sort by the precise byte value returned by PostgreSQL rather
+                // than by its display label (for example, PostgreSQL uses kB).
+                if (n === 3) {
+                    const xSize = Number(a.cells[n].dataset.sizeBytes) || 0;
+                    const ySize = Number(b.cells[n].dataset.sizeBytes) || 0;
+                    return sortAsc ? xSize - ySize : ySize - xSize;
+                }
+
+                // Default string sorting
+                return sortAsc ? x.localeCompare(y) : y.localeCompare(x);
+            });
+
+            tbody.append(...sortedRows);
+        }
+
+        async function fetchData() {
+            const start = document.getElementById('sc-start').value;
+            const end = document.getElementById('sc-end').value;
+            const btn = document.getElementById('btn-run');
+            const msg = document.getElementById('loading-msg');
+            const table = document.getElementById('results-table');
+
+            if (!start || !end) return alert("Please select date range");
+
+            btn.disabled = true;
+            btn.innerHTML = "Analyzing...";
+            msg.style.display = 'block';
+            table.style.display = 'none';
+
+            try {
+                const r = await fetch(`/api/sanity_check?start_date=${start}&end_date=${end}`);
+                currentData = await r.json();
+
+                if (currentData.error) throw new Error(currentData.error);
+
+                renderTable();
+            } catch (e) {
+                alert("Analysis failed: " + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = "Run Analysis";
+                msg.style.display = 'none';
+            }
+        }
+
+        function renderTable() {
+            if (!window.currentData || !window.currentData.daily_stats) return;
+            const currentData = window.currentData;
+
+            const warnPct = parseFloat(document.getElementById('thresh-warn').value) || 10;
+            const errPct = parseFloat(document.getElementById('thresh-err').value) || 20;
+
+            // Warn if < (100 - warn)% of avg
+            // Example: Warn=10%, factor=0.9. If val < 0.9*avg, warn.
+            const warnFactor = (100 - warnPct) / 100;
+            const errFactor = (100 - errPct) / 100;
+
+            const tbody = document.getElementById('results-body');
+            tbody.innerHTML = '';
+
+            // Update Headers
+            document.getElementById('avg-cgm').innerText = `(Avg: ${currentData.averages.cgm})`;
+            document.getElementById('avg-treat').innerText = `(Avg: ${currentData.averages.treatments})`;
+            document.getElementById('avg-device').innerText = `(Avg: ${currentData.averages.device})`;
+            document.getElementById('results-table').style.display = 'table';
+
+            currentData.daily_stats.forEach(row => {
+                const tr = document.createElement('tr');
+
+                const createCell = (val, avg) => {
+                    let cls = "";
+                    let style = "";
+                    if (avg > 0) {
+                        const ratio = val / avg;
+                        if (ratio < errFactor) {
+                            cls = "status-err";
+                            style = "background-color: rgba(231, 76, 60, 0.2); color: #e74c3c;";
+                        }
+                        else if (ratio < warnFactor) {
+                            cls = "status-warn";
+                            style = "background-color: rgba(241, 196, 15, 0.2); color: #f1c40f;";
+                        }
+                    } else if (val === 0) {
+                        // Highlight 0 counts even if avg is 0 (though avg 0 implies all 0)
+                        // But if backfill is done and count is 0, that's suspicious if expected.
+                        // For now we rely on avg comparison.
+                        // If avg is > 0, val 0 triggers errFactor (<0).
+                    }
+                    return `<td style="${style}">${val}</td>`;
+                };
+
+                const syncStatus = row.sync_status || "Gaps";
+                let statusHtml = "";
+                let actionHtml = "";
+
+                if (syncStatus === "Live") {
+                    statusHtml = '<span style="color: #3498db; font-weight: bold;">✓ Live</span>';
+                } else if (syncStatus === "Synced") {
+                    statusHtml = '<span style="color: #2ecc71; font-weight: bold;">✓ Synced</span>';
+                } else {
+                    statusHtml = '<span style="color: #e74c3c; font-weight: bold;">⚠️ Gaps</span>';
+                    actionHtml = `<button class="action-btn" style="padding: 4px 10px; font-size: 0.85em; background-color: var(--danger); border: 1px solid rgba(255,255,255,0.2);" onclick="repairDay('${row.date}')">Repair Gaps</button>`;
+                }
+
+                tr.innerHTML = `
+                    <td>${row.date}</td>
+                    ${createCell(row.cgm, currentData.averages.cgm)}
+                    ${createCell(row.treatments, currentData.averages.treatments)}
+                    ${createCell(row.device, currentData.averages.device)}
+                    <td style="text-align: center;">${statusHtml}</td>
+                    <td style="text-align: right;">${actionHtml}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Show "Repair All" if any day has gaps
+            const hasGaps = currentData.daily_stats.some(r => r.sync_status !== "Live" && r.sync_status !== "Synced");
+            document.getElementById('repair-all-btn').style.display = hasGaps ? 'inline-block' : 'none';
+        }
+
+        async function repairAll() {
+            const startStr = document.getElementById('start_date').value;
+            const endStr = document.getElementById('end_date').value;
+
+            if (!confirm(`Trigger repairs for ALL gaps between ${startStr} and ${endStr}?`)) return;
+            triggerRepair(startStr, endStr);
+        }
+
+        async function repairDay(date) {
+            if (!confirm(`Trigger surgical backfill for ${date}?`)) return;
+            triggerRepair(date, date);
+        }
+
+        async function triggerRepair(start, end) {
+            try {
+                const r = await fetch('/backfill/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ start: start, end: end })
+                });
+                const res = await r.json();
+                if (res.status === "ok") {
+                    alert("Repair started! Check 'Status & Logs' for progress.");
+                } else {
+                    alert("Error: " + res.message);
+                }
+            } catch (e) {
+                alert("Connection failed");
+            }
+        }
+
+        // --- Retention Logic ---
+        let retentionState = null;
+
+        /**
+         * Refined Slider Mapping
+         * Points 0-10: 30-330 days (30 day increments)
+         * Points 11-15: 1-5 years (Annual increments, Tier 1 Max)
+         * Points 11-20: 1-10 years (Annual increments, Tier 2 Max)
+         * Last Point: All Time
+         */
+        function mapSliderToDays(val, isTier2 = false) {
+            val = parseInt(val);
+            if (val <= 10) return (val + 1) * 30;
+            const yrs = val - 10;
+            if (isTier2) {
+                if (yrs <= 10) return yrs * 365;
+                return 99999;
+            } else {
+                if (yrs <= 5) return yrs * 365;
+                return 99999;
+            }
+        }
+
+        function mapDaysToSlider(days, isTier2 = false) {
+            if (days >= 99999) return isTier2 ? 21 : 16;
+            if (days <= 335) return Math.round(days / 30) - 1;
+            const yrs = Math.round(days / 365);
+            return 10 + yrs;
+        }
+
+        function formatDays(days) {
+            if (days >= 99999) return "All Time";
+            if (days < 365) return days + " days";
+            const yrs = Math.round(days / 365);
+            return yrs + " year" + (yrs > 1 ? "s" : "");
+        }
+
+        async function loadRetentionStats() {
+            try {
+                const r = await fetch('/api/retention/stats');
+                retentionState = await r.json();
+
+                const fmt = (bytes) => (bytes / 1024 / 1024).toFixed(1) + " MB";
+
+                document.getElementById('t1-size-label').innerText = fmt(retentionState.tier1.size_bytes);
+                document.getElementById('t2-size-label').innerText = fmt(retentionState.tier2.size_bytes);
+                document.getElementById('t1-growth-label').innerText = fmt(retentionState.tier1.monthly_growth_bytes) + " / month";
+                document.getElementById('t2-growth-label').innerText = fmt(retentionState.tier2.monthly_growth_bytes) + " / month";
+
+                // Update Bar (Real numbers)
+                const disk = retentionState.disk;
+                const totalCap = disk.total;
+                const p1 = (retentionState.tier1.size_bytes / totalCap * 100).toFixed(1);
+                const p2 = (retentionState.tier2.size_bytes / totalCap * 100).toFixed(1);
+                const pf = (disk.free / totalCap * 100).toFixed(1);
+
+                const b1 = document.getElementById('bar-tier1');
+                const b2 = document.getElementById('bar-tier2');
+                const bf = document.getElementById('bar-free');
+
+                b1.style.width = p1 + "%";
+                b1.innerText = p1 > 5 ? fmt(retentionState.tier1.size_bytes) : "";
+
+                b2.style.width = p2 + "%";
+                b2.innerText = p2 > 5 ? fmt(retentionState.tier2.size_bytes) : "";
+
+                bf.style.width = pf + "%";
+                bf.innerText = pf > 5 ? fmt(disk.free) + " Free Space" : "";
+
+                // Initialize Sliders strictly from Server Config
+                const serverConf = retentionState.config;
+                document.getElementById('t1-slider').value = mapDaysToSlider(serverConf.t1);
+                document.getElementById('t2-slider').value = mapDaysToSlider(serverConf.t2, true);
+                document.getElementById('retention-enabled').checked = serverConf.enabled;
+
+                // Check if uncommitted local draft exists in localStorage
+                const local = JSON.parse(localStorage.getItem('ns_sanity_retention_draft') || '{}');
+                const banner = document.getElementById('retention-draft-banner');
+                if (local && (local.t1 !== undefined || local.t2 !== undefined || local.enabled !== undefined)) {
+                    const hasDiff = local.t1 !== serverConf.t1 || local.t2 !== serverConf.t2 || local.enabled !== serverConf.enabled;
+                    if (hasDiff && banner) {
+                        banner.style.display = 'flex';
+                    } else {
+                        localStorage.removeItem('ns_sanity_retention_draft');
+                        if (banner) banner.style.display = 'none';
+                    }
+                } else if (banner) {
+                    banner.style.display = 'none';
+                }
+
+                toggleRetentionUI(false);
+                updateProjection(false);
+            } catch (e) {
+                console.error("Retention Stats Error", e);
+            }
+        }
+
+        function restoreRetentionDraft() {
+            const local = JSON.parse(localStorage.getItem('ns_sanity_retention_draft') || '{}');
+            if (local.t1 !== undefined) document.getElementById('t1-slider').value = mapDaysToSlider(local.t1);
+            if (local.t2 !== undefined) document.getElementById('t2-slider').value = mapDaysToSlider(local.t2, true);
+            if (local.enabled !== undefined) document.getElementById('retention-enabled').checked = local.enabled;
+            const banner = document.getElementById('retention-draft-banner');
+            if (banner) banner.style.display = 'none';
+            toggleRetentionUI(false);
+            updateProjection(false);
+        }
+
+        function discardRetentionDraft() {
+            localStorage.removeItem('ns_sanity_retention_draft');
+            const banner = document.getElementById('retention-draft-banner');
+            if (banner) banner.style.display = 'none';
+            resetRetentionForm();
+        }
+
+        function toggleRetentionUI(save = true) {
+            const enabled = document.getElementById('retention-enabled').checked;
+            const tmsg = document.getElementById('trim-msg');
+
+            if (enabled) {
+                tmsg.innerText = "Pruning logic is active. Automated background tasks triggered at 3am every day will enforce these rules.";
+                tmsg.style.color = "var(--success)";
+            } else {
+                tmsg.innerText = "Pruning is currently disabled. Data will grow indefinitely.";
+                tmsg.style.color = "#888";
+            }
+            if (save) saveRetentionSettings();
+            updateProjection(save);
+        }
+
+        function updateProjection(save = true) {
+            if (!retentionState) return;
+
+            const t1Days = mapSliderToDays(document.getElementById('t1-slider').value);
+            const t2Days = mapSliderToDays(document.getElementById('t2-slider').value, true);
+
+            document.getElementById('t1-days-val').innerText = formatDays(t1Days);
+            document.getElementById('t2-days-val').innerText = formatDays(t2Days, true);
+
+            const fmt = (bytes) => (bytes / 1024 / 1024).toFixed(1) + " MB";
+
+            const t1IsAllTime = t1Days >= 99999;
+            const t2IsAllTime = t2Days >= 99999;
+
+            // Steady-state capped sizes (valid when finite days)
+            const t1Proj = (retentionState.tier1.monthly_growth_bytes / 30) * t1Days;
+            const t2Proj = (retentionState.tier2.monthly_growth_bytes / 30) * t2Days;
+
+            // Predicted Size labels on tier cards
+            if (t1IsAllTime) {
+                document.getElementById('t1-proj-label').innerText = "Grows continuously (~" + fmt(retentionState.tier1.monthly_growth_bytes) + "/month)";
+            } else {
+                document.getElementById('t1-proj-label').innerText = fmt(t1Proj) + " (steady-state cap)";
+            }
+
+            if (t2IsAllTime) {
+                document.getElementById('t2-proj-label').innerText = "Grows continuously (~" + fmt(retentionState.tier2.monthly_growth_bytes) + "/month)";
+            } else {
+                document.getElementById('t2-proj-label').innerText = fmt(t2Proj) + " (steady-state cap)";
+            }
+
+            // Projection summary message
+            const pMsg = document.getElementById('projection-msg');
+            const currentTotal = retentionState.tier1.size_bytes + retentionState.tier2.size_bytes;
+
+            if (!t1IsAllTime && !t2IsAllTime) {
+                const totalProj = t1Proj + t2Proj;
+                pMsg.innerHTML = 'Based on your selection, the system will maintain approximately <strong id="projected-total">' + fmt(totalProj) + '</strong> of history at steady state.';
+            } else if (t1IsAllTime && t2IsAllTime) {
+                const totalMonthly = retentionState.tier1.monthly_growth_bytes + retentionState.tier2.monthly_growth_bytes;
+                pMsg.innerHTML = 'With <strong>All Time</strong> selected for both tiers, data will not be pruned and will continue growing indefinitely (approx. <strong>' + fmt(totalMonthly) + '/month</strong>, or <strong>' + fmt(totalMonthly * 12) + '/year</strong>). Current total: <strong>' + fmt(currentTotal) + '</strong>.';
+            } else if (t1IsAllTime) {
+                pMsg.innerHTML = 'Raw Nightscout Logs (Tier 1) will grow indefinitely without pruning (approx. <strong>+' + fmt(retentionState.tier1.monthly_growth_bytes) + '/month</strong>), while Clinical History (Tier 2) will cap at approximately <strong>' + fmt(t2Proj) + '</strong>.';
+            } else {
+                pMsg.innerHTML = 'Clinical History (Tier 2) will grow indefinitely without pruning (approx. <strong>+' + fmt(retentionState.tier2.monthly_growth_bytes) + '/month</strong>), while Raw Nightscout Logs (Tier 1) will cap at approximately <strong>' + fmt(t1Proj) + '</strong>.';
+            }
+
+            // Savings calculation relative to active server policy
+            const enabled = document.getElementById('retention-enabled').checked;
+            const serverConf = (retentionState && retentionState.config) ? retentionState.config : null;
+            let savings = 0;
+
+            if (enabled && serverConf) {
+                const getTierTarget = (days, currentBytes, monthlyGrowth) => {
+                    if (days >= 99999) return currentBytes;
+                    const proj = (monthlyGrowth / 30) * days;
+                    return proj < currentBytes ? proj : currentBytes;
+                };
+
+                if (serverConf.enabled) {
+                    const s1Target = getTierTarget(serverConf.t1, retentionState.tier1.size_bytes, retentionState.tier1.monthly_growth_bytes);
+                    const s2Target = getTierTarget(serverConf.t2, retentionState.tier2.size_bytes, retentionState.tier2.monthly_growth_bytes);
+                    const n1Target = getTierTarget(t1Days, retentionState.tier1.size_bytes, retentionState.tier1.monthly_growth_bytes);
+                    const n2Target = getTierTarget(t2Days, retentionState.tier2.size_bytes, retentionState.tier2.monthly_growth_bytes);
+
+                    if (t1Days < serverConf.t1) savings += Math.max(0, s1Target - n1Target);
+                    if (t2Days < serverConf.t2) savings += Math.max(0, s2Target - n2Target);
+                } else {
+                    if (!t1IsAllTime && retentionState.tier1.size_bytes > t1Proj) {
+                        savings += (retentionState.tier1.size_bytes - t1Proj);
+                    }
+                    if (!t2IsAllTime && retentionState.tier2.size_bytes > t2Proj) {
+                        savings += (retentionState.tier2.size_bytes - t2Proj);
+                    }
+                }
+            }
+
+            const sMsg = document.getElementById('savings-msg');
+            if (savings > 5 * 1024 * 1024) {
+                sMsg.style.display = 'block';
+                document.getElementById('savings-val').innerText = fmt(savings);
+            } else {
+                sMsg.style.display = 'none';
+            }
+            if (save) saveRetentionSettings();
+        }
+
+        function saveRetentionSettings() {
+            const settings = {
+                t1: mapSliderToDays(document.getElementById('t1-slider').value),
+                t2: mapSliderToDays(document.getElementById('t2-slider').value, true),
+                enabled: document.getElementById('retention-enabled').checked
+            };
+            localStorage.setItem('ns_sanity_retention_draft', JSON.stringify(settings));
+        }
+
+        function resetRetentionForm() {
+            if (!retentionState || !retentionState.config) return;
+            const serverConf = retentionState.config;
+
+            document.getElementById('t1-slider').value = mapDaysToSlider(serverConf.t1);
+            document.getElementById('t2-slider').value = mapDaysToSlider(serverConf.t2, true);
+            document.getElementById('retention-enabled').checked = serverConf.enabled;
+
+            localStorage.removeItem('ns_sanity_retention_draft'); // Clear unsaved local state
+            const banner = document.getElementById('retention-draft-banner');
+            if (banner) banner.style.display = 'none';
+            toggleRetentionUI(false);
+            updateProjection(false);
+        }
+
+        function showCommitModal() {
+            document.getElementById('commit-modal').style.display = 'block';
+        }
+
+        function closeCommitModal() {
+            document.getElementById('commit-modal').style.display = 'none';
+        }
+
+        async function commitRetention() {
+            const settings = {
+                retention_days_raw: mapSliderToDays(document.getElementById('t1-slider').value),
+                retention_days_clinical: mapSliderToDays(document.getElementById('t2-slider').value, true),
+                retention_enabled: document.getElementById('retention-enabled').checked ? "true" : "false"
+            };
+
+            try {
+                const response = await fetch('/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
+                const result = await response.json();
+                if (result.status === "ok") {
+                    alert("Settings saved successfully! Pruning policy updated.");
+                    localStorage.removeItem('ns_sanity_retention_draft'); // Clear temporary local state
+                    const banner = document.getElementById('retention-draft-banner');
+                    if (banner) banner.style.display = 'none';
+                    // Refresh stats to confirm server confirmed values
+                    loadRetentionStats();
+                } else {
+                    alert("Error saving settings: " + result.message);
+                }
+            } catch (e) {
+                alert("Network error while saving settings.");
+                console.error(e);
+            }
+            closeCommitModal();
+        }
+
+        window.onclick = function (event) {
+            const modal = document.getElementById('commit-modal');
+            if (event.target == modal) closeCommitModal();
+        }
+
+        loadRetentionStats();
+
+        // ---- Basal Rebuild ----
+        let basalPollTimer = null;
+
+        async function startBasalRebuild() {
+            const btn = document.getElementById('btn-basal-rebuild');
+            btn.disabled = true;
+            btn.innerText = 'Starting...';
+
+            try {
+                const r = await fetch('/api/v1/rebuild_basal', { method: 'POST' });
+                const d = await r.json();
+                if (r.ok) {
+                    pollBasalStatus();
+                } else {
+                    btn.innerText = 'Rebuild Basal History';
+                    btn.disabled = false;
+                    alert(d.message || 'Failed to start rebuild');
+                }
+            } catch (e) {
+                btn.innerText = 'Rebuild Basal History';
+                btn.disabled = false;
+                alert('Connection error');
+            }
+        }
+
+        async function pollBasalStatus() {
+            try {
+                const r = await fetch('/api/v1/rebuild_basal');
+                const d = await r.json();
+
+                document.getElementById('basal-status-val').innerText = d.running ? '🔄 Running' : (d.error ? '❌ Error' : '✅ Idle');
+                document.getElementById('basal-rebuild-progress').innerText = d.progress || '';
+                document.getElementById('basal-rows-val').innerText = d.total_rows ? d.total_rows.toLocaleString() : '—';
+                document.getElementById('basal-last-val').innerText = d.last_completed ? new Date(d.last_completed).toLocaleString() : '—';
+
+                const btn = document.getElementById('btn-basal-rebuild');
+                if (d.running) {
+                    btn.disabled = true;
+                    btn.innerText = 'Rebuilding...';
+                    if (!basalPollTimer) basalPollTimer = setInterval(pollBasalStatus, 2000);
+                } else {
+                    btn.disabled = false;
+                    btn.innerText = 'Rebuild Basal History';
+                    if (basalPollTimer) { clearInterval(basalPollTimer); basalPollTimer = null; }
+                }
+            } catch (e) {
+                console.error('Basal status poll failed:', e);
+            }
+        }
+
+        // Auto-load status when section is opened
+        document.getElementById('seg-basal').addEventListener('toggle', function () {
+            if (this.open) pollBasalStatus();
+        });
+    </script>
+</body>
+
+</html>

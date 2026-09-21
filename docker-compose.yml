@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_DB: ${POSTGRES_DB:-nightscout}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - ${POSTGRES_DATA_DIR:-/var/lib/nightscout-monitor/postgres}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-nightscout}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migration:
+    image: amacneil/dbmate:2
+    restart: "no"
+    env_file:
+      - .env
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_URL: postgres://${POSTGRES_USER:-admin}@postgres:5432/${POSTGRES_DB:-nightscout}?sslmode=disable
+    command: ["up"]
+    volumes:
+      - ./db/migrations:/db/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  nightscout_daemon:
+    build:
+      context: ./daemon
+    env_file:
+      - .env
+    environment:
+      PYTHONUNBUFFERED: 1
+      TZ: ${TIMEZONE:-Australia/Perth}
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    command: ["python", "-u", "main.py"]
+    volumes:
+      - ./daemon:/app
+
+  e2e_tester:
+    image: mcr.microsoft.com/playwright/python:v1.40.0-jammy
+    profiles: ["test"]
+    environment:
+      - BASE_URL=http://nightscout_daemon:8080
+    working_dir: /opt/nightscout-monitor
+    volumes:
+      - .:/opt/nightscout-monitor
+    depends_on:
+      - nightscout_daemon
+    command: ["bash", "-c", "pip install playwright==1.40.0 && python3 tests/e2e/run_tests.py"]

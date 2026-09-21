@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Navigation Mockup {{ opt }} — ns-monitor</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        /* Mockup Switcher Floating Bar */
+        .mockup-switcher {
+            position: fixed;
+            bottom: 18px;
+            right: 24px;
+            z-index: 100000;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 30px;
+            padding: 6px 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            font-size: 0.85rem;
+        }
+        .mockup-switcher span {
+            color: #8b949e;
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .mockup-pill {
+            padding: 4px 10px;
+            border-radius: 16px;
+            color: #c9d1d9;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.15s ease;
+        }
+        .mockup-pill:hover {
+            background: #21262d;
+            color: #ffffff;
+        }
+        .mockup-pill.active {
+            background: #2f81f7;
+            color: #ffffff;
+            font-weight: 700;
+        }
+
+        /* Demo Body Layouts */
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+        }
+
+        /* Content Stage */
+        .demo-stage {
+            padding: 24px 32px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .demo-banner {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-left: 4px solid #2f81f7;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+        }
+        .demo-banner h2 {
+            margin: 0 0 6px 0;
+            font-size: 1.15rem;
+            color: #e6edf3;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .demo-banner p {
+            margin: 0;
+            color: #8b949e;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        /* Generic Preview Card Grid */
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        .preview-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 18px 20px;
+        }
+        .preview-card h3 {
+            margin: 0 0 8px 0;
+            font-size: 0.95rem;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .preview-stat {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #e6edf3;
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+        .preview-stat small {
+            font-size: 0.9rem;
+            color: #2ecc71;
+            font-weight: 500;
+        }
+        .preview-chart-box {
+            background: var(--surface-inset);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            height: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6e7681;
+            font-size: 0.9rem;
+            margin-top: 14px;
+        }
+
+        /* Shared BG Panel Styling */
+        .bg-score-pill {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 4px 10px;
+        }
+        .bg-score-pill .sg-val {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #e6edf3;
+        }
+        .bg-score-pill .sg-delta {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #2ecc71;
+        }
+        .bg-score-pill .sg-time {
+            font-size: 0.75rem;
+            color: #8b949e;
+            margin-left: 2px;
+        }
+
+        /* =========================================================================
+           OPTION 1 SPECIFICS: Linear / Raycast Structured Sidebar
+           ========================================================================= */
+        {% if opt == 1 %}
+        body { padding-left: 250px; }
+        .sidebar-opt1 {
+            position: fixed;
+            top: 0; left: 0; bottom: 0;
+            width: 250px;
+            background: #161b22;
+            border-right: 1px solid #30363d;
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+        }
+        .sidebar-opt1 .sb-brand {
+            padding: 16px;
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .sidebar-opt1 .sb-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 10px;
+        }
+        .sb-sec-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #6e7681;
+            padding: 10px 10px 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .sb-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 7px 10px;
+            border-radius: 6px;
+            color: #c9d1d9;
+            text-decoration: none;
+            font-size: 0.88rem;
+            transition: background 0.12s;
+            margin-bottom: 2px;
+        }
+        .sb-nav-item:hover { background: #21262d; color: #ffffff; }
+        .sb-nav-item.active { background: #2f81f7; color: #ffffff; font-weight: 600; }
+        .sb-nav-item i { width: 18px; text-align: center; color: #8b949e; }
+        .sb-nav-item.active i { color: #ffffff; }
+        
+        .opt1-dock {
+            padding: 10px;
+            border-top: 1px solid #30363d;
+            background: #13171e;
+        }
+        .opt1-dock-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: #6e7681;
+            font-weight: 700;
+            padding: 0 6px 6px;
+        }
+        .opt1-dock-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px;
+        }
+        .opt1-dock-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 32px;
+            border-radius: 6px;
+            color: #8b949e;
+            text-decoration: none;
+            background: #1c2128;
+            border: 1px solid #30363d;
+            transition: all 0.15s;
+        }
+        .opt1-dock-btn:hover {
+            color: #ffffff;
+            border-color: #58a6ff;
+            background: #262c36;
+        }
+        {% endif %}
+
+        /* =========================================================================
+           OPTION 2 SPECIFICS: Stripe / Datadog Top Header Nav
+           ========================================================================= */
+        {% if opt == 2 %}
+        body { padding-top: 60px; }
+        .top-nav-opt2 {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: 58px;
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 10000;
+        }
+        .opt2-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .opt2-brand {
+            font-weight: 700;
+            color: #ffffff;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1rem;
+        }
+        .opt2-links {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .opt2-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            color: #c9d1d9;
+            text-decoration: none;
+            font-size: 0.88rem;
+            font-weight: 500;
+            transition: all 0.12s;
+        }
+        .opt2-item:hover { background: #21262d; color: #ffffff; }
+        .opt2-item.active { background: #21262d; color: #2f81f7; font-weight: 600; border-bottom: 2px solid #2f81f7; border-radius: 4px 4px 0 0; }
+        
+        .opt2-dropdown {
+            position: relative;
+        }
+        .opt2-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            min-width: 180px;
+            padding: 6px;
+            z-index: 1000;
+        }
+        .opt2-dropdown:hover .opt2-dropdown-menu {
+            display: block;
+        }
+        .opt2-dropdown-menu a {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 4px;
+            color: #c9d1d9;
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+        .opt2-dropdown-menu a:hover {
+            background: #21262d;
+            color: #ffffff;
+        }
+
+        .opt2-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        {% endif %}
+
+        /* =========================================================================
+           OPTION 3 SPECIFICS: Apple Health / macOS Settings Sidebar
+           ========================================================================= */
+        {% if opt == 3 %}
+        body { padding-left: 260px; }
+        .sidebar-opt3 {
+            position: fixed;
+            top: 0; left: 0; bottom: 0;
+            width: 260px;
+            background: #0d1117;
+            border-right: 1px solid #30363d;
+            display: flex;
+            flex-direction: column;
+            padding: 16px 12px;
+            gap: 16px;
+            overflow-y: auto;
+        }
+        .opt3-hero-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .opt3-group {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .opt3-group-title {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #8b949e;
+            padding: 8px 12px 6px;
+            background: #1c2128;
+            border-bottom: 1px solid #30363d;
+            letter-spacing: 0.05em;
+        }
+        .opt3-link {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 9px 12px;
+            color: #c9d1d9;
+            text-decoration: none;
+            font-size: 0.88rem;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            transition: background 0.12s;
+        }
+        .opt3-link:last-child { border-bottom: none; }
+        .opt3-link:hover { background: #21262d; color: #ffffff; }
+        .opt3-link.active { background: rgba(47, 129, 247, 0.15); color: #58a6ff; font-weight: 600; }
+        .opt3-link-left { display: flex; align-items: center; gap: 10px; }
+        .opt3-link-left i { width: 18px; text-align: center; }
+        {% endif %}
+
+        /* =========================================================================
+           OPTION 4 SPECIFICS: Vercel / Superhuman Minimalist Rail + Drawer
+           ========================================================================= */
+        {% if opt == 4 %}
+        body { padding-left: 64px; }
+        .rail-opt4 {
+            position: fixed;
+            top: 0; left: 0; bottom: 0;
+            width: 64px;
+            background: #161b22;
+            border-right: 1px solid #30363d;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 0;
+            z-index: 10000;
+            justify-content: space-between;
+        }
+        .rail-top {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+        }
+        .rail-brand {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: #21262d;
+            border: 1px solid #30363d;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #2f81f7;
+            font-size: 1.2rem;
+            margin-bottom: 8px;
+        }
+        .rail-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #8b949e;
+            text-decoration: none;
+            font-size: 1.05rem;
+            transition: all 0.15s;
+            position: relative;
+        }
+        .rail-btn:hover {
+            background: #21262d;
+            color: #ffffff;
+        }
+        .rail-btn.active {
+            background: #2f81f7;
+            color: #ffffff;
+        }
+        .rail-btn:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 70px;
+            background: #1c2128;
+            border: 1px solid #30363d;
+            color: #e6edf3;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            z-index: 10001;
+            pointer-events: none;
+        }
+        .rail-bottom {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+
+        /* Slide-over Drawer */
+        .opt4-drawer-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(2px);
+            z-index: 15000;
+        }
+        .opt4-drawer {
+            position: fixed;
+            top: 0; left: -360px; bottom: 0;
+            width: 340px;
+            background: #161b22;
+            border-right: 1px solid #30363d;
+            z-index: 16000;
+            transition: left 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .opt4-drawer.open {
+            left: 64px;
+        }
+        .opt4-drawer-backdrop.open {
+            display: block;
+        }
+        {% endif %}
+
+        /* =========================================================================
+           OPTION 5 SPECIFICS: Contextual Dual-Tier Mode Switcher
+           ========================================================================= */
+        {% if opt == 5 %}
+        body { padding-top: 54px; padding-left: 230px; }
+        .mode-bar-opt5 {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: 52px;
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 10000;
+        }
+        .opt5-brand {
+            font-weight: 700;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .opt5-modes {
+            display: flex;
+            background: #090d13;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 3px;
+            gap: 4px;
+        }
+        .opt5-mode-btn {
+            border: none;
+            background: none;
+            color: #8b949e;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .opt5-mode-btn.active {
+            background: #21262d;
+            color: #ffffff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        .sidebar-opt5 {
+            position: fixed;
+            top: 53px; left: 0; bottom: 0;
+            width: 230px;
+            background: #0d1117;
+            border-right: 1px solid #30363d;
+            display: flex;
+            flex-direction: column;
+            padding: 14px 10px;
+            z-index: 1000;
+        }
+        .opt5-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            color: #c9d1d9;
+            text-decoration: none;
+            font-size: 0.88rem;
+            margin-bottom: 3px;
+        }
+        .opt5-nav-item:hover { background: #161b22; color: #ffffff; }
+        .opt5-nav-item.active { background: #2f81f7; color: #ffffff; font-weight: 600; }
+        {% endif %}
+    </style>
+</head>
+<body>
+
+    <!-- Floating Navigation Option Switcher -->
+    <div class="mockup-switcher">
+        <span>Layout Options:</span>
+        <a href="/mockup/1" class="mockup-pill {{ 'active' if opt == 1 else '' }}">1. Linear Sidebar</a>
+        <a href="/mockup/2" class="mockup-pill {{ 'active' if opt == 2 else '' }}">2. Top Header</a>
+        <a href="/mockup/3" class="mockup-pill {{ 'active' if opt == 3 else '' }}">3. Apple Hub</a>
+        <a href="/mockup/4" class="mockup-pill {{ 'active' if opt == 4 else '' }}">4. Icon Rail</a>
+        <a href="/mockup/5" class="mockup-pill {{ 'active' if opt == 5 else '' }}">5. Dual-Tier Modes</a>
+    </div>
+
+    <!-- =========================================================================
+         OPTION 1: LINEAR / RAYCAST STRUCTURED SIDEBAR
+         ========================================================================= -->
+    {% if opt == 1 %}
+    <aside class="sidebar-opt1">
+        <div class="sb-brand">
+            <div class="bg-score-pill">
+                <span class="sg-val" id="bg-val-display">--</span>
+                <span class="sg-delta" id="bg-delta-display"></span>
+                <span class="sg-time" id="bg-time-display">--</span>
+            </div>
+            <a href="{{ nightscout_site_url }}" target="_blank" title="Open Nightscout" style="color:#8b949e;"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+        </div>
+        <div class="sb-scroll">
+            <div class="sb-sec-label">Primary Workspaces</div>
+            <a href="/patterns" class="sb-nav-item active"><i class="fa-solid fa-gauge-high"></i><span>Dashboard (Home)</span></a>
+            <a href="/patterns" class="sb-nav-item"><i class="fa-solid fa-chart-line"></i><span>Patterns</span></a>
+            <a href="/trends" class="sb-nav-item"><i class="fa-solid fa-timeline"></i><span>Trends</span></a>
+            <a href="/trace" class="sb-nav-item"><i class="fa-solid fa-calendar-day"></i><span>Trace</span></a>
+            <a href="/calendar" class="sb-nav-item"><i class="fa-solid fa-calendar-days"></i><span>Calendar</span></a>
+            <a href="/diary" class="sb-nav-item"><i class="fa-solid fa-book-medical"></i><span>Diary</span></a>
+
+            <div class="sb-sec-label" style="margin-top:10px;">Therapy &amp; Evidence</div>
+            <a href="/profiles" class="sb-nav-item"><i class="fa-solid fa-sliders"></i><span>Basal Profiles</span></a>
+            <a href="/omnipod" class="sb-nav-item"><i class="fa-solid fa-syringe"></i><span>Omnipod</span></a>
+            <a href="/clinical_reports" class="sb-nav-item"><i class="fa-solid fa-notes-medical"></i><span>Clinical Reports</span></a>
+
+            <div class="sb-sec-label" style="margin-top:10px;">Experimental Lab</div>
+            <a href="/novel_reports" class="sb-nav-item"><i class="fa-solid fa-flask"></i><span>Novel Reports</span></a>
+            <a href="/sandbox" class="sb-nav-item"><i class="fa-solid fa-vial"></i><span>Sandbox</span></a>
+        </div>
+
+        <!-- Pinned Bottom Dock for Rats & Mice -->
+        <div class="opt1-dock">
+            <div class="opt1-dock-title">Data &amp; Platform</div>
+            <div class="opt1-dock-grid">
+                <a href="/import" class="opt1-dock-btn" title="Import Data"><i class="fa-solid fa-file-import"></i></a>
+                <a href="/export" class="opt1-dock-btn" title="Export Data"><i class="fa-solid fa-file-export"></i></a>
+                <a href="/maintenance" class="opt1-dock-btn" title="Maintenance / Integrity"><i class="fa-solid fa-database"></i></a>
+                <a href="/logs" class="opt1-dock-btn" title="Status &amp; Logs"><i class="fa-solid fa-heart-pulse"></i></a>
+                <a href="/settings" class="opt1-dock-btn" title="Settings"><i class="fa-solid fa-gear"></i></a>
+            </div>
+        </div>
+    </aside>
+    {% endif %}
+
+    <!-- =========================================================================
+         OPTION 2: STRIPE / DATADOG TOP HEADER NAV
+         ========================================================================= -->
+    {% if opt == 2 %}
+    <header class="top-nav-opt2">
+        <div class="opt2-left">
+            <a href="/patterns" class="opt2-brand">
+                <i class="fa-solid fa-wave-square" style="color:#2f81f7;"></i>
+                <span>ns-monitor</span>
+            </a>
+            <div class="bg-score-pill">
+                <span class="sg-val" id="bg-val-display">--</span>
+                <span class="sg-delta" id="bg-delta-display"></span>
+                <span class="sg-time" id="bg-time-display">--</span>
+            </div>
+            <nav class="opt2-links">
+                <a href="/patterns" class="opt2-item active"><i class="fa-solid fa-gauge-high"></i> Home</a>
+                <a href="/patterns" class="opt2-item">Patterns</a>
+                <a href="/trends" class="opt2-item">Trends</a>
+                <a href="/trace" class="opt2-item">Trace</a>
+                <a href="/calendar" class="opt2-item">Calendar</a>
+                <a href="/diary" class="opt2-item">Diary</a>
+
+                <!-- Dropdown: Clinical & Devices -->
+                <div class="opt2-dropdown">
+                    <a href="#" class="opt2-item">Therapy <i class="fa-solid fa-chevron-down" style="font-size:0.7em;"></i></a>
+                    <div class="opt2-dropdown-menu">
+                        <a href="/profiles"><i class="fa-solid fa-sliders"></i> Basal Profiles</a>
+                        <a href="/omnipod"><i class="fa-solid fa-syringe"></i> Omnipod</a>
+                        <a href="/clinical_reports"><i class="fa-solid fa-notes-medical"></i> Clinical Reports</a>
+                    </div>
+                </div>
+
+                <!-- Dropdown: Lab -->
+                <div class="opt2-dropdown">
+                    <a href="#" class="opt2-item">Lab <i class="fa-solid fa-chevron-down" style="font-size:0.7em;"></i></a>
+                    <div class="opt2-dropdown-menu">
+                        <a href="/novel_reports"><i class="fa-solid fa-flask"></i> Novel Reports</a>
+                        <a href="/sandbox"><i class="fa-solid fa-vial"></i> Sandbox Studio</a>
+                    </div>
+                </div>
+            </nav>
+        </div>
+        <div class="opt2-right">
+            <!-- Data & System Dropdown -->
+            <div class="opt2-dropdown">
+                <button class="btn btn-secondary btn-sm" style="display:flex;align-items:center;gap:6px;">
+                    <i class="fa-solid fa-database"></i> Operations <i class="fa-solid fa-chevron-down" style="font-size:0.7em;"></i>
+                </button>
+                <div class="opt2-dropdown-menu" style="right:0;left:auto;">
+                    <div style="padding:4px 8px;font-size:0.7rem;color:#8b949e;text-transform:uppercase;font-weight:700;">Data Management</div>
+                    <a href="/import"><i class="fa-solid fa-file-import"></i> Import Data</a>
+                    <a href="/export"><i class="fa-solid fa-file-export"></i> Export Data</a>
+                    <a href="/maintenance"><i class="fa-solid fa-screwdriver-wrench"></i> Maintenance</a>
+                    <div style="border-top:1px solid #30363d;margin:4px 0;"></div>
+                    <div style="padding:4px 8px;font-size:0.7rem;color:#8b949e;text-transform:uppercase;font-weight:700;">Engine &amp; System</div>
+                    <a href="/targets"><i class="fa-solid fa-bullseye"></i> Target Thresholds</a>
+                    <a href="/logs"><i class="fa-solid fa-heart-pulse"></i> Status &amp; Logs</a>
+                    <a href="/settings"><i class="fa-solid fa-gear"></i> System Settings</a>
+                </div>
+            </div>
+            <a href="{{ nightscout_site_url }}" target="_blank" class="btn btn-secondary btn-sm" title="Nightscout">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            </a>
+        </div>
+    </header>
+    {% endif %}
+
+    <!-- =========================================================================
+         OPTION 3: APPLE HEALTH / MACOS SETTINGS SIDEBAR
+         ========================================================================= -->
+    {% if opt == 3 %}
+    <aside class="sidebar-opt3">
+        <!-- Hero Dashboard Hub Card -->
+        <div class="opt3-hero-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-weight:700;font-size:0.95rem;color:#ffffff;">Home Dashboard</span>
+                <span class="badge badge-success" style="font-size:0.7rem;">Live</span>
+            </div>
+            <div class="bg-score-pill">
+                <span class="sg-val" id="bg-val-display">--</span>
+                <span class="sg-delta" id="bg-delta-display"></span>
+                <span class="sg-time" id="bg-time-display">--</span>
+            </div>
+            <div style="display:flex;gap:4px;margin-top:2px;">
+                <a href="/patterns" class="btn btn-secondary btn-sm" style="flex:1;text-align:center;font-size:0.75rem;">Dashboard</a>
+                <a href="/summary_table" class="btn btn-secondary btn-sm" style="flex:1;text-align:center;font-size:0.75rem;" title="Summary Table">Summary</a>
+                <a href="/best_worst" class="btn btn-secondary btn-sm" style="flex:1;text-align:center;font-size:0.75rem;" title="Best & Worst Days">Best/Worst</a>
+            </div>
+        </div>
+
+        <!-- Clinical Workspaces Group -->
+        <div class="opt3-group">
+            <div class="opt3-group-title">Clinical Workspaces</div>
+            <a href="/patterns" class="opt3-link active"><span class="opt3-link-left"><i class="fa-solid fa-chart-line"></i> Patterns</span><i class="fa-solid fa-chevron-right" style="font-size:0.7em;color:#6e7681;"></i></a>
+            <a href="/trends" class="opt3-link"><span class="opt3-link-left"><i class="fa-solid fa-timeline"></i> Trends</span><i class="fa-solid fa-chevron-right" style="font-size:0.7em;color:#6e7681;"></i></a>
+            <a href="/trace" class="opt3-link"><span class="opt3-link-left"><i class="fa-solid fa-calendar-day"></i> Trace</span><i class="fa-solid fa-chevron-right" style="font-size:0.7em;color:#6e7681;"></i></a>
+            <a href="/calendar" class="opt3-link"><span class="opt3-link-left"><i class="fa-solid fa-calendar-days"></i> Calendar</span><i class="fa-solid fa-chevron-right" style="font-size:0.7em;color:#6e7681;"></i></a>
+            <a href="/diary" class="opt3-link"><span class="opt3-link-left"><i class="fa-solid fa-book-medical"></i> Diary</span><i class="fa-solid fa-chevron-right" style="font-size:0.7em;color:#6e7681;"></i></a>
+        </div>
+
+        <!-- Therapy & Evidence Group -->
+        <div class="opt3-group">
+            <div class="opt3-group-title">Therapy &amp; Evidence</div>
+            <a href="/profiles" class="opt3-link"><span class="opt3-link-left"><i class="fa-solid fa-sliders"></i> Profiles</span><i class="fa-solid fa-chevron-right" style="font-size:0.7em;color:#6e7681;"></i></a>
+            <a href="/omnipod" class="opt3-link"><span class="opt3-link-left"><i class="fa-solid fa-syringe"></i> Omnipod</span><i class="fa-solid fa-chevron-right" style="font-size:0.7em;color:#6e7681;"></i></a>
+            <a href="/clinical_reports" class="opt3-link"><span class="opt3-link-left"><i class="fa-solid fa-notes-medical"></i> Clinical Reports</span><i class="fa-solid fa-chevron-right" style="font-size:0.7em;color:#6e7681;"></i></a>
+            <a href="/novel_reports" class="opt3-link"><span class="opt3-link-left"><i class="fa-solid fa-flask"></i> Lab Reports</span><i class="fa-solid fa-chevron-right" style="font-size:0.7em;color:#6e7681;"></i></a>
+        </div>
+
+        <!-- Platform & Data Group -->
+        <div class="opt3-group">
+            <div class="opt3-group-title">Platform &amp; Engine</div>
+            <a href="/import" class="opt3-link"><span class="opt3-link-left"><i class="fa-solid fa-file-import"></i> Data Exchange</span><i class="fa-solid fa-chevron-right" style="font-size:0.7em;color:#6e7681;"></i></a>
+            <a href="/maintenance" class="opt3-link"><span class="opt3-link-left"><i class="fa-solid fa-database"></i> Maintenance</span><i class="fa-solid fa-chevron-right" style="font-size:0.7em;color:#6e7681;"></i></a>
+            <a href="/targets" class="opt3-link"><span class="opt3-link-left"><i class="fa-solid fa-bullseye"></i> Targets &amp; Filters</span><i class="fa-solid fa-chevron-right" style="font-size:0.7em;color:#6e7681;"></i></a>
+            <a href="/logs" class="opt3-link"><span class="opt3-link-left"><i class="fa-solid fa-heart-pulse"></i> Status &amp; Logs</span><i class="fa-solid fa-chevron-right" style="font-size:0.7em;color:#6e7681;"></i></a>
+            <a href="/settings" class="opt3-link"><span class="opt3-link-left"><i class="fa-solid fa-gear"></i> Settings</span><i class="fa-solid fa-chevron-right" style="font-size:0.7em;color:#6e7681;"></i></a>
+        </div>
+    </aside>
+    {% endif %}
+
+    <!-- =========================================================================
+         OPTION 4: VERCEL / SUPERHUMAN MINIMALIST RAIL + DRAWER
+         ========================================================================= -->
+    {% if opt == 4 %}
+    <nav class="rail-opt4">
+        <div class="rail-top">
+            <div class="rail-brand" title="ns-monitor">
+                <i class="fa-solid fa-wave-square"></i>
+            </div>
+            <a href="/patterns" class="rail-btn active" data-tooltip="Dashboard (Home)"><i class="fa-solid fa-gauge-high"></i></a>
+            <a href="/patterns" class="rail-btn" data-tooltip="Patterns"><i class="fa-solid fa-chart-line"></i></a>
+            <a href="/trends" class="rail-btn" data-tooltip="Trends"><i class="fa-solid fa-timeline"></i></a>
+            <a href="/trace" class="rail-btn" data-tooltip="Trace"><i class="fa-solid fa-calendar-day"></i></a>
+            <a href="/calendar" class="rail-btn" data-tooltip="Calendar"><i class="fa-solid fa-calendar-days"></i></a>
+            <a href="/diary" class="rail-btn" data-tooltip="Diary Studio"><i class="fa-solid fa-book-medical"></i></a>
+        </div>
+        <div class="rail-bottom">
+            <button class="rail-btn" id="opt4-drawer-toggle" data-tooltip="All Tools &amp; Ops (Cmd+K)" style="border:none;background:none;cursor:pointer;">
+                <i class="fa-solid fa-ellipsis"></i>
+            </button>
+            <a href="/settings" class="rail-btn" data-tooltip="Settings"><i class="fa-solid fa-gear"></i></a>
+        </div>
+    </nav>
+
+    <!-- Slide-over Drawer for All Tools -->
+    <div class="opt4-drawer-backdrop" id="opt4-backdrop"></div>
+    <div class="opt4-drawer" id="opt4-drawer">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+            <h3 style="margin:0;font-size:1.1rem;color:#ffffff;">All Tools &amp; Operations</h3>
+            <button id="opt4-close" style="background:none;border:none;color:#8b949e;cursor:pointer;font-size:1.1rem;"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="bg-score-pill" style="margin-bottom:20px;">
+            <span class="sg-val" id="bg-val-display">--</span>
+            <span class="sg-delta" id="bg-delta-display"></span>
+            <span class="sg-time" id="bg-time-display">--</span>
+        </div>
+
+        <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#8b949e;margin-bottom:8px;">Therapy &amp; Evidence</div>
+        <a href="/profiles" class="sb-nav-item" style="color:#c9d1d9;text-decoration:none;display:flex;gap:10px;padding:8px;"><i class="fa-solid fa-sliders"></i> Basal Profiles</a>
+        <a href="/omnipod" class="sb-nav-item" style="color:#c9d1d9;text-decoration:none;display:flex;gap:10px;padding:8px;"><i class="fa-solid fa-syringe"></i> Omnipod</a>
+        <a href="/clinical_reports" class="sb-nav-item" style="color:#c9d1d9;text-decoration:none;display:flex;gap:10px;padding:8px;"><i class="fa-solid fa-notes-medical"></i> Clinical Reports</a>
+        <a href="/summary_table" class="sb-nav-item" style="color:#c9d1d9;text-decoration:none;display:flex;gap:10px;padding:8px;"><i class="fa-solid fa-table"></i> Summary Table</a>
+        <a href="/best_worst" class="sb-nav-item" style="color:#c9d1d9;text-decoration:none;display:flex;gap:10px;padding:8px;"><i class="fa-solid fa-ranking-star"></i> Best &amp; Worst Days</a>
+
+        <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#8b949e;margin:16px 0 8px;">Experimental Lab</div>
+        <a href="/novel_reports" class="sb-nav-item" style="color:#c9d1d9;text-decoration:none;display:flex;gap:10px;padding:8px;"><i class="fa-solid fa-flask"></i> Novel Reports</a>
+        <a href="/sandbox" class="sb-nav-item" style="color:#c9d1d9;text-decoration:none;display:flex;gap:10px;padding:8px;"><i class="fa-solid fa-vial"></i> Sandbox</a>
+
+        <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#8b949e;margin:16px 0 8px;">Data &amp; Operations</div>
+        <a href="/import" class="sb-nav-item" style="color:#c9d1d9;text-decoration:none;display:flex;gap:10px;padding:8px;"><i class="fa-solid fa-file-import"></i> Import Data</a>
+        <a href="/export" class="sb-nav-item" style="color:#c9d1d9;text-decoration:none;display:flex;gap:10px;padding:8px;"><i class="fa-solid fa-file-export"></i> Export Data</a>
+        <a href="/maintenance" class="sb-nav-item" style="color:#c9d1d9;text-decoration:none;display:flex;gap:10px;padding:8px;"><i class="fa-solid fa-database"></i> Maintenance</a>
+        <a href="/targets" class="sb-nav-item" style="color:#c9d1d9;text-decoration:none;display:flex;gap:10px;padding:8px;"><i class="fa-solid fa-bullseye"></i> Targets &amp; Filters</a>
+        <a href="/logs" class="sb-nav-item" style="color:#c9d1d9;text-decoration:none;display:flex;gap:10px;padding:8px;"><i class="fa-solid fa-heart-pulse"></i> Status &amp; Logs</a>
+        <a href="/settings" class="sb-nav-item" style="color:#c9d1d9;text-decoration:none;display:flex;gap:10px;padding:8px;"><i class="fa-solid fa-gear"></i> Settings</a>
+    </div>
+    {% endif %}
+
+    <!-- =========================================================================
+         OPTION 5: CONTEXTUAL DUAL-TIER MODE SWITCHER
+         ========================================================================= -->
+    {% if opt == 5 %}
+    <header class="mode-bar-opt5">
+        <div class="opt5-brand">
+            <i class="fa-solid fa-wave-square" style="color:#2f81f7;"></i>
+            <span>ns-monitor</span>
+        </div>
+        <div class="opt5-modes">
+            <button class="opt5-mode-btn active" onclick="switchOpt5Mode('monitoring', this)"><i class="fa-solid fa-heart-pulse"></i> Monitoring &amp; Care</button>
+            <button class="opt5-mode-btn" onclick="switchOpt5Mode('reports', this)"><i class="fa-solid fa-chart-pie"></i> Review &amp; Reports</button>
+            <button class="opt5-mode-btn" onclick="switchOpt5Mode('ops', this)"><i class="fa-solid fa-sliders"></i> Operations &amp; Data</button>
+        </div>
+        <div class="bg-score-pill">
+            <span class="sg-val" id="bg-val-display">--</span>
+            <span class="sg-delta" id="bg-delta-display"></span>
+            <span class="sg-time" id="bg-time-display">--</span>
+        </div>
+    </header>
+
+    <aside class="sidebar-opt5">
+        <!-- Scoped Tier: Monitoring & Care -->
+        <div id="opt5-sec-monitoring" class="opt5-section">
+            <div class="sb-sec-label">Clinical Core</div>
+            <a href="/patterns" class="opt5-nav-item active"><i class="fa-solid fa-gauge-high"></i> Dashboard (Home)</a>
+            <a href="/patterns" class="opt5-nav-item"><i class="fa-solid fa-chart-line"></i> Patterns (AGP)</a>
+            <a href="/trends" class="opt5-nav-item"><i class="fa-solid fa-timeline"></i> Trends (Timeline)</a>
+            <a href="/trace" class="opt5-nav-item"><i class="fa-solid fa-calendar-day"></i> Trace (Daily)</a>
+            <a href="/calendar" class="opt5-nav-item"><i class="fa-solid fa-calendar-days"></i> Calendar</a>
+            <a href="/diary" class="opt5-nav-item"><i class="fa-solid fa-book-medical"></i> Diary Studio</a>
+        </div>
+
+        <!-- Scoped Tier: Review & Reports -->
+        <div id="opt5-sec-reports" class="opt5-section" style="display:none;">
+            <div class="sb-sec-label">Analytics &amp; Therapy</div>
+            <a href="/summary_table" class="opt5-nav-item"><i class="fa-solid fa-table"></i> Summary Table</a>
+            <a href="/best_worst" class="opt5-nav-item"><i class="fa-solid fa-ranking-star"></i> Best &amp; Worst Days</a>
+            <a href="/clinical_reports" class="opt5-nav-item"><i class="fa-solid fa-notes-medical"></i> Clinical Reports</a>
+            <a href="/profiles" class="opt5-nav-item"><i class="fa-solid fa-sliders"></i> Basal Profiles</a>
+            <a href="/omnipod" class="opt5-nav-item"><i class="fa-solid fa-syringe"></i> Omnipod</a>
+            <div class="sb-sec-label" style="margin-top:12px;">Experimental</div>
+            <a href="/novel_reports" class="opt5-nav-item"><i class="fa-solid fa-flask"></i> Novel Reports</a>
+            <a href="/sandbox" class="opt5-nav-item"><i class="fa-solid fa-vial"></i> Sandbox</a>
+        </div>
+
+        <!-- Scoped Tier: Operations & Data -->
+        <div id="opt5-sec-ops" class="opt5-section" style="display:none;">
+            <div class="sb-sec-label">Data Management</div>
+            <a href="/import" class="opt5-nav-item"><i class="fa-solid fa-file-import"></i> Import Data</a>
+            <a href="/export" class="opt5-nav-item"><i class="fa-solid fa-file-export"></i> Export Data</a>
+            <a href="/maintenance" class="opt5-nav-item"><i class="fa-solid fa-database"></i> Maintenance</a>
+            <div class="sb-sec-label" style="margin-top:12px;">Engine &amp; Platform</div>
+            <a href="/targets" class="opt5-nav-item"><i class="fa-solid fa-bullseye"></i> Targets &amp; Filters</a>
+            <a href="/logs" class="opt5-nav-item"><i class="fa-solid fa-heart-pulse"></i> Status &amp; Logs</a>
+            <a href="/settings" class="opt5-nav-item"><i class="fa-solid fa-gear"></i> System Settings</a>
+        </div>
+    </aside>
+    {% endif %}
+
+    <!-- =========================================================================
+         SIMULATED CLINICAL STAGE (PATTERNS / DASHBOARD VIEW)
+         ========================================================================= -->
+    <main class="demo-stage">
+        <div class="demo-banner">
+            <h2>
+                <i class="fa-solid fa-compass-drafting" style="color:#2f81f7;"></i>
+                Option {{ opt }}: 
+                {% if opt == 1 %}Linear / Raycast Structured Sidebar
+                {% elif opt == 2 %}Stripe / Datadog Top Header Navigation
+                {% elif opt == 3 %}Apple Health / macOS Settings Sidebar
+                {% elif opt == 4 %}Vercel / Superhuman Minimalist Rail + Drawer
+                {% elif opt == 5 %}Contextual Dual-Tier Mode Switcher
+                {% endif %}
+            </h2>
+            <p>
+                {% if opt == 1 %}
+                Clean vertical hierarchy: 6 Daily Primary items pinned at top, secondary therapy & lab collapsible in middle, and "rats & mice" docked into a compact 5-icon quick utility grid at the bottom.
+                {% elif opt == 2 %}
+                Zero left sidebar! Reclaims <strong>100% full screen width</strong> for continuous trace and multi-week trend charts. Primary links sit in the header; therapy & data live in quick dropdowns.
+                {% elif opt == 3 %}
+                Hub-and-spoke layout: Dashboard acts as home anchor (absorbing Summary & Best/Worst). No nested sub-menus; clear semantic group headers with iOS/macOS styled list items.
+                {% elif opt == 4 %}
+                Ultra-compact 64px icon rail for pure clinical focus. Click the <i class="fa-solid fa-ellipsis"></i> icon at the bottom of the rail to slide out the categorized tools drawer.
+                {% elif opt == 5 %}
+                Top mode switcher dynamically swaps the left sidebar between <strong>Monitoring & Care</strong>, <strong>Review & Reports</strong>, and <strong>Operations & Data</strong>, keeping the link list to ≤ 6 items at all times.
+                {% endif %}
+            </p>
+        </div>
+
+        <div class="preview-grid">
+            <div class="preview-card">
+                <h3>Time in Range (70-180 mg/dL)</h3>
+                <div class="preview-stat">82.4% <small><i class="fa-solid fa-arrow-up"></i> +4.1% vs prev 14d</small></div>
+                <div class="preview-chart-box">AGP Density Simulation ({{ '100% Width Full-Bleed' if opt == 2 else 'Sidebar Constrained Width' }})</div>
+            </div>
+            <div class="preview-card">
+                <h3>Average Glucose / GMI</h3>
+                <div class="preview-stat">6.8 mmol/L <small style="color:#8b949e;">Est. HbA1c 6.2%</small></div>
+                <div class="preview-chart-box">Hourly Median &amp; Interquartile Spread</div>
+            </div>
+            <div class="preview-card">
+                <h3>Variability (CV)</h3>
+                <div class="preview-stat">31.2% <small><i class="fa-solid fa-check"></i> Within &lt; 36% Target</small></div>
+                <div class="preview-chart-box">Daily Excursion Heatmap</div>
+            </div>
+        </div>
+
+        <div class="preview-card" style="margin-bottom: 30px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h3 style="margin:0;">Continuous Glucose Trace &amp; Basal Overlay</h3>
+                <span class="badge badge-primary">Interactive Preview</span>
+            </div>
+            <div class="preview-chart-box" style="height:280px;">
+                Continuous-scroll Trace canvas simulation (Notice how available horizontal width behaves with Option {{ opt }})
+            </div>
+        </div>
+    </main>
+
+    <!-- Telemetry Polling Script for live BG in mockups -->
+    <script>
+        (function() {
+            var MGDL_PER_MMOL = 18.0182;
+            function toMmol(mgdl) { return (mgdl / MGDL_PER_MMOL).toFixed(1); }
+            function formatTimeAgo(d) {
+                if (!d) return '';
+                var sec = Math.max(0, Math.round((Date.now() - d.getTime()) / 1000));
+                if (sec < 60) return 'just now';
+                var mins = Math.floor(sec / 60);
+                if (mins < 60) return mins + 'm ago';
+                return Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm ago';
+            }
+
+            function updateBgDisplays() {
+                fetch('/api/latest')
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) {
+                        var valEls = document.querySelectorAll('#bg-val-display');
+                        var deltaEls = document.querySelectorAll('#bg-delta-display');
+                        var timeEls = document.querySelectorAll('#bg-time-display');
+
+                        if (!d || d.sg === null || d.sg === undefined) {
+                            valEls.forEach(function(el) { el.textContent = '--'; });
+                            return;
+                        }
+
+                        valEls.forEach(function(el) { el.textContent = toMmol(d.sg); });
+
+                        if (d.delta !== null && d.delta !== undefined) {
+                            var deltaMmol = (d.delta / MGDL_PER_MMOL);
+                            var sign = deltaMmol > 0 ? '+' : '';
+                            deltaEls.forEach(function(el) { el.textContent = sign + deltaMmol.toFixed(1); });
+                        }
+
+                        if (d.ts_utc) {
+                            var dt = new Date(d.ts_utc);
+                            timeEls.forEach(function(el) { el.textContent = formatTimeAgo(dt); });
+                        }
+                    })
+                    .catch(function(err) { console.error('BG fetch err', err); });
+            }
+
+            updateBgDisplays();
+            setInterval(updateBgDisplays, 15000);
+
+            // Option 4 Drawer Interaction
+            var toggleBtn = document.getElementById('opt4-drawer-toggle');
+            var drawer = document.getElementById('opt4-drawer');
+            var backdrop = document.getElementById('opt4-backdrop');
+            var closeBtn = document.getElementById('opt4-close');
+
+            if (toggleBtn && drawer && backdrop) {
+                toggleBtn.addEventListener('click', function() {
+                    drawer.classList.add('open');
+                    backdrop.classList.add('open');
+                });
+                backdrop.addEventListener('click', function() {
+                    drawer.classList.remove('open');
+                    backdrop.classList.remove('open');
+                });
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', function() {
+                        drawer.classList.remove('open');
+                        backdrop.classList.remove('open');
+                    });
+                }
+            }
+        })();
+
+        // Option 5 Mode Switcher
+        function switchOpt5Mode(mode, btn) {
+            document.querySelectorAll('.opt5-mode-btn').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+
+            document.querySelectorAll('.opt5-section').forEach(function(s) { s.style.display = 'none'; });
+            var target = document.getElementById('opt5-sec-' + mode);
+            if (target) target.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
