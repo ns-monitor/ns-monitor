@@ -72,12 +72,8 @@
                             onclick="startManualBackfill()">
                             <i class="fas fa-play"></i> Start Bulk Fetch
                         </button>
-                        <button type="button" class="btn btn-danger" id="btn-bf-cancel" onclick="cancelBackfill()"
-                            style="display:none">
-                            <i class="fas fa-stop"></i> Stop Fetching
-                        </button>
-                        <button type="button" class="btn btn-secondary"
-                            onclick="resetBackfillRange()">Cancel</button>
+                        <button type="button" class="btn btn-secondary" id="btn-bf-clear"
+                            onclick="resetBackfillRange()">Clear Dates</button>
                     </div>
 
                     <div class="hint" style="margin-top: var(--space-4);">
@@ -146,21 +142,35 @@
         }
 
         async function startManualBackfill() {
+            const btnStart = document.getElementById('btn-bf-start');
+            if (btnStart.disabled) return;
+
             const start = document.getElementById('bf-manual-start').value;
             const end = document.getElementById('bf-manual-end').value;
             if (!start || !end) return showToast('Select a date range first.', true);
 
-            const r = await fetch('/backfill/start', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ start, end })
-            });
-            const res = await r.json();
-            if (res.status === 'ok') {
-                showToast('Bulk fetch started');
-                loadImportStatus();
-            } else {
-                showToast('Error: ' + res.message, true);
+            btnStart.disabled = true;
+            btnStart.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting…';
+
+            try {
+                const r = await fetch('/backfill/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ start, end })
+                });
+                const res = await r.json();
+                if (res.status === 'ok') {
+                    showToast('Bulk fetch started');
+                    loadImportStatus();
+                } else {
+                    showToast('Error: ' + res.message, true);
+                    btnStart.disabled = false;
+                    btnStart.innerHTML = '<i class="fas fa-play"></i> Start Bulk Fetch';
+                }
+            } catch (err) {
+                showToast('Network error starting backfill', true);
+                btnStart.disabled = false;
+                btnStart.innerHTML = '<i class="fas fa-play"></i> Start Bulk Fetch';
             }
         }
 
@@ -183,10 +193,21 @@
                 statusEl.className = 'stat-value ' + (running ? 'status-warn' : 'status-ok');
                 document.getElementById('import-bf-progress').innerText = data.status.backfill.progress || 'No active task';
 
-                // Keep the Bulk Fetch card's own Start/Stop buttons in sync with
-                // actual server state, not just whichever button was last clicked.
-                document.getElementById('btn-bf-start').style.display = running ? 'none' : '';
-                document.getElementById('btn-bf-cancel').style.display = running ? '' : 'none';
+                // Keep Start button in sync with actual server state
+                const btnStart = document.getElementById('btn-bf-start');
+                if (btnStart) {
+                    btnStart.disabled = running;
+                    btnStart.innerHTML = running
+                        ? '<i class="fas fa-spinner fa-spin"></i> Fetching in Progress…'
+                        : '<i class="fas fa-play"></i> Start Bulk Fetch';
+                }
+
+                // Stop button in Column 2
+                const btnStop = document.getElementById('btn-import-stop');
+                if (btnStop) {
+                    btnStop.disabled = !running;
+                    btnStop.style.opacity = running ? '1' : '0.5';
+                }
             } catch (e) { console.error('Import status load error:', e); }
         }
 

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard — ns-monitor</title>
-    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <link rel="stylesheet" href="/static/css/ns-shared.css?v=dashboard-profiles-2">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
     <!-- Gridstack.js vanilla drag/resize engine (MIT, zero-framework) -->
@@ -81,6 +81,12 @@
             background: var(--accent, #2f81f7);
             color: #ffffff;
         }
+        @media (max-width: 700px) {
+            .dash-topbar-left { width: 100%; }
+            .dash-slot-group { display: flex; flex-wrap: wrap; max-width: 100%; }
+            .dash-slot-btn { padding: 5px 8px; font-size: 0.76rem; }
+            .dash-slot-name { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        }
 
         /* Edit Mode Actions */
         .dash-actions {
@@ -88,6 +94,20 @@
             align-items: center;
             gap: 8px;
         }
+        .dash-profile-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-secondary, #8b949e);
+            background: var(--surface-inset, #090d13);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: var(--radius-md, 6px);
+            padding: 6px 9px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .dash-profile-indicator i { color: #58a6ff; }
         .btn-edit-mode {
             display: inline-flex;
             align-items: center;
@@ -126,6 +146,44 @@
         .grid-stack {
             margin-bottom: 30px;
         }
+        .dash-canvas-viewport {
+            width: 100%;
+            overflow: hidden;
+        }
+        .dash-canvas {
+            width: 100%;
+            transform-origin: top left;
+            position: relative;
+        }
+        .dash-fold-guide { display: none; }
+        body.dash-editing[data-dash-device="phone_portrait"] .dash-canvas,
+        body.dash-editing[data-dash-device="phone_landscape"] .dash-canvas,
+        body.dash-editing[data-dash-device="tablet_portrait"] .dash-canvas,
+        body.dash-editing[data-dash-device="tablet_landscape"] .dash-canvas {
+            border: 10px solid #090d13;
+            border-radius: 24px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+        }
+        body.dash-editing[data-dash-device]:not([data-dash-device="computer"]) .dash-fold-guide {
+            display: block;
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: var(--dash-fold-px, 720px);
+            border-top: 2px dashed rgba(241, 196, 15, 0.8);
+            z-index: 4;
+            pointer-events: none;
+        }
+        body.dash-editing[data-dash-device]:not([data-dash-device="computer"]) .dash-fold-guide span {
+            position: absolute;
+            right: 8px;
+            top: -18px;
+            background: #090d13;
+            color: #f1c40f;
+            padding: 2px 5px;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
         .grid-stack-item-content {
             background: var(--card-bg, #161b22) !important;
             border: 1px solid var(--border-color, #30363d) !important;
@@ -135,6 +193,78 @@
             display: flex !important;
             flex-direction: column !important;
             transition: border-color 0.15s ease, box-shadow 0.15s ease;
+            container-type: inline-size;
+            container-name: widget;
+        }
+
+        .hero-bg {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            height: 100%;
+        }
+        .hero-bg-reading-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .hero-bg-val { font-size: 2.4rem; font-weight: 800; }
+        .hero-bg-arrow { font-size: 1.4rem; }
+        .hero-bg-delta { flex-shrink: 0; }
+        .hero-bg-time { font-size: 0.78rem; color: var(--text-secondary, #8b949e); margin-top: 8px; }
+        .hero-bg-stale-warning { color: #f1c40f; font-weight: 700; }
+        body[data-dash-device="phone_portrait"] .hero-bg-val { font-size: 2.8rem; }
+        body[data-dash-device="phone_portrait"] .hero-bg-arrow { font-size: 2.2rem; }
+        body[data-dash-device="phone_portrait"] .hero-bg-delta { font-size: 1rem; }
+        body[data-dash-device="phone_landscape"] .hero-bg-val { font-size: 3.6rem; }
+        body[data-dash-device="phone_landscape"] .hero-bg-arrow { font-size: 2.6rem; }
+        body[data-dash-device="phone_landscape"] .hero-bg-delta { font-size: 1.2rem; }
+        body[data-dash-device="tablet_portrait"] .hero-bg-val { font-size: 4.2rem; }
+        body[data-dash-device="tablet_portrait"] .hero-bg-arrow { font-size: 3.2rem; }
+        body[data-dash-device="tablet_portrait"] .hero-bg-delta { font-size: 1.4rem; }
+        body[data-dash-device="tablet_landscape"] .hero-bg-val { font-size: 4.4rem; }
+        body[data-dash-device="tablet_landscape"] .hero-bg-arrow { font-size: 3.4rem; }
+        body[data-dash-device="tablet_landscape"] .hero-bg-delta { font-size: 1.5rem; }
+        body[data-dash-device]:not([data-dash-device="computer"]) .hero-bg-stale-warning {
+            display: block;
+            width: 100%;
+            background: rgba(241, 196, 15, 0.14);
+            border: 1px solid rgba(241, 196, 15, 0.45);
+            border-radius: 4px;
+            padding: 5px 7px;
+            box-sizing: border-box;
+        }
+        body[data-dash-device]:not([data-dash-device="computer"]) .hero-bg:has(.hero-bg-stale-warning) .hero-bg-val { opacity: 0.5; }
+        /* Explicit renderer hook: Safari/Chrome must not depend on a container-query
+           implementation to simplify a one-cell phone scorecard. */
+        body[data-dash-device="phone_portrait"] .grid-stack-item.dash-phone-micro .scorecard-hero {
+            margin-bottom: 0;
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 5px;
+        }
+        body[data-dash-device="phone_portrait"] .grid-stack-item.dash-phone-micro .scorecard-main-val {
+            font-size: 2.15rem;
+        }
+        body[data-dash-device="phone_portrait"] .grid-stack-item.dash-phone-micro .scorecard-delta-badge {
+            font-size: 0.66rem;
+            padding: 2px 5px;
+            white-space: normal;
+            line-height: 1.15;
+        }
+        body[data-dash-device="phone_portrait"] .grid-stack-item.dash-phone-micro .scorecard-grid {
+            display: none;
+        }
+
+        @container widget (max-width: 210px) {
+            .widget-header { padding: 6px 8px; }
+            .widget-title { font-size: 0.72rem; gap: 5px; }
+            .widget-body { min-width: 0; }
+            .hero-bg-val { font-size: 1.75rem; }
+            .hero-bg-arrow { font-size: 1rem; }
+            .hero-bg-reading-row { align-items: flex-start; flex-direction: column; gap: 2px; }
+            .hero-bg-time { font-size: 0.68rem; margin-top: 4px; }
         }
         
         /* Edit Mode Styling */
@@ -146,7 +276,7 @@
                 linear-gradient(to right, rgba(88, 166, 255, 0.22) 1px, transparent 1px),
                 /* Horizontal cell boundary dashed lines */
                 linear-gradient(to bottom, rgba(88, 166, 255, 0.22) 1px, transparent 1px);
-            background-size: calc(100% / 24) 72px, calc(100% / 24) 72px, calc(100% / 24) 72px;
+            background-size: calc(100% / var(--dash-grid-columns, 24)) 72px, calc(100% / var(--dash-grid-columns, 24)) 72px, calc(100% / var(--dash-grid-columns, 24)) 72px;
             background-position: 0 0;
             min-height: calc(100vh - 220px);
             outline: 2px dashed rgba(88, 166, 255, 0.4);
@@ -616,6 +746,18 @@
             flex-direction: column;
             gap: 8px;
         }
+        .slot-device-select, .slot-device-fixed {
+            min-width: 156px;
+            font-size: 0.74rem;
+            color: var(--text-secondary, #8b949e);
+        }
+        .slot-device-select {
+            background: var(--surface-inset, #090d13);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: var(--radius-sm, 4px);
+            padding: 5px 6px;
+        }
+        .slot-device-fixed { font-weight: 700; }
         .slot-row {
             background: var(--surface-raised, #21262d);
             border: 1px solid var(--border-color, #30363d);
@@ -812,6 +954,9 @@
 
             <!-- Edit Mode Trigger Buttons -->
             <div class="dash-actions">
+                <span class="dash-profile-indicator" id="dash-profile-indicator" title="This dashboard retains a dedicated layout for its selected device profile.">
+                    <i class="fa-solid fa-display"></i><span>Computer</span>
+                </span>
                 <button type="button" class="btn btn-secondary btn-edit-mode" id="btn-toggle-edit" onclick="toggleEditMode()">
                     <i class="fa-solid fa-pen-ruler"></i>
                     <span>Edit Layout</span>
@@ -848,8 +993,13 @@
             </button>
         </div>
 
-        <!-- Gridstack Canvas (12 Columns, 60px Chunky Row Units) -->
-        <div class="grid-stack" id="dashboard-grid"></div>
+        <!-- The profile canvas is scaled as a single unit on a narrower screen. -->
+        <div class="dash-canvas-viewport" id="dash-canvas-viewport">
+            <div class="dash-canvas" id="dash-canvas">
+                <div class="dash-fold-guide"><span>Typical screen fold</span></div>
+                <div class="grid-stack" id="dashboard-grid"></div>
+            </div>
+        </div>
     </div>
 
     <!-- Widget Library Drawer -->
@@ -873,7 +1023,7 @@
         <div class="dash-modal-header">
             <div>
                 <h2 class="dash-modal-title"><i class="fa-solid fa-table-columns" style="color: #58a6ff;"></i>Manage Dashboards</h2>
-                <div class="dash-modal-subtitle">Drag handles or use the arrows to re-order dashboards. Rename any slot directly.</div>
+                <div class="dash-modal-subtitle">Re-order, rename, and choose the intended screen shape for each dashboard. Slot 1 remains the computer layout.</div>
             </div>
             <button type="button" class="widget-btn" onclick="closeManageSlotsModal()"><i class="fa-solid fa-xmark"></i></button>
         </div>
@@ -926,6 +1076,44 @@
         var draggedSlotIndex = null;
         var wakeLock = null;
         var sseSource = null;
+        var currentProfile = 'computer';
+        var currentProfileColumns = 24;
+        var canvasResizeObserver = null;
+        var gridResizeObserver = null;
+
+        var DEVICE_PROFILES = {
+            computer: { columns: 24, label: 'Computer (24 columns)' },
+            phone_portrait: { columns: 2, label: 'Phone portrait (2 columns)' },
+            phone_landscape: { columns: 6, label: 'Phone landscape (6 columns)' },
+            tablet_portrait: { columns: 8, label: 'Tablet portrait (8 columns)' },
+            tablet_landscape: { columns: 12, label: 'Tablet landscape (12 columns)' }
+        };
+
+        // The widget catalogue declares the information-density category; this
+        // map translates that category into the deliberate grid contract for
+        // each device profile. It is the only profile sizing policy.
+        var PROFILE_CATEGORY_RULES = {
+            phone_portrait: {
+                compact: { minW: 1, maxW: 2, defaultW: 1 },
+                adaptive: { minW: 1, maxW: 2, defaultW: 1 },
+                panoramic: { minW: 2, maxW: 2, defaultW: 2, forceFullWidth: true }
+            },
+            phone_landscape: {
+                compact: { minW: 2, maxW: 4, defaultW: 2 },
+                adaptive: { minW: 3, maxW: 6, defaultW: 3 },
+                panoramic: { minW: 6, maxW: 6, defaultW: 6, forceFullWidth: true }
+            },
+            tablet_portrait: {
+                compact: { minW: 2, maxW: 4, defaultW: 2 },
+                adaptive: { minW: 4, maxW: 8, defaultW: 4 },
+                panoramic: { minW: 8, maxW: 8, defaultW: 8, forceFullWidth: true }
+            },
+            tablet_landscape: {
+                compact: { minW: 3, maxW: 6, defaultW: 3 },
+                adaptive: { minW: 4, maxW: 12, defaultW: 4 },
+                panoramic: { minW: 12, maxW: 12, defaultW: 12, forceFullWidth: true }
+            }
+        };
 
         function escapeHtml(str) {
             if (!str) return '';
@@ -990,6 +1178,103 @@
                    '<div class="scorecard-subitem"><span class="scorecard-subitem-lbl">' + baselineLabel + '</span><span class="scorecard-subitem-val">' + fmtBaseline + '</span></div>' +
                    '<div class="scorecard-subitem"><span class="scorecard-subitem-lbl">' + benchmarkLabel + '</span><span class="scorecard-subitem-val" title="' + (bestRec.date || '') + '">' + fmtBest + '</span></div>' +
                    '</div>';
+        }
+
+        // GMI is intentionally not a generic scorecard. Its headline always
+        // compares today against the clinical 90-day reference, while each of
+        // its three supporting cells is selected independently by the author.
+        function renderGmiScorecard(cfg) {
+            if (!scorecardData) {
+                return '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#8b949e;"><i class="fa-solid fa-spinner fa-spin"></i></div>';
+            }
+            cfg = cfg || {};
+            var today = scorecardData.today || {};
+            var yesterday = scorecardData.yesterday || {};
+            var rolling = scorecardData.rolling || {};
+            var records = scorecardData.records || {};
+            var records365 = scorecardData.records_365d || {};
+            var selections = [cfg.detail_1 || 'yesterday', cfg.detail_2 || '90d', cfg.detail_3 || 'best_1yr'];
+
+            function oneDecimal(value) {
+                var parsed = parseFloat(value);
+                return isNaN(parsed) ? '--' : parsed.toFixed(1) + '%';
+            }
+            function detail(selection) {
+                var values = {
+                    yesterday: { label: 'Yesterday', value: yesterday.gmi },
+                    '7d': { label: 'Last 7d', value: rolling.gmi_7d },
+                    '30d': { label: 'Last 30d', value: rolling.gmi_30d },
+                    '60d': { label: 'Last 60d', value: rolling.gmi_60d },
+                    '90d': { label: 'Last 90d', value: rolling.gmi_90d },
+                    best_1yr: { label: 'Best 1yr', value: (records365.gmi || {}).val, date: (records365.gmi || {}).date },
+                    best_all_time: { label: 'Best All-time', value: (records.gmi || {}).val, date: (records.gmi || {}).date }
+                };
+                return values[selection] || values.yesterday;
+            }
+
+            var current = parseFloat(today.gmi);
+            var reference = parseFloat(rolling.gmi_90d);
+            var deltaHtml = '<span class="scorecard-delta-badge delta-neutral">--</span>';
+            if (!isNaN(current) && !isNaN(reference)) {
+                var delta = parseFloat((current - reference).toFixed(1));
+                var sign = delta > 0 ? '▲ +' : (delta < 0 ? '▼ ' : '');
+                var deltaClass = Math.abs(delta) < 0.05 ? 'delta-neutral' : (delta < 0 ? 'delta-positive' : 'delta-negative');
+                deltaHtml = '<span class="scorecard-delta-badge ' + deltaClass + '">' + sign + delta.toFixed(1) + '% vs 90d</span>';
+            }
+            var cells = selections.map(detail).map(function(item) {
+                return '<div class="scorecard-subitem"><span class="scorecard-subitem-lbl">' + item.label + '</span><span class="scorecard-subitem-val"' + (item.date ? ' title="' + item.date + '"' : '') + '>' + oneDecimal(item.value) + '</span></div>';
+            }).join('');
+            return '<div class="scorecard-hero"><div><span class="scorecard-main-val">' + oneDecimal(today.gmi) + '</span></div>' + deltaHtml + '</div><div class="scorecard-grid">' + cells + '</div>';
+        }
+
+        // The configurable glycaemic-range card keeps its metric and headline
+        // comparison controls, but exposes each supporting cell independently.
+        function renderRangeScorecard(cfg) {
+            if (!scorecardData) {
+                return '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#8b949e;"><i class="fa-solid fa-spinner fa-spin"></i></div>';
+            }
+            cfg = cfg || {};
+            var metric = cfg.metric || 'tir';
+            var isHigherBetter = metric === 'tir' || metric === 'titr';
+            var rollingWindow = cfg.rolling_window || '14d';
+            var today = scorecardData.today || {};
+            var yesterday = scorecardData.yesterday || {};
+            var rolling = scorecardData.rolling || {};
+            var records = scorecardData.records || {};
+            var records365 = scorecardData.records_365d || {};
+            var selections = [cfg.detail_1 || 'yesterday', cfg.detail_2 || '90d', cfg.detail_3 || 'best_all_time'];
+
+            function percent(value) {
+                var parsed = parseFloat(value);
+                return isNaN(parsed) ? '--' : parsed.toFixed(1) + '%';
+            }
+            function detail(selection) {
+                var values = {
+                    yesterday: { label: 'Yesterday', value: yesterday[metric] },
+                    '7d': { label: 'Last 7d', value: rolling[metric + '_7d'] },
+                    '30d': { label: 'Last 30d', value: rolling[metric + '_30d'] },
+                    '60d': { label: 'Last 60d', value: rolling[metric + '_60d'] },
+                    '90d': { label: 'Last 90d', value: rolling[metric + '_90d'] },
+                    best_1yr: { label: 'Best 1yr', value: (records365[metric] || {}).val, date: (records365[metric] || {}).date },
+                    best_all_time: { label: 'Best All-time', value: (records[metric] || {}).val, date: (records[metric] || {}).date }
+                };
+                return values[selection] || values.yesterday;
+            }
+
+            var current = parseFloat(today[metric]);
+            var reference = parseFloat(rolling[metric + '_' + rollingWindow]);
+            var deltaHtml = '<span class="scorecard-delta-badge delta-neutral">--</span>';
+            if (!isNaN(current) && !isNaN(reference)) {
+                var delta = parseFloat((current - reference).toFixed(1));
+                var sign = delta > 0 ? '▲ +' : (delta < 0 ? '▼ ' : '');
+                var isGood = isHigherBetter ? delta >= 0 : delta <= 0;
+                var deltaClass = Math.abs(delta) < 0.05 ? 'delta-neutral' : (isGood ? 'delta-positive' : 'delta-negative');
+                deltaHtml = '<span class="scorecard-delta-badge ' + deltaClass + '">' + sign + delta.toFixed(1) + '% vs ' + rollingWindow + '</span>';
+            }
+            var cells = selections.map(detail).map(function(item) {
+                return '<div class="scorecard-subitem"><span class="scorecard-subitem-lbl">' + item.label + '</span><span class="scorecard-subitem-val"' + (item.date ? ' title="' + item.date + '"' : '') + '>' + percent(item.value) + '</span></div>';
+            }).join('');
+            return '<div class="scorecard-hero"><div><span class="scorecard-main-val">' + percent(today[metric]) + '</span></div>' + deltaHtml + '</div><div class="scorecard-grid">' + cells + '</div>';
         }
 
         function renderStackedRangeBarWidget(cfg) {
@@ -1239,7 +1524,10 @@
             var deltaNum = (tel.delta_mmol !== undefined && tel.delta_mmol !== null) ? parseFloat(tel.delta_mmol) : NaN;
             var delta = !isNaN(deltaNum) ? (deltaNum > 0 ? '+' : '') + deltaNum.toFixed(1) + ' mmol' : '--';
             var mins = (tel.mins_ago !== undefined && tel.mins_ago !== null) ? tel.mins_ago : 0;
-            var timeStr = tel.is_stale ? 'Stale (' + mins + 'm ago)' : 'Synced ' + mins + 'm ago';
+            var isStale = !!tel.is_stale || Number(mins) > 10;
+            var timeStr = isStale
+                ? 'Last Reading ' + mins + ' minutes ago — data may be delayed'
+                : 'Last Reading ' + mins + ' minute' + (Number(mins) === 1 ? '' : 's') + ' ago';
 
             var sgColor = '#e6edf3';
             if (!isNaN(sgNum)) {
@@ -1251,12 +1539,12 @@
 
             var deltaClass = (!isNaN(deltaNum) && deltaNum > 0) ? 'delta-positive' : 'delta-neutral';
 
-            return '<div style="display:flex;flex-direction:column;justify-content:center;height:100%;">' +
-                   '<div style="display:flex;align-items:baseline;justify-content:space-between;">' +
-                   '<div style="font-size:2.4rem;font-weight:800;color:' + sgColor + ';" id="dash-live-bg">' + sg + ' <span style="font-size:1.4rem;">' + arrow + '</span></div>' +
-                   '<div class="scorecard-delta-badge ' + deltaClass + '" id="dash-live-delta">' + delta + '</div>' +
+            return '<div class="hero-bg">' +
+                   '<div class="hero-bg-reading-row">' +
+                   '<div class="hero-bg-val" style="color:' + sgColor + ';" id="dash-live-bg">' + sg + ' <span class="hero-bg-arrow">' + arrow + '</span></div>' +
+                   '<div class="scorecard-delta-badge hero-bg-delta ' + deltaClass + '" id="dash-live-delta">' + delta + '</div>' +
                    '</div>' +
-                   '<div style="font-size:0.78rem;color:#8b949e;margin-top:8px;" id="dash-live-time">' + timeStr + '</div>' +
+                   '<div class="hero-bg-time' + (isStale ? ' hero-bg-stale-warning' : '') + '" id="dash-live-time" role="status">' + timeStr + '</div>' +
                    '</div>';
         }
 
@@ -1656,7 +1944,7 @@
                     else sgColor = '#f85149';
                 }
                 bgEl.style.color = sgColor;
-                bgEl.innerHTML = sgText + ' <span style="font-size:1.4rem;">' + arrow + '</span>';
+                bgEl.innerHTML = sgText + ' <span class="hero-bg-arrow">' + arrow + '</span>';
             }
 
             var deltaEl = document.getElementById('dash-live-delta');
@@ -1665,13 +1953,17 @@
                 if (!isNaN(deltaNum)) {
                     var dStr = (deltaNum > 0 ? '+' : '') + deltaNum.toFixed(1) + ' mmol';
                     deltaEl.textContent = dStr;
-                    deltaEl.className = 'scorecard-delta-badge ' + (deltaNum > 0 ? 'delta-positive' : 'delta-neutral');
+                    deltaEl.className = 'scorecard-delta-badge hero-bg-delta ' + (deltaNum > 0 ? 'delta-positive' : 'delta-neutral');
                 }
             }
 
             var timeEl = document.getElementById('dash-live-time');
             if (timeEl && tel.mins_ago !== undefined) {
-                timeEl.textContent = tel.is_stale ? 'Stale (' + tel.mins_ago + 'm ago)' : 'Synced ' + tel.mins_ago + 'm ago';
+                var stale = !!tel.is_stale || Number(tel.mins_ago) > 10;
+                timeEl.textContent = stale
+                    ? 'Last Reading ' + tel.mins_ago + ' minutes ago — data may be delayed'
+                    : 'Last Reading ' + tel.mins_ago + ' minute' + (Number(tel.mins_ago) === 1 ? '' : 's') + ' ago';
+                timeEl.classList.toggle('hero-bg-stale-warning', stale);
             }
 
             var iobEl = document.getElementById('dash-live-iob');
@@ -1724,6 +2016,7 @@
             // Category A: Core Glycemic Scorecards & Distribution
             'range_scorecard': {
                 name: 'Time in Range / Band', cat: 'Core Glycemic', icon: 'fa-chart-line',
+                phone: { category: 'adaptive', microLabel: 'TIR', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Configurable glycemic band percentage (TIR, TITR, TAR, TATR, Very High, TBR, Very Low) with rolling comparisons.',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 schema: [
@@ -1740,23 +2033,18 @@
                         { val: '7d', text: 'Last 7 Days (7d)' },
                         { val: '14d', text: 'Last 14 Days (14d)' },
                         { val: '30d', text: 'Last 30 Days (30d)' },
+                        { val: '60d', text: 'Last 60 Days (60d)' },
                         { val: '90d', text: 'Last 90 Days (90d)' },
-                        { val: '365d', text: 'Last 365 Days (365d)' }
                     ], default: '14d' },
-                    { key: 'benchmark_period', label: 'Benchmark Comparison', type: 'select', options: [
-                        { val: 'all_time', text: 'All-Time Best Period' },
-                        { val: '365d', text: 'Best Period (Last 365 Days)' }
-                    ], default: 'all_time' }
+                    { key: 'detail_1', label: 'Second Row — Left', type: 'select', options: [{val:'yesterday', text:'Yesterday'}, {val:'7d', text:'Last 7d'}, {val:'30d', text:'Last 30d'}, {val:'60d', text:'Last 60d'}, {val:'90d', text:'Last 90d'}, {val:'best_1yr', text:'Best 1yr'}, {val:'best_all_time', text:'Best All-time'}], default: 'yesterday' },
+                    { key: 'detail_2', label: 'Second Row — Centre', type: 'select', options: [{val:'yesterday', text:'Yesterday'}, {val:'7d', text:'Last 7d'}, {val:'30d', text:'Last 30d'}, {val:'60d', text:'Last 60d'}, {val:'90d', text:'Last 90d'}, {val:'best_1yr', text:'Best 1yr'}, {val:'best_all_time', text:'Best All-time'}], default: '90d' },
+                    { key: 'detail_3', label: 'Second Row — Right', type: 'select', options: [{val:'yesterday', text:'Yesterday'}, {val:'7d', text:'Last 7d'}, {val:'30d', text:'Last 30d'}, {val:'60d', text:'Last 60d'}, {val:'90d', text:'Last 90d'}, {val:'best_1yr', text:'Best 1yr'}, {val:'best_all_time', text:'Best All-time'}], default: 'best_all_time' }
                 ],
-                render: function(cfg) {
-                    cfg = cfg || {};
-                    var m = cfg.metric || 'tir';
-                    var isHigher = (m === 'tir' || m === 'titr');
-                    return renderScorecardMetric(m, '%', isHigher, m, cfg);
-                }
+                render: renderRangeScorecard
             },
             'stacked_range_bar': {
                 name: 'Glycemic Range', cat: 'Core Glycemic', icon: 'fa-bars-progress',
+                phone: { category: 'panoramic', minW: 2, maxW: 2, defaultW: 2 },
                 desc: 'Dual horizontal stacked distribution bars with independent period and target range selections.',
                 w: 6, h: 4, minW: 4, minH: 3, maxW: 16, maxH: 8,
                 schema: [
@@ -1787,6 +2075,7 @@
             },
             'avg_bg_scorecard': {
                 name: 'Average Glucose', cat: 'Core Glycemic', icon: 'fa-calculator',
+                phone: { category: 'adaptive', microLabel: 'Avg BG', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Mean glucose in mmol/L with rolling comparisons and benchmarks.',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 schema: [
@@ -1796,17 +2085,20 @@
                 render: function(cfg) { return renderScorecardMetric('mean_mmol', ' mmol/L', false, 'avg_bg', cfg); }
             },
             'gmi_scorecard': {
-                name: 'GMI (Est. HbA1c)', cat: 'Core Glycemic', icon: 'fa-percent',
-                desc: 'Estimated laboratory A1c calculated from continuous sensor mean.',
+                name: 'GMI', cat: 'Core Glycemic', icon: 'fa-percent',
+                phone: { category: 'adaptive', microLabel: 'GMI', minW: 1, maxW: 2, defaultW: 1 },
+                desc: 'CGM-derived estimated A1c with a fixed 90-day headline comparison and configurable supporting references.',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 schema: [
-                    { key: 'rolling_window', label: 'Comparison Window', type: 'select', options: [{val:'7d', text:'Last 7 Days (7d)'}, {val:'14d', text:'Last 14 Days (14d)'}, {val:'30d', text:'Last 30 Days (30d)'}, {val:'90d', text:'Last 90 Days (90d)'}, {val:'365d', text:'Last 365 Days (365d)'}], default: '14d' },
-                    { key: 'benchmark_period', label: 'Benchmark Comparison', type: 'select', options: [{val:'all_time', text:'All-Time Best Period'}, {val:'365d', text:'Best Period (Last 365 Days)'}], default: 'all_time' }
+                    { key: 'detail_1', label: 'Second Row — Left', type: 'select', options: [{val:'yesterday', text:'Yesterday'}, {val:'7d', text:'Last 7d'}, {val:'30d', text:'Last 30d'}, {val:'60d', text:'Last 60d'}, {val:'90d', text:'Last 90d'}, {val:'best_1yr', text:'Best 1yr (rolling 90d)'}, {val:'best_all_time', text:'Best All-time (rolling 90d)'}], default: 'yesterday' },
+                    { key: 'detail_2', label: 'Second Row — Centre', type: 'select', options: [{val:'yesterday', text:'Yesterday'}, {val:'7d', text:'Last 7d'}, {val:'30d', text:'Last 30d'}, {val:'60d', text:'Last 60d'}, {val:'90d', text:'Last 90d'}, {val:'best_1yr', text:'Best 1yr (rolling 90d)'}, {val:'best_all_time', text:'Best All-time (rolling 90d)'}], default: '90d' },
+                    { key: 'detail_3', label: 'Second Row — Right', type: 'select', options: [{val:'yesterday', text:'Yesterday'}, {val:'7d', text:'Last 7d'}, {val:'30d', text:'Last 30d'}, {val:'60d', text:'Last 60d'}, {val:'90d', text:'Last 90d'}, {val:'best_1yr', text:'Best 1yr (rolling 90d)'}, {val:'best_all_time', text:'Best All-time (rolling 90d)'}], default: 'best_1yr' }
                 ],
-                render: function(cfg) { return renderScorecardMetric('gmi', '%', false, 'gmi', cfg); }
+                render: renderGmiScorecard
             },
             'cv_scorecard': {
                 name: 'Coefficient of Variation (CV)', cat: 'Core Glycemic', icon: 'fa-wave-square',
+                phone: { category: 'adaptive', microLabel: 'CV', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Glucose stability metric (Target < 36.0%).',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 schema: [
@@ -1817,6 +2109,7 @@
             },
             'sd_scorecard': {
                 name: 'Standard Deviation (SD)', cat: 'Core Glycemic', icon: 'fa-chart-area',
+                phone: { category: 'adaptive', microLabel: 'SD', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Absolute spread around the glucose mean in mmol/L.',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 schema: [
@@ -1827,6 +2120,7 @@
             },
             'gri_scorecard': {
                 name: 'Glycemia Risk Index (GRI)', cat: 'Core Glycemic', icon: 'fa-shield-halved',
+                phone: { category: 'adaptive', microLabel: 'GRI', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Composite risk score balancing hypoglycemia and hyperglycemia (0–100).',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 schema: [
@@ -1837,6 +2131,7 @@
             },
             'lbgi_scorecard': {
                 name: 'Low Blood Glucose Index (LBGI)', cat: 'Core Glycemic', icon: 'fa-down-long',
+                phone: { category: 'adaptive', microLabel: 'LBGI', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Symmetric transformed risk score sensitive to hypoglycemia severity.',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 schema: [
@@ -1847,6 +2142,7 @@
             },
             'hbgi_scorecard': {
                 name: 'High Blood Glucose Index (HBGI)', cat: 'Core Glycemic', icon: 'fa-up-long',
+                phone: { category: 'adaptive', microLabel: 'HBGI', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Symmetric transformed risk score sensitive to hyperglycemia severity.',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 schema: [
@@ -1857,6 +2153,7 @@
             },
             'gvi_scorecard': {
                 name: 'Glycemic Variability Index (GVI)', cat: 'Core Glycemic', icon: 'fa-water',
+                phone: { category: 'adaptive', microLabel: 'GVI', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Continuous curve length relative to ideal flat line (ideal = 1.0).',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 schema: [
@@ -1867,6 +2164,7 @@
             },
             'mag_scorecard': {
                 name: 'Mean Absolute Glucose (MAG)', cat: 'Core Glycemic', icon: 'fa-chart-column',
+                phone: { category: 'adaptive', microLabel: 'MAG', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Rate-of-change velocity metric measuring glucose oscillation speed.',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 schema: [
@@ -1877,6 +2175,7 @@
             },
             'hypo_free_streak': {
                 name: 'Days Free of Severe Hypo', cat: 'Core Glycemic', icon: 'fa-heart-circle-check',
+                phone: { category: 'compact', microLabel: 'Hypo-free', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Streak counter tracking consecutive days with zero glucose < 3.0 mmol/L.',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 schema: [
@@ -1895,6 +2194,7 @@
             // Category B: Rolling-Week Triage Table
             'triage_focus_table': {
                 name: 'Rolling-Week Triage Focus Table', cat: 'Core Glycemic', icon: 'fa-table',
+                phone: { category: 'panoramic', minW: 2, maxW: 2, defaultW: 2 },
                 desc: 'Compare core metrics across Today, Yesterday, 7d, 14d, 30d, and 90d rolling windows.',
                 w: 24, h: 5, minW: 12, minH: 4, maxW: 24, maxH: 8,
                 schema: [
@@ -1910,18 +2210,26 @@
             // Category C: Live Status & Telemetry
             'current_bg_hero': {
                 name: 'Current Glucose & Trend', cat: 'Today & Live', icon: 'fa-bolt',
+                phone: { category: 'compact', microLabel: 'Glucose', minW: 1, maxW: 2, defaultW: 1 },
+                profileRules: {
+                    phone_landscape: { minW: 3, maxW: 6, defaultW: 3 },
+                    tablet_portrait: { minW: 4, maxW: 8, defaultW: 4 },
+                    tablet_landscape: { minW: 4, maxW: 12, defaultW: 4 }
+                },
                 desc: 'Large live reading, trend arrow, delta (+/-), and minutes-ago freshness ticker.',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 render: renderCurrentBgHero
             },
             'iob_cob_stat': {
                 name: 'Active IOB & COB', cat: 'Today & Live', icon: 'fa-syringe',
+                phone: { category: 'compact', microLabel: 'IOB / COB', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Real-time units of active insulin on board and grams of carbs on board.',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 render: renderIobCobWidget
             },
             'recent_notes_feed': {
                 name: 'Recent Diary Notes', cat: 'Clinical Diary', icon: 'fa-book-open',
+                phone: { category: 'panoramic', minW: 2, maxW: 2, defaultW: 2 },
                 desc: 'Last 3 clinical notes or meal entries with direct click to Diary Studio.',
                 w: 12, h: 3, minW: 6, minH: 2, maxW: 24, maxH: 5,
                 schema: [
@@ -1933,6 +2241,7 @@
             // Category D: Device & Sensor Health
             'pod_countdown_timer': {
                 name: 'Pod Lifetime Countdown (80h)', cat: 'Device & Sensor', icon: 'fa-stopwatch',
+                phone: { category: 'compact', microLabel: 'Pod', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Countdown to maximum 80-hour Omnipod cutoff with quiet-hours warning.',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 schema: [
@@ -1944,6 +2253,7 @@
             },
             'cgm_sensor_timer': {
                 name: 'Sensor Expiry Timer', cat: 'Device & Sensor', icon: 'fa-clock',
+                phone: { category: 'compact', microLabel: 'Sensor', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Countdown to CGM sensor expiration with warm-up alert.',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 schema: [
@@ -1960,6 +2270,7 @@
             },
             'reservoir_monitor': {
                 name: 'Reservoir Remaining', cat: 'Device & Sensor', icon: 'fa-flask',
+                phone: { category: 'compact', microLabel: 'Reservoir', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Units remaining in pump reservoir with Omnipod <50U floor handling.',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 schema: [
@@ -1970,6 +2281,7 @@
             },
             'device_battery_stat': {
                 name: 'Hardware Battery Status', cat: 'Device & Sensor', icon: 'fa-battery-three-quarters',
+                phone: { category: 'compact', microLabel: 'Battery', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Phone uploader battery and pump connection telemetry.',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 schema: [
@@ -1981,24 +2293,28 @@
             // Category E: Therapy Dosing & Clinical Curves
             'tdd_dosing_stat': {
                 name: 'Insulin TDD & Basal:Bolus', cat: 'Clinical Deep Dive', icon: 'fa-chart-pie',
+                phone: { category: 'adaptive', microLabel: 'TDD', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Total daily dose breakdown with basal vs bolus split bar.',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 render: renderTddDosingWidget
             },
             'smb_activity_stat': {
                 name: 'Micro-Bolus (SMB) Activity', cat: 'Clinical Deep Dive', icon: 'fa-syringe',
+                phone: { category: 'compact', microLabel: 'SMB', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Count of automated micro-boluses and total SMB units delivered today.',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 render: renderSmbActivityWidget
             },
             'autosens_ratio_stat': {
                 name: 'Autosens Sensitivity Ratio', cat: 'Clinical Deep Dive', icon: 'fa-sliders',
+                phone: { category: 'compact', microLabel: 'Autosens', minW: 1, maxW: 2, defaultW: 1 },
                 desc: 'Live AAPS sensitivity ratio percentage and resistance indicator.',
                 w: 6, h: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
                 render: renderAutosensWidget
             },
             'ghost_curve_overlay': {
                 name: 'Today vs Best-14d Ghost Curve', cat: 'Clinical Deep Dive', icon: 'fa-chart-area',
+                phone: { category: 'panoramic', minW: 2, maxW: 2, defaultW: 2 },
                 desc: 'Overlay today 24h continuous trace against selectable baseline median curves.',
                 w: 12, h: 4, minW: 8, minH: 3, maxW: 24, maxH: 6,
                 schema: [
@@ -2014,6 +2330,7 @@
             },
             'meal_analysis_placeholder': {
                 name: 'Meal Analysis (Pending Project)', cat: 'Clinical Deep Dive', icon: 'fa-utensils',
+                phone: { category: 'panoramic', minW: 2, maxW: 2, defaultW: 2 },
                 desc: 'Dedicated slice & dice meal analysis page with postprandial curve sorting.',
                 w: 12, h: 3, minW: 6, minH: 2, maxW: 24, maxH: 5,
                 render: function(cfg) { return renderPlaceholder('Meal Analysis Tool', 'Dedicated slice &amp; dice meal analysis project with postprandial curve triage coming in next milestone.', 'fa-utensils'); }
@@ -2022,6 +2339,7 @@
             // Category F: Layout & Headers
             'custom_text_header': {
                 name: 'Custom Text / Header', cat: 'Layout & Headers', icon: 'fa-heading',
+                phone: { category: 'panoramic', minW: 2, maxW: 2, defaultW: 2 },
                 desc: 'Clean, frameless section title or note banner with customizable alignment.',
                 w: 24, h: 2, minW: 6, minH: 1, maxW: 24, maxH: 4,
                 schema: [
@@ -2045,6 +2363,15 @@
                 render: renderCustomTextHeaderWidget
             }
         };
+
+        // Legacy scorecards remain in persisted layouts but are hidden from the
+        // drawer. Keep their phone contract next to the catalogue rather than
+        // resurrecting type lists in the responsive layout code.
+        ['tir_scorecard', 'titr_scorecard', 'tar_scorecard', 'tatr_scorecard', 'tbr_scorecard']
+            .forEach(function(type) {
+                var labels = { tir_scorecard: 'TIR', titr_scorecard: 'TITR', tar_scorecard: 'TAR', tatr_scorecard: 'TATR', tbr_scorecard: 'TBR' };
+                WIDGET_CATALOG[type].phone = { category: 'adaptive', microLabel: labels[type], minW: 1, maxW: 2, defaultW: 1 };
+            });
 
         // =========================================================================
         // Kiosk Mode, Wake Lock & Home Assistant Sleep / Standby Control
@@ -2242,18 +2569,11 @@
         // State & Gridstack Initialization
         // =========================================================================
         document.addEventListener('DOMContentLoaded', function () {
-            // 1. Initialize Gridstack (24 Columns for high-precision widget layout)
-            grid = GridStack.init({
-                column: 24,
-                cellHeight: 60,
-                margin: 12,
-                animate: true,
-                disableDrag: true,   // Read-only by default
-                disableResize: true, // Read-only by default
-                resizable: {
-                    handles: 'e, se, s, sw, w'
-                }
-            }, '#dashboard-grid');
+            // The grid is deliberately re-created per profile. GridStack's column()
+            // conversion mutates coordinates, which would corrupt the independent maps.
+            buildDashboardGrid('computer');
+            canvasResizeObserver = new ResizeObserver(syncDashboardCanvasScale);
+            canvasResizeObserver.observe(document.getElementById('dash-canvas-viewport'));
 
             // 2. Parse kiosk mode & direct slot parameter
             var forcedSlot = initKioskAndSlotFromUrl();
@@ -2267,6 +2587,83 @@
             // 5. Watchdog fallback polling (60s interval in case SSE drops)
             setInterval(pollTelemetry, 60000);
         });
+
+        function buildDashboardGrid(profile) {
+            currentProfile = DEVICE_PROFILES[profile] ? profile : 'computer';
+            currentProfileColumns = DEVICE_PROFILES[currentProfile].columns;
+            document.body.dataset.dashDevice = currentProfile;
+            var gridEl = document.getElementById('dashboard-grid');
+            // GridStack measures its container during init. Set the new logical
+            // canvas width before that measurement, rather than one animation
+            // frame later in the visual scaling pass.
+            var canvas = document.getElementById('dash-canvas');
+            if (canvas) canvas.style.width = profileCanvasWidth(currentProfile) + 'px';
+            if (grid) {
+                grid.removeAll(false);
+                grid.destroy(false);
+            }
+            gridEl.innerHTML = '';
+            gridEl.style.setProperty('--dash-grid-columns', currentProfileColumns);
+            grid = GridStack.init({
+                column: currentProfileColumns,
+                cellHeight: 60,
+                margin: 12,
+                animate: true,
+                disableDrag: true,
+                disableResize: true,
+                resizable: { handles: 'e, se, s, sw, w' }
+            }, gridEl);
+            if (gridResizeObserver) gridResizeObserver.disconnect();
+            gridResizeObserver = new ResizeObserver(function() {
+                requestAnimationFrame(syncDashboardCanvasScale);
+            });
+            gridResizeObserver.observe(gridEl);
+            grid.on('change', function(event, changedNodes) {
+                (changedNodes || []).forEach(function(node) {
+                    applyPhoneMicroPresentation(node.el);
+                });
+                requestAnimationFrame(syncDashboardCanvasScale);
+            });
+            grid.on('added', function(event, addedNodes) {
+                (addedNodes || []).forEach(function(node) {
+                    applyPhoneMicroPresentation(node.el);
+                });
+                requestAnimationFrame(syncDashboardCanvasScale);
+            });
+        }
+
+        function applyPhoneMicroPresentation(itemEl) {
+            if (!itemEl || currentProfile !== 'phone_portrait') return;
+            var node = itemEl.gridstackNode || {};
+            var width = (node.w !== undefined) ? node.w : parseInt(itemEl.getAttribute('gs-w') || '1', 10);
+            var isMicro = width === 1;
+            itemEl.classList.toggle('dash-phone-micro', isMicro);
+            var title = itemEl.querySelector('.widget-title span');
+            if (title) {
+                title.textContent = isMicro
+                    ? (itemEl.getAttribute('data-micro-title') || itemEl.getAttribute('data-full-title') || '')
+                    : (itemEl.getAttribute('data-full-title') || '');
+            }
+        }
+
+        function syncDashboardCanvasScale() {
+            var viewport = document.getElementById('dash-canvas-viewport');
+            var canvas = document.getElementById('dash-canvas');
+            if (!viewport || !canvas || !currentProfileColumns) return;
+            var profileWidth = profileCanvasWidth(currentProfile);
+            var foldHeight = { phone_portrait: 720, phone_landscape: 390, tablet_portrait: 900, tablet_landscape: 650 }[currentProfile] || 0;
+            var available = viewport.clientWidth;
+            var scale = Math.min(1, available / profileWidth);
+            canvas.style.width = profileWidth + 'px';
+            canvas.style.transform = 'scale(' + scale + ')';
+            canvas.style.marginLeft = Math.max(0, (available - profileWidth * scale) / 2) + 'px';
+            canvas.style.setProperty('--dash-fold-px', foldHeight + 'px');
+            viewport.style.height = Math.ceil(canvas.scrollHeight * scale) + 'px';
+        }
+
+        function profileCanvasWidth(profile) {
+            return { computer: 1200, tablet_landscape: 1000, tablet_portrait: 760, phone_landscape: 640, phone_portrait: 360 }[profile] || 1200;
+        }
 
         document.addEventListener('visibilitychange', function() {
             if (document.visibilityState === 'visible') {
@@ -2351,6 +2748,11 @@
             .then(function(results) {
                 var layoutData = results[0];
                 currentLayoutData = layoutData;
+                buildDashboardGrid(layoutData.target_device || 'computer');
+                var profileIndicator = document.getElementById('dash-profile-indicator');
+                if (profileIndicator && DEVICE_PROFILES[currentProfile]) {
+                    profileIndicator.querySelector('span').textContent = DEVICE_PROFILES[currentProfile].label;
+                }
                 var titleText = layoutData.name || ('Dashboard ' + slotNum);
                 document.getElementById('dash-title-display').textContent = titleText;
                 var titleInput = document.getElementById('dash-title-input');
@@ -2375,6 +2777,60 @@
                 });
         }
 
+        function widgetProfileRule(widgetType) {
+            if (currentProfile === 'computer') return {};
+            var definition = WIDGET_CATALOG[widgetType] || {};
+            if (definition.profileRules && definition.profileRules[currentProfile]) {
+                return definition.profileRules[currentProfile];
+            }
+            var phone = definition.phone || {};
+            var category = phone.category || 'adaptive';
+            var profileRules = PROFILE_CATEGORY_RULES[currentProfile] || {};
+            var rule = profileRules[category];
+            if (rule) return rule;
+            return { minW: 1, maxW: currentProfileColumns, defaultW: 1 };
+        }
+
+        function widgetMicroLabel(widgetType, cfg, def) {
+            if (widgetType === 'range_scorecard') {
+                return ({ tir: 'TIR', titr: 'TITR', tar: 'TAR', tatr: 'TATR', vhigh: 'High', tbr: 'TBR', vlow: 'V.Low' })[(cfg || {}).metric || 'tir'] || 'Range';
+            }
+            return (def.phone && def.phone.microLabel) || def.name;
+        }
+
+        function profileCoordinates(widget, profileRule) {
+            if (currentProfile === 'computer') {
+                return { x: widget.x, y: widget.y, w: widget.w, h: widget.h };
+            }
+            var saved = (widget.profile_overrides || {})[currentProfile];
+            if (saved) return { x: saved.x, y: saved.y, w: saved.w, h: saved.h };
+            // A newly selected profile starts with a visual-only, proportional draft.
+            // It is not persisted until the user saves this profile.
+            var ratio = currentProfileColumns / 24;
+            var width = profileRule.defaultW || Math.max(1, Math.min(currentProfileColumns, Math.round((widget.w || 1) * ratio)));
+            return {
+                x: Math.max(0, Math.min(currentProfileColumns - width, Math.round((widget.x || 0) * ratio))),
+                y: Math.max(0, widget.y || 0), w: width, h: Math.max(1, widget.h || 1)
+            };
+        }
+
+        function normalizeLegacyDesktopWidgets(widgets) {
+            if (currentProfile !== 'computer') return widgets;
+            var unprofiled = widgets.every(function(w) {
+                return !w.profile_overrides || Object.keys(w.profile_overrides).length === 0;
+            });
+            var is12ColLegacy = unprofiled && widgets.every(function(w) {
+                return ((w.x || 0) + (w.w || 3)) <= 12;
+            });
+            if (!is12ColLegacy) return widgets;
+            return widgets.map(function(w) {
+                var migrated = Object.assign({}, w);
+                migrated.x = (w.x || 0) * 2;
+                migrated.w = Math.min(24, (w.w || 3) * 2);
+                return migrated;
+            });
+        }
+
         function renderLayoutWidgets(widgets) {
             grid.removeAll();
             var emptyState = document.getElementById('dash-empty-state');
@@ -2385,14 +2841,7 @@
             }
             emptyState.classList.remove('show');
 
-            // Seamless migration: If all widgets fit in 12 cols, scale coordinates to 24 cols
-            var is12ColLegacy = widgets.every(function(w) { return ((w.x || 0) + (w.w || 3)) <= 12; });
-            if (is12ColLegacy) {
-                widgets.forEach(function(w) {
-                    w.x = (w.x || 0) * 2;
-                    w.w = Math.min(24, (w.w || 3) * 2);
-                });
-            }
+            widgets = normalizeLegacyDesktopWidgets(widgets);
 
             widgets.forEach(function(w) {
                 var def = WIDGET_CATALOG[w.widget_type];
@@ -2419,7 +2868,11 @@
                 // Dynamic title reflection for Range, Ghost Curve, and Hypo Streak widgets
                 var displayTitle = w.title || def.name;
                 var isRangeType = (w.widget_type === 'range_scorecard' || w.widget_type === 'tir_scorecard' || w.widget_type === 'titr_scorecard' || w.widget_type === 'tar_scorecard' || w.widget_type === 'tatr_scorecard' || w.widget_type === 'tbr_scorecard');
-                if (isRangeType) {
+                if (w.widget_type === 'gmi_scorecard') {
+                    // Existing saved layouts retain their historic title, so
+                    // deliberately override it to the new concise GMI label.
+                    displayTitle = 'GMI';
+                } else if (isRangeType) {
                     var m = cfg.metric;
                     if (!m) {
                         if (w.widget_type === 'titr_scorecard') m = 'titr';
@@ -2459,6 +2912,20 @@
                     displayTitle = (cfg.range_type === 'tight') ? 'Glycemic Range (Tight 3.9–7.8)' : 'Glycemic Range (Standard 3.9–10.0)';
                 }
 
+                var profileRule = widgetProfileRule(w.widget_type);
+                var coords = profileCoordinates(w, profileRule);
+                if (profileRule.forceFullWidth) {
+                    coords.x = 0;
+                    coords.w = currentProfileColumns;
+                } else {
+                    var minProfileWidth = profileRule.minW || 1;
+                    var maxProfileWidth = profileRule.maxW || currentProfileColumns;
+                    coords.w = Math.max(minProfileWidth, Math.min(maxProfileWidth, coords.w));
+                    coords.x = Math.max(0, Math.min(currentProfileColumns - coords.w, coords.x));
+                }
+                var isPhoneMicro = currentProfile === 'phone_portrait' && coords.w === 1;
+                if (isPhoneMicro) displayTitle = widgetMicroLabel(w.widget_type, cfg, def);
+
                 var contentHtml = 
                     '<div class="widget-header">' +
                     '<div class="widget-title"><i class="fa-solid ' + (def.icon || 'fa-chart-simple') + '"></i><span>' + displayTitle + '</span></div>' +
@@ -2470,22 +2937,41 @@
                     '<div class="widget-body">' + def.render(cfg) + '</div>';
 
                 var widgetEl = grid.addWidget({
-                    x: w.x, y: w.y, w: w.w, h: w.h,
-                    minW: def.minW || 3, minH: def.minH || (w.widget_type === 'custom_text_header' ? 1 : 2),
-                    maxW: def.maxW || 24, maxH: def.maxH || 12,
+                    x: coords.x, y: coords.y, w: coords.w, h: coords.h,
+                    minW: Math.min(profileRule.minW || def.minW || 1, currentProfileColumns), minH: def.minH || (w.widget_type === 'custom_text_header' ? 1 : 2),
+                    maxW: Math.min(profileRule.maxW || def.maxW || currentProfileColumns, currentProfileColumns), maxH: def.maxH || 12,
                     content: contentHtml
                 });
                 if (widgetEl) {
+                    widgetEl.setAttribute('data-full-title', displayTitle);
+                    widgetEl.setAttribute('data-micro-title', widgetMicroLabel(w.widget_type, cfg, def));
+                    if (isPhoneMicro) widgetEl.classList.add('dash-phone-micro');
+                    widgetEl.setAttribute('data-widget-key', w.widget_key || '');
+                    widgetEl.setAttribute('data-profile-overrides', JSON.stringify(w.profile_overrides || {}));
+                    widgetEl.setAttribute('data-desktop-coordinates', JSON.stringify({ x: w.x, y: w.y, w: w.w, h: w.h }));
                     widgetEl.setAttribute('data-widget-type', w.widget_type);
                     widgetEl.setAttribute('data-widget-config', JSON.stringify(cfg));
                     widgetEl._widgetConfig = cfg;
                     var c = widgetEl.querySelector('.grid-stack-item-content');
                     if (c) {
+                        c.setAttribute('data-widget-key', w.widget_key || '');
+                        c.setAttribute('data-profile-overrides', JSON.stringify(w.profile_overrides || {}));
+                        c.setAttribute('data-desktop-coordinates', widgetEl.getAttribute('data-desktop-coordinates'));
                         c.setAttribute('data-widget-type', w.widget_type);
                         c.setAttribute('data-widget-config', JSON.stringify(cfg));
                         c._widgetConfig = cfg;
                     }
+                    applyPhoneMicroPresentation(widgetEl);
                 }
+            });
+            requestAnimationFrame(syncDashboardCanvasScale);
+        }
+
+        function createWidgetKey() {
+            if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
             });
         }
 
@@ -2586,14 +3072,35 @@
                         try { cfgObj = JSON.parse(cfgStr); } catch(e) { cfgObj = {}; }
                     }
 
+                    var overridesStr = itemEl.getAttribute('data-profile-overrides') || '{}';
+                    var profileOverrides;
+                    try { profileOverrides = JSON.parse(overridesStr); } catch(e) { profileOverrides = {}; }
+                    var widgetKey = itemEl.getAttribute('data-widget-key') || createWidgetKey();
+                    var profileCoords = { x: x, y: y, w: w, h: h };
+                    if (currentProfile !== 'computer') {
+                        profileOverrides[currentProfile] = profileCoords;
+                        var desktopStr = itemEl.getAttribute('data-desktop-coordinates') || '{}';
+                        try {
+                            var desktopCoords = JSON.parse(desktopStr);
+                            if (desktopCoords && Number.isInteger(desktopCoords.x) && Number.isInteger(desktopCoords.y) && Number.isInteger(desktopCoords.w) && Number.isInteger(desktopCoords.h)) {
+                                x = desktopCoords.x;
+                                y = desktopCoords.y;
+                                w = desktopCoords.w;
+                                h = desktopCoords.h;
+                            }
+                        } catch (e) {}
+                    }
+
                     widgetPayload.push({
+                        widget_key: widgetKey,
                         widget_type: type,
                         title: title,
                         x: x,
                         y: y,
                         w: w,
                         h: h,
-                        config: cfgObj || {}
+                        config: cfgObj || {},
+                        profile_overrides: profileOverrides
                     });
                 });
 
@@ -2603,7 +3110,8 @@
                     body: JSON.stringify({
                         slot_number: currentSlot,
                         name: newTitle,
-                        widgets: widgetPayload
+                        widgets: widgetPayload,
+                        edited_profile: currentProfile
                     })
                 })
                 .then(function(r) {
@@ -2775,25 +3283,46 @@
                 '</div>' +
                 '<div class="widget-body">' + def.render(cfg) + '</div>';
 
+            var profileRule = widgetProfileRule(typeKey);
+            var addWidth = def.w || 6;
+            var addHeight = def.h || (typeKey === 'custom_text_header' ? 1 : 3);
+            var minWidth = def.minW || 1;
+            var maxWidth = def.maxW || currentProfileColumns;
+            if (currentProfile !== 'computer') {
+                addWidth = profileRule.defaultW || 1;
+                minWidth = profileRule.minW || 1;
+                maxWidth = profileRule.maxW || currentProfileColumns;
+            }
+
             var widgetEl = grid.addWidget({
-                w: def.w || 6, h: def.h || (typeKey === 'custom_text_header' ? 1 : 3),
-                minW: def.minW || 3, minH: def.minH || (typeKey === 'custom_text_header' ? 1 : 2),
-                maxW: def.maxW || 24, maxH: def.maxH || 12,
+                w: addWidth, h: addHeight,
+                minW: Math.min(minWidth, currentProfileColumns), minH: def.minH || (typeKey === 'custom_text_header' ? 1 : 2),
+                maxW: Math.min(maxWidth, currentProfileColumns), maxH: def.maxH || 12,
                 content: contentHtml
             });
             if (widgetEl) {
+                widgetEl.setAttribute('data-full-title', displayTitle);
+                widgetEl.setAttribute('data-micro-title', widgetMicroLabel(typeKey, cfg, def));
+                widgetEl.setAttribute('data-widget-key', createWidgetKey());
+                widgetEl.setAttribute('data-profile-overrides', '{}');
+                widgetEl.setAttribute('data-desktop-coordinates', JSON.stringify({ x: 0, y: 0, w: def.w || 6, h: def.h || addHeight }));
                 widgetEl.setAttribute('data-widget-type', typeKey);
                 widgetEl.setAttribute('data-widget-config', JSON.stringify(cfg));
                 widgetEl._widgetConfig = cfg;
                 var c = widgetEl.querySelector('.grid-stack-item-content');
                 if (c) {
+                    c.setAttribute('data-widget-key', widgetEl.getAttribute('data-widget-key'));
+                    c.setAttribute('data-profile-overrides', '{}');
+                    c.setAttribute('data-desktop-coordinates', widgetEl.getAttribute('data-desktop-coordinates'));
                     c.setAttribute('data-widget-type', typeKey);
                     c.setAttribute('data-widget-config', JSON.stringify(cfg));
                     c._widgetConfig = cfg;
                 }
+                applyPhoneMicroPresentation(widgetEl);
             }
 
             closeWidgetLibrary();
+            requestAnimationFrame(syncDashboardCanvasScale);
         }
 
         function filterWidgetLibrary() {
@@ -2823,6 +3352,12 @@
         function updateWorkingSlotName(idx, val) {
             if (workingSlots[idx]) {
                 workingSlots[idx].name = val;
+            }
+        }
+
+        function updateWorkingSlotProfile(idx, val) {
+            if (workingSlots[idx] && workingSlots[idx].slot_number !== 1 && DEVICE_PROFILES[val]) {
+                workingSlots[idx].target_device = val;
             }
         }
 
@@ -2856,6 +3391,12 @@
                 var isFirst = (idx === 0);
                 var isLast = (idx === workingSlots.length - 1);
                 var isActive = (slot.slot_number === currentSlot);
+                var profileOptions = Object.keys(DEVICE_PROFILES).map(function(key) {
+                    return '<option value="' + key + '"' + ((slot.target_device || 'computer') === key ? ' selected' : '') + '>' + DEVICE_PROFILES[key].label + '</option>';
+                }).join('');
+                var profileControl = slot.slot_number === 1
+                    ? '<span class="slot-device-fixed">Computer layout</span>'
+                    : '<select class="slot-device-select" onchange="updateWorkingSlotProfile(' + idx + ', this.value)">' + profileOptions + '</select>';
 
                 row.innerHTML = 
                     '<span class="slot-drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical"></i></span>' +
@@ -2865,6 +3406,7 @@
                     '</div>' +
                     '<span class="slot-num-badge">Slot ' + slot.slot_number + '</span>' +
                     '<input type="text" class="slot-name-input" value="' + escapeHtml(slot.name) + '" maxlength="40" oninput="updateWorkingSlotName(' + idx + ', this.value)">' +
+                    profileControl +
                     (isActive ? '<span class="slot-active-pill">Active</span>' : '');
 
                 // Drag and Drop Event Listeners
@@ -2933,7 +3475,8 @@
                 return {
                     slot_number: s.slot_number,
                     display_order: idx + 1,
-                    name: s.name.trim() || ('Dashboard ' + s.slot_number)
+                    name: s.name.trim() || ('Dashboard ' + s.slot_number),
+                    target_device: s.slot_number === 1 ? 'computer' : (s.target_device || 'computer')
                 };
             });
 
@@ -2956,6 +3499,7 @@
                     if (titleInput) titleInput.value = cur.name;
                 }
                 closeManageSlotsModal();
+                loadDashboardSlot(currentSlot);
             })
             .catch(function(err) {
                 console.error("Failed to reorder slots:", err);

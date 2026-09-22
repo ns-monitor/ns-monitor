@@ -2294,57 +2294,58 @@ input[type="color"]::-moz-focus-inner {
 }
 
 /* -----------------------------------------------------------------------
-   22. GRIDSTACK 24-COLUMN RESPONSIVE LAYOUT SYSTEM
-   Canonical percentage-based column positions and widths for 24-column
-   clinical dashboard layouts. Dynamically scales with container width.
+   22. GRIDSTACK PROFILE-AWARE LAYOUT SYSTEM
+   Canonical percentage-based positions scale from the dashboard's declared
+   profile column count (24 on computer, 2/6/8/12 on device layouts).
    ----------------------------------------------------------------------- */
-.grid-stack > .grid-stack-item[gs-w="1"]  { width: calc(100% * 1 / 24); }
-.grid-stack > .grid-stack-item[gs-w="2"]  { width: calc(100% * 2 / 24); }
-.grid-stack > .grid-stack-item[gs-w="3"]  { width: calc(100% * 3 / 24); }
-.grid-stack > .grid-stack-item[gs-w="4"]  { width: calc(100% * 4 / 24); }
-.grid-stack > .grid-stack-item[gs-w="5"]  { width: calc(100% * 5 / 24); }
-.grid-stack > .grid-stack-item[gs-w="6"]  { width: calc(100% * 6 / 24); }
-.grid-stack > .grid-stack-item[gs-w="7"]  { width: calc(100% * 7 / 24); }
-.grid-stack > .grid-stack-item[gs-w="8"]  { width: calc(100% * 8 / 24); }
-.grid-stack > .grid-stack-item[gs-w="9"]  { width: calc(100% * 9 / 24); }
-.grid-stack > .grid-stack-item[gs-w="10"] { width: calc(100% * 10 / 24); }
-.grid-stack > .grid-stack-item[gs-w="11"] { width: calc(100% * 11 / 24); }
-.grid-stack > .grid-stack-item[gs-w="12"] { width: calc(100% * 12 / 24); }
-.grid-stack > .grid-stack-item[gs-w="13"] { width: calc(100% * 13 / 24); }
-.grid-stack > .grid-stack-item[gs-w="14"] { width: calc(100% * 14 / 24); }
-.grid-stack > .grid-stack-item[gs-w="15"] { width: calc(100% * 15 / 24); }
-.grid-stack > .grid-stack-item[gs-w="16"] { width: calc(100% * 16 / 24); }
-.grid-stack > .grid-stack-item[gs-w="17"] { width: calc(100% * 17 / 24); }
-.grid-stack > .grid-stack-item[gs-w="18"] { width: calc(100% * 18 / 24); }
-.grid-stack > .grid-stack-item[gs-w="19"] { width: calc(100% * 19 / 24); }
-.grid-stack > .grid-stack-item[gs-w="20"] { width: calc(100% * 20 / 24); }
-.grid-stack > .grid-stack-item[gs-w="21"] { width: calc(100% * 21 / 24); }
-.grid-stack > .grid-stack-item[gs-w="22"] { width: calc(100% * 22 / 24); }
-.grid-stack > .grid-stack-item[gs-w="23"] { width: calc(100% * 23 / 24); }
+.grid-stack > .grid-stack-item[gs-w="1"]  { width: calc(100% * 1 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="2"]  { width: calc(100% * 2 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="3"]  { width: calc(100% * 3 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="4"]  { width: calc(100% * 4 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="5"]  { width: calc(100% * 5 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="6"]  { width: calc(100% * 6 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="7"]  { width: calc(100% * 7 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="8"]  { width: calc(100% * 8 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="9"]  { width: calc(100% * 9 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="10"] { width: calc(100% * 10 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="11"] { width: calc(100% * 11 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="12"] { width: calc(100% * 12 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="13"] { width: calc(100% * 13 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="14"] { width: calc(100% * 14 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="15"] { width: calc(100% * 15 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="16"] { width: calc(100% * 16 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="17"] { width: calc(100% * 17 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="18"] { width: calc(100% * 18 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="19"] { width: calc(100% * 19 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="20"] { width: calc(100% * 20 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="21"] { width: calc(100% * 21 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="22"] { width: calc(100% * 22 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-w="23"] { width: calc(100% * 23 / var(--dash-grid-columns, 24)); }
 .grid-stack > .grid-stack-item[gs-w="24"] { width: 100%; }
+/* GridStack omits gs-w for a one-column item; retain its profile-aware width. */
+.grid-stack > .grid-stack-item:not([gs-w]) { width: calc(100% / var(--dash-grid-columns, 24)); }
 
 .grid-stack > .grid-stack-item[gs-x="0"]  { left: 0%; }
-.grid-stack > .grid-stack-item[gs-x="1"]  { left: calc(100% * 1 / 24); }
-.grid-stack > .grid-stack-item[gs-x="2"]  { left: calc(100% * 2 / 24); }
-.grid-stack > .grid-stack-item[gs-x="3"]  { left: calc(100% * 3 / 24); }
-.grid-stack > .grid-stack-item[gs-x="4"]  { left: calc(100% * 4 / 24); }
-.grid-stack > .grid-stack-item[gs-x="5"]  { left: calc(100% * 5 / 24); }
-.grid-stack > .grid-stack-item[gs-x="6"]  { left: calc(100% * 6 / 24); }
-.grid-stack > .grid-stack-item[gs-x="7"]  { left: calc(100% * 7 / 24); }
-.grid-stack > .grid-stack-item[gs-x="8"]  { left: calc(100% * 8 / 24); }
-.grid-stack > .grid-stack-item[gs-x="9"]  { left: calc(100% * 9 / 24); }
-.grid-stack > .grid-stack-item[gs-x="10"] { left: calc(100% * 10 / 24); }
-.grid-stack > .grid-stack-item[gs-x="11"] { left: calc(100% * 11 / 24); }
-.grid-stack > .grid-stack-item[gs-x="12"] { left: calc(100% * 12 / 24); }
-.grid-stack > .grid-stack-item[gs-x="13"] { left: calc(100% * 13 / 24); }
-.grid-stack > .grid-stack-item[gs-x="14"] { left: calc(100% * 14 / 24); }
-.grid-stack > .grid-stack-item[gs-x="15"] { left: calc(100% * 15 / 24); }
-.grid-stack > .grid-stack-item[gs-x="16"] { left: calc(100% * 16 / 24); }
-.grid-stack > .grid-stack-item[gs-x="17"] { left: calc(100% * 17 / 24); }
-.grid-stack > .grid-stack-item[gs-x="18"] { left: calc(100% * 18 / 24); }
-.grid-stack > .grid-stack-item[gs-x="19"] { left: calc(100% * 19 / 24); }
-.grid-stack > .grid-stack-item[gs-x="20"] { left: calc(100% * 20 / 24); }
-.grid-stack > .grid-stack-item[gs-x="21"] { left: calc(100% * 21 / 24); }
-.grid-stack > .grid-stack-item[gs-x="22"] { left: calc(100% * 22 / 24); }
-.grid-stack > .grid-stack-item[gs-x="23"] { left: calc(100% * 23 / 24); }
-
+.grid-stack > .grid-stack-item[gs-x="1"]  { left: calc(100% * 1 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="2"]  { left: calc(100% * 2 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="3"]  { left: calc(100% * 3 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="4"]  { left: calc(100% * 4 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="5"]  { left: calc(100% * 5 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="6"]  { left: calc(100% * 6 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="7"]  { left: calc(100% * 7 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="8"]  { left: calc(100% * 8 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="9"]  { left: calc(100% * 9 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="10"] { left: calc(100% * 10 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="11"] { left: calc(100% * 11 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="12"] { left: calc(100% * 12 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="13"] { left: calc(100% * 13 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="14"] { left: calc(100% * 14 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="15"] { left: calc(100% * 15 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="16"] { left: calc(100% * 16 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="17"] { left: calc(100% * 17 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="18"] { left: calc(100% * 18 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="19"] { left: calc(100% * 19 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="20"] { left: calc(100% * 20 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="21"] { left: calc(100% * 21 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="22"] { left: calc(100% * 22 / var(--dash-grid-columns, 24)); }
+.grid-stack > .grid-stack-item[gs-x="23"] { left: calc(100% * 23 / var(--dash-grid-columns, 24)); }

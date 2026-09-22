@@ -817,10 +817,12 @@ def dashboard_home_page(slot_number=None):
     _tz = ZoneInfo(getattr(config, 'TIMEZONE', 'UTC'))
     today_local = datetime.now(_tz).strftime("%Y-%m-%d")
     is_kiosk = request.args.get("kiosk") in ("1", "true", "yes") or request.args.get("fullscreen") in ("1", "true", "yes")
-    return render_template("dashboard_home.html",
-                           today_local=today_local,
-                           initial_slot=slot_number,
-                           is_kiosk=is_kiosk)
+    resp = make_response(render_template("dashboard_home.html",
+                                         today_local=today_local,
+                                         initial_slot=slot_number,
+                                         is_kiosk=is_kiosk))
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return resp
 
 @app.route("/api/v1/dashboard/slots", methods=["GET"])
 def api_dashboard_slots():
@@ -866,6 +868,8 @@ def api_dashboard_reorder_slots():
         conn = database.get_conn()
         updated_slots = database.reorder_dashboard_slots(conn, slots)
         return jsonify({"success": True, "slots": updated_slots})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
@@ -899,14 +903,21 @@ def api_dashboard_save_layout():
 
     name = data.get("name")
     widgets = data.get("widgets", [])
+    edited_profile = data.get("edited_profile", "computer")
     if not isinstance(widgets, list):
         return jsonify({"error": "widgets must be a list"}), 400
+    if edited_profile not in database.DEVICE_PROFILES:
+        return jsonify({"error": "edited_profile must be a supported device profile"}), 400
+    if slot_number == 1 and edited_profile != "computer":
+        return jsonify({"error": "Dashboard slot 1 must use the computer profile"}), 400
 
     conn = None
     try:
         conn = database.get_conn()
-        saved = database.save_dashboard_layout(conn, int(slot_number), name, widgets)
+        saved = database.save_dashboard_layout(conn, int(slot_number), name, widgets, edited_profile)
         return jsonify({"success": True, "layout": saved})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:

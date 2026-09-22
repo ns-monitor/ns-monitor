@@ -190,7 +190,7 @@ def run_loop(refresh_callback=None, status_data=None, status_lock=None):
                     sleep_sec = wait_delta
                     print(f"[cloud] Phase-locked. Next sync in {int(sleep_sec)}s (Target: {nightscout_api.iso_z(target_time)})")
                 else:
-                    sleep_sec = 10
+                    sleep_sec = 60
                     print(f"[cloud] Catching up. Next sync in {sleep_sec}s")
             else:
                 print(f"[cloud] No data found. Falling back to standard {sleep_sec}s interval.")

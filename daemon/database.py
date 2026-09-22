@@ -3588,11 +3588,59 @@ def _serialize_diary_note_row(row: dict) -> dict:
 # ---------------------------------------------------------------------------
 # Dashboard Layouts & Widgets (Phase 1)
 # ---------------------------------------------------------------------------
+DEVICE_PROFILES = {
+    "computer": 24,
+    "phone_portrait": 2,
+    "phone_landscape": 6,
+    "tablet_portrait": 8,
+    "tablet_landscape": 12,
+}
+
+# This is the server-side counterpart of dashboard_home.html's widget catalogue.
+# Keeping the allow-list here prevents malformed or unknown widget payloads from
+# becoming persistent layouts that the client cannot reliably render.
+DASHBOARD_WIDGET_TYPES = {
+    "autosens_ratio_stat", "avg_bg_scorecard", "cgm_sensor_timer",
+    "current_bg_hero", "custom_text_header", "cv_scorecard",
+    "device_battery_stat", "ghost_curve_overlay", "gmi_scorecard",
+    "gri_scorecard", "gvi_scorecard", "hbgi_scorecard", "hypo_free_streak",
+    "iob_cob_stat", "lbgi_scorecard", "mag_scorecard", "meal_analysis_placeholder",
+    "pod_countdown_timer", "range_scorecard", "recent_notes_feed",
+    "reservoir_monitor", "sd_scorecard", "smb_activity_stat", "stacked_range_bar",
+    "tar_scorecard", "tatr_scorecard", "tbr_scorecard", "tdd_dosing_stat",
+    "tir_scorecard", "titr_scorecard", "triage_focus_table",
+}
+
+
+def _dashboard_profile_coordinates(value: Any, columns: int) -> Dict[str, int]:
+    """Validate one persisted GridStack coordinate set for a device profile."""
+    if not isinstance(value, dict):
+        raise ValueError("Profile coordinates must be an object.")
+    try:
+        x, y, w, h = (int(value[k]) for k in ("x", "y", "w", "h"))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("Profile coordinates require integer x, y, w and h values.") from exc
+    if x < 0 or y < 0 or w < 1 or h < 1 or x + w > columns:
+        raise ValueError("Profile coordinates are outside the selected device grid.")
+    return {"x": x, "y": y, "w": w, "h": h}
+
+
+def _dashboard_widget_key(value: Any) -> str:
+    """Return a validated stable widget UUID, generating one for a new widget."""
+    import uuid
+    if value in (None, ""):
+        return str(uuid.uuid4())
+    try:
+        return str(uuid.UUID(str(value)))
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise ValueError("widget_key must be a UUID.") from exc
+
+
 def get_dashboard_slots(conn) -> List[Dict[str, Any]]:
     """Return all dashboard layout slots ordered by display_order."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("""
-            SELECT id, slot_number, display_order, name, is_active, created_at, updated_at
+            SELECT id, slot_number, display_order, name, target_device, is_active, created_at, updated_at
             FROM dashboard_layouts
             ORDER BY display_order ASC, slot_number ASC
         """)
@@ -3612,22 +3660,29 @@ def reorder_dashboard_slots(conn, slots_data: List[Dict[str, Any]]) -> List[Dict
             slot_num = item.get("slot_number")
             order = item.get("display_order")
             name = item.get("name")
+            target_device = item.get("target_device")
             if slot_num is not None:
+                if int(slot_num) == 1 and target_device not in (None, "computer"):
+                    raise ValueError("Dashboard slot 1 must use the computer profile.")
+                if target_device is not None and target_device not in DEVICE_PROFILES:
+                    raise ValueError("Unknown dashboard device profile.")
                 if name is not None and str(name).strip():
                     cur.execute("""
                         UPDATE dashboard_layouts
                         SET display_order = COALESCE(%s, display_order),
                             name = %s,
+                            target_device = COALESCE(%s, target_device),
                             updated_at = NOW()
                         WHERE slot_number = %s
-                    """, (order, str(name).strip(), int(slot_num)))
+                    """, (order, str(name).strip(), target_device, int(slot_num)))
                 else:
                     cur.execute("""
                         UPDATE dashboard_layouts
                         SET display_order = COALESCE(%s, display_order),
+                            target_device = COALESCE(%s, target_device),
                             updated_at = NOW()
                         WHERE slot_number = %s
-                    """, (order, int(slot_num)))
+                    """, (order, target_device, int(slot_num)))
         conn.commit()
     return get_dashboard_slots(conn)
 
@@ -3646,13 +3701,13 @@ def get_dashboard_layout(conn, slot_number: Optional[int] = None) -> Optional[Di
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         if slot_number is not None:
             cur.execute("""
-                SELECT id, slot_number, name, is_active
+                SELECT id, slot_number, name, target_device, is_active
                 FROM dashboard_layouts
                 WHERE slot_number = %s
             """, (slot_number,))
         else:
             cur.execute("""
-                SELECT id, slot_number, name, is_active
+                SELECT id, slot_number, name, target_device, is_active
                 FROM dashboard_layouts
                 WHERE is_active = TRUE
                 LIMIT 1
@@ -3662,7 +3717,7 @@ def get_dashboard_layout(conn, slot_number: Optional[int] = None) -> Optional[Di
             return None
 
         cur.execute("""
-            SELECT id, widget_type, title, x, y, w, h, config
+            SELECT id, widget_key, widget_type, title, x, y, w, h, config, profile_overrides
             FROM dashboard_widgets
             WHERE layout_id = %s
             ORDER BY y ASC, x ASC, id ASC
@@ -3672,9 +3727,16 @@ def get_dashboard_layout(conn, slot_number: Optional[int] = None) -> Optional[Di
         return layout
 
 
-def save_dashboard_layout(conn, slot_number: int, name: Optional[str], widgets: List[Dict[str, Any]]) -> Dict[str, Any]:
+def save_dashboard_layout(
+    conn, slot_number: int, name: Optional[str], widgets: List[Dict[str, Any]], edited_profile: str
+) -> Dict[str, Any]:
     """Save/replace all widgets and optionally rename a dashboard slot in an atomic transaction."""
-    with conn.cursor() as cur:
+    if edited_profile not in DEVICE_PROFILES:
+        raise ValueError("Unknown dashboard device profile.")
+    if slot_number == 1 and edited_profile != "computer":
+        raise ValueError("Dashboard slot 1 must use the computer profile.")
+
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         # 1. Update slot name if provided
         if name:
             cur.execute("""
@@ -3693,23 +3755,72 @@ def save_dashboard_layout(conn, slot_number: int, name: Optional[str], widgets: 
         row = cur.fetchone()
         if not row:
             raise ValueError(f"Dashboard slot {slot_number} does not exist.")
-        layout_id = row[0]
+        layout_id = row["id"]
+
+        cur.execute("SELECT target_device FROM dashboard_layouts WHERE id = %s", (layout_id,))
+        layout = cur.fetchone()
+        if layout and layout["target_device"] != edited_profile:
+            raise ValueError("The saved profile does not match this dashboard slot.")
+
+        cur.execute("SELECT widget_key, x, y, w, h, profile_overrides FROM dashboard_widgets WHERE layout_id = %s", (layout_id,))
+        existing_widgets = {str(row["widget_key"]): row for row in cur.fetchall()}
+        widget_keys = set()
+        prepared_widgets = []
+        for widget in widgets:
+            if not isinstance(widget, dict):
+                raise ValueError("Each dashboard widget must be an object.")
+            widget_key = _dashboard_widget_key(widget.get("widget_key"))
+            if widget_key in widget_keys:
+                raise ValueError("Each dashboard widget must have a unique widget_key.")
+            widget_keys.add(widget_key)
+
+            widget_type = widget.get("widget_type")
+            if widget_type not in DASHBOARD_WIDGET_TYPES:
+                raise ValueError("Unknown dashboard widget type.")
+            if not isinstance(widget.get("config", {}), dict):
+                raise ValueError("Dashboard widget config must be an object.")
+
+            existing = existing_widgets.get(widget_key)
+            stored_overrides = dict(existing.get("profile_overrides") or {}) if existing else {}
+            incoming_overrides = widget.get("profile_overrides") or {}
+            if edited_profile == "computer":
+                desktop = _dashboard_profile_coordinates(widget, DEVICE_PROFILES["computer"])
+            else:
+                edited_coordinates = _dashboard_profile_coordinates(
+                    incoming_overrides.get(edited_profile), DEVICE_PROFILES[edited_profile]
+                )
+                stored_overrides[edited_profile] = edited_coordinates
+                desktop = (
+                    _dashboard_profile_coordinates(existing, DEVICE_PROFILES["computer"])
+                    if existing else _dashboard_profile_coordinates(widget, DEVICE_PROFILES["computer"])
+                )
+
+            prepared_widgets.append({
+                "widget_key": widget_key,
+                "widget_type": widget_type,
+                "title": widget.get("title", ""),
+                "x": desktop["x"], "y": desktop["y"], "w": desktop["w"], "h": desktop["h"],
+                "config": widget.get("config", {}),
+                "profile_overrides": stored_overrides,
+            })
 
         # 2. Replace widgets
         cur.execute("DELETE FROM dashboard_widgets WHERE layout_id = %s", (layout_id,))
-        for w in widgets:
+        for w in prepared_widgets:
             cur.execute("""
-                INSERT INTO dashboard_widgets (layout_id, widget_type, title, x, y, w, h, config)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO dashboard_widgets (layout_id, widget_key, widget_type, title, x, y, w, h, config, profile_overrides)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 layout_id,
+                w["widget_key"],
                 w.get("widget_type", "unnamed_widget"),
                 w.get("title", ""),
                 int(w.get("x", 0)),
                 int(w.get("y", 0)),
                 int(w.get("w", 4)),
                 int(w.get("h", 3)),
-                psycopg2.extras.Json(w.get("config", {}))
+                psycopg2.extras.Json(w.get("config", {})),
+                psycopg2.extras.Json(w.get("profile_overrides", {})),
             ))
         conn.commit()
 
@@ -3778,6 +3889,7 @@ def _fetch_glycemic_stats(cur, res: Dict[str, Any]) -> None:
         t["tatr_7d"] = round(max(0.0, 100.0 - float(t.get("titr_7d") or 0) - float(t.get("tbr_7d") or 0)), 1) if t.get("titr_7d") is not None else None
         t["tatr_14d"] = round(max(0.0, 100.0 - float(t.get("titr_14d") or 0) - float(t.get("tbr_14d") or 0)), 1) if t.get("titr_14d") is not None else None
         t["tatr_30d"] = round(max(0.0, 100.0 - float(t.get("titr_30d") or 0) - float(t.get("tbr_30d") or 0)), 1) if t.get("titr_30d") is not None else None
+        t["tatr_60d"] = round(max(0.0, 100.0 - float(t.get("titr_60d") or 0) - float(t.get("tbr_60d") or 0)), 1) if t.get("titr_60d") is not None else None
         t["tatr_90d"] = round(max(0.0, 100.0 - float(t.get("titr_90d") or 0) - float(t.get("tbr_90d") or 0)), 1) if t.get("titr_90d") is not None else None
 
         res["today"] = t
@@ -3785,17 +3897,18 @@ def _fetch_glycemic_stats(cur, res: Dict[str, Any]) -> None:
         # Rolling shortcuts for 7d, 14d, 30d, 90d
         res["rolling"] = {
             "tir_7d": t.get("tir_7d"), "tir_14d": t.get("tir_14d"), "tir_30d": t.get("tir_30d"), "tir_90d": t.get("tir_90d"),
-            "titr_7d": t.get("titr_7d"), "titr_14d": t.get("titr_14d"), "titr_30d": t.get("titr_30d"), "titr_90d": t.get("titr_90d"),
-            "tatr_7d": t.get("tatr_7d"), "tatr_14d": t.get("tatr_14d"), "tatr_30d": t.get("tatr_30d"), "tatr_90d": t.get("tatr_90d"),
-            "tar_7d": t.get("tar_7d"), "tar_14d": t.get("tar_14d"), "tar_30d": t.get("tar_30d"), "tar_90d": t.get("tar_90d"),
-            "tbr_7d": t.get("tbr_7d"), "tbr_14d": t.get("tbr_14d"), "tbr_30d": t.get("tbr_30d"), "tbr_90d": t.get("tbr_90d"),
-            "vlow_7d": t.get("vlow_7d"), "vlow_14d": t.get("vlow_14d"), "vlow_30d": t.get("vlow_30d"), "vlow_90d": t.get("vlow_90d"),
-            "vhigh_7d": t.get("vhigh_7d"), "vhigh_14d": t.get("vhigh_14d"), "vhigh_30d": t.get("vhigh_30d"), "vhigh_90d": t.get("vhigh_90d"),
+            "tir_60d": t.get("tir_60d"),
+            "titr_7d": t.get("titr_7d"), "titr_14d": t.get("titr_14d"), "titr_30d": t.get("titr_30d"), "titr_60d": t.get("titr_60d"), "titr_90d": t.get("titr_90d"),
+            "tatr_7d": t.get("tatr_7d"), "tatr_14d": t.get("tatr_14d"), "tatr_30d": t.get("tatr_30d"), "tatr_60d": t.get("tatr_60d"), "tatr_90d": t.get("tatr_90d"),
+            "tar_7d": t.get("tar_7d"), "tar_14d": t.get("tar_14d"), "tar_30d": t.get("tar_30d"), "tar_60d": t.get("tar_60d"), "tar_90d": t.get("tar_90d"),
+            "tbr_7d": t.get("tbr_7d"), "tbr_14d": t.get("tbr_14d"), "tbr_30d": t.get("tbr_30d"), "tbr_60d": t.get("tbr_60d"), "tbr_90d": t.get("tbr_90d"),
+            "vlow_7d": t.get("vlow_7d"), "vlow_14d": t.get("vlow_14d"), "vlow_30d": t.get("vlow_30d"), "vlow_60d": t.get("vlow_60d"), "vlow_90d": t.get("vlow_90d"),
+            "vhigh_7d": t.get("vhigh_7d"), "vhigh_14d": t.get("vhigh_14d"), "vhigh_30d": t.get("vhigh_30d"), "vhigh_60d": t.get("vhigh_60d"), "vhigh_90d": t.get("vhigh_90d"),
             "mean_7d": t.get("mean_mmol_7d"), "mean_14d": t.get("mean_mmol_14d"), "mean_30d": t.get("mean_mmol_30d"), "mean_90d": t.get("mean_mmol_90d"),
             "mean_mmol_7d": t.get("mean_mmol_7d"), "mean_mmol_14d": t.get("mean_mmol_14d"), "mean_mmol_30d": t.get("mean_mmol_30d"), "mean_mmol_90d": t.get("mean_mmol_90d"),
             "sd_7d": t.get("sd_mmol_7d"), "sd_14d": t.get("sd_mmol_14d"), "sd_30d": t.get("sd_mmol_30d"), "sd_90d": t.get("sd_mmol_90d"),
             "sd_mmol_7d": t.get("sd_mmol_7d"), "sd_mmol_14d": t.get("sd_mmol_14d"), "sd_mmol_30d": t.get("sd_mmol_30d"), "sd_mmol_90d": t.get("sd_mmol_90d"),
-            "gmi_7d": t.get("gmi_7d"), "gmi_14d": t.get("gmi_14d"), "gmi_30d": t.get("gmi_30d"), "gmi_90d": t.get("gmi_90d"),
+            "gmi_7d": t.get("gmi_7d"), "gmi_14d": t.get("gmi_14d"), "gmi_30d": t.get("gmi_30d"), "gmi_60d": t.get("gmi_60d"), "gmi_90d": t.get("gmi_90d"),
             "cv_7d": t.get("cv_7d"), "cv_14d": t.get("cv_14d"), "cv_30d": t.get("cv_30d"), "cv_90d": t.get("cv_90d"),
             "gri_7d": t.get("gri_7d"), "gri_14d": t.get("gri_14d"), "gri_30d": t.get("gri_30d"), "gri_90d": t.get("gri_90d"),
             "lbgi_7d": t.get("lbgi_7d"), "lbgi_14d": t.get("lbgi_14d"), "lbgi_30d": t.get("lbgi_30d"), "lbgi_90d": t.get("lbgi_90d"),
@@ -3894,8 +4007,8 @@ def _fetch_best_records(cur, res: Dict[str, Any]) -> None:
             (SELECT json_build_object('val', sd_mmol_14d, 'date', to_char(date, 'Mon YYYY')) 
              FROM layer2_daily_risk_stats WHERE sd_mmol_14d IS NOT NULL ORDER BY sd_mmol_14d ASC LIMIT 1) AS best_sd,
              
-            (SELECT json_build_object('val', gmi_14d, 'date', to_char(date, 'Mon YYYY')) 
-             FROM layer2_daily_risk_stats WHERE gmi_14d IS NOT NULL ORDER BY gmi_14d ASC LIMIT 1) AS best_gmi,
+            (SELECT json_build_object('val', gmi_90d, 'date', to_char(date, 'Mon YYYY'))
+             FROM layer2_daily_risk_stats WHERE gmi_90d IS NOT NULL ORDER BY gmi_90d ASC LIMIT 1) AS best_gmi,
              
             (SELECT json_build_object('val', cv_14d, 'date', to_char(date, 'Mon YYYY')) 
              FROM layer2_daily_risk_stats WHERE cv_14d IS NOT NULL ORDER BY cv_14d ASC LIMIT 1) AS best_cv,
@@ -3943,8 +4056,8 @@ def _fetch_best_records(cur, res: Dict[str, Any]) -> None:
             (SELECT json_build_object('val', sd_mmol_14d, 'date', to_char(date, 'Mon YYYY')) 
              FROM layer2_daily_risk_stats WHERE sd_mmol_14d IS NOT NULL AND date >= CURRENT_DATE - INTERVAL '365 days' ORDER BY sd_mmol_14d ASC LIMIT 1) AS best_sd_365d,
 
-            (SELECT json_build_object('val', gmi_14d, 'date', to_char(date, 'Mon YYYY')) 
-             FROM layer2_daily_risk_stats WHERE gmi_14d IS NOT NULL AND date >= CURRENT_DATE - INTERVAL '365 days' ORDER BY gmi_14d ASC LIMIT 1) AS best_gmi_365d,
+            (SELECT json_build_object('val', gmi_90d, 'date', to_char(date, 'Mon YYYY'))
+             FROM layer2_daily_risk_stats WHERE gmi_90d IS NOT NULL AND date >= CURRENT_DATE - INTERVAL '365 days' ORDER BY gmi_90d ASC LIMIT 1) AS best_gmi_365d,
 
             (SELECT json_build_object('val', cv_14d, 'date', to_char(date, 'Mon YYYY')) 
              FROM layer2_daily_risk_stats WHERE cv_14d IS NOT NULL AND date >= CURRENT_DATE - INTERVAL '365 days' ORDER BY cv_14d ASC LIMIT 1) AS best_cv_365d,
