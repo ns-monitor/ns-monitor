@@ -1,8 +1,10 @@
 # Nightscout Monitor
 
-A high-performance, clinical-grade analytics and visualization suite for **Nightscout** and **AndroidAPS** (oref1 / openaps) data.
+A high-performance, analytics and visualization suite for people using **Nightscout** and **AndroidAPS** (oref1 / openaps).
 
-Built to run alongside your self-hosted Nightscout instance, **Nightscout Monitor** provides deep clinical insights, responsive trend exploration, AGP/Patterns analysis, continuous kinetic HbA1c estimation, and automated diary event tracking with sub-second query latency over multi-year datasets.
+Built to run alongside your self-hosted Nightscout instance, **Nightscout Monitor** provides deep clinical insights, responsive trend exploration, AGP/Patterns analysis, continuous HbA1c estimation, and diary event tracking. It is designed to show graphs with sub-second query latency over multi-year datasets.
+
+And full disclosure, the app was entirely Vibe Coded by AI.
 
 ---
 
