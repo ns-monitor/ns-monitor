@@ -26,6 +26,8 @@
     let isRequestPending = false;
     let stepDebounceTimer = null;
     let rasterSlantValue = 0.0;
+    let customThresholds = null;
+    let customThresholdsMetric = null;
 
     // Chart instances
     let spectrumChart = null;
@@ -66,6 +68,15 @@
     const rasterCanvas = document.getElementById('calendarRasterCanvas');
     const rasterMinLabel = document.getElementById('rasterMinLabel');
     const rasterMaxLabel = document.getElementById('rasterMaxLabel');
+    const threshInput1 = document.getElementById('rasterThresh1');
+    const threshInput2 = document.getElementById('rasterThresh2');
+    const threshInput3 = document.getElementById('rasterThresh3');
+    const threshInput4 = document.getElementById('rasterThresh4');
+    const threshDot1 = document.getElementById('rasterThreshDot1');
+    const threshDot2 = document.getElementById('rasterThreshDot2');
+    const threshDot3 = document.getElementById('rasterThreshDot3');
+    const threshDot4 = document.getElementById('rasterThreshDot4');
+    const threshUnitLabel = document.getElementById('rasterThreshUnit');
 
     function getDateRange() {
         const startInput = document.getElementById('start_date');
@@ -793,6 +804,11 @@
         if (rasterMinLabel) rasterMinLabel.textContent = `${lo.toFixed(1)}${cfg.unit}`;
         if (rasterMaxLabel) rasterMaxLabel.textContent = `${hi.toFixed(1)}${cfg.unit}`;
 
+        if (!customThresholds || customThresholdsMetric !== metricKey) {
+            customThresholdsMetric = metricKey;
+            customThresholds = computeThresholdsForSlant(rasterSlantValue);
+        }
+        syncThresholdBoxes(customThresholds, metricKey);
         updateLegendGradient(rasterSlantValue, metricKey);
 
         // Group records by year and day-of-year
@@ -872,95 +888,123 @@
         });
     }
 
+    function getBaseStops(isHigherBetter) {
+        return isHigherBetter
+            ? [
+                { p: 0.00, color: '#ef4444', rgb: [239, 68, 68] },
+                { p: 0.20, color: '#f97316', rgb: [249, 115, 22] },
+                { p: 0.40, color: '#eab308', rgb: [234, 179, 8] },
+                { p: 0.60, color: '#84cc16', rgb: [132, 204, 22] },
+                { p: 0.80, color: '#10b981', rgb: [16, 185, 129] },
+                { p: 1.00, color: '#065f46', rgb: [6, 95, 70] }
+            ]
+            : [
+                { p: 0.00, color: '#065f46', rgb: [6, 95, 70] },
+                { p: 0.20, color: '#10b981', rgb: [16, 185, 129] },
+                { p: 0.40, color: '#84cc16', rgb: [132, 204, 22] },
+                { p: 0.60, color: '#eab308', rgb: [234, 179, 8] },
+                { p: 0.80, color: '#f97316', rgb: [249, 115, 22] },
+                { p: 1.00, color: '#ef4444', rgb: [239, 68, 68] }
+            ];
+    }
+
+    function computeThresholdsForSlant(slant) {
+        const baseStops = [0.20, 0.40, 0.60, 0.80];
+        const gamma = Math.pow(2, slant);
+        const invGamma = 1.0 / gamma;
+
+        return baseStops.map(p => {
+            const shiftedP = Math.pow(p, invGamma) * 100.0;
+            return Math.max(0.5, Math.min(99.5, Math.round(shiftedP * 10) / 10));
+        });
+    }
+
+    function syncThresholdBoxes(thresholds, metric) {
+        const active = metric || activeMetric;
+        const isHigherBetter = (active === 'tir' || active === 'titr');
+        const stops = getBaseStops(isHigherBetter);
+
+        if (threshUnitLabel) threshUnitLabel.textContent = '%';
+
+        const dots = [threshDot1, threshDot2, threshDot3, threshDot4];
+        [1, 2, 3, 4].forEach((stopIdx, i) => {
+            if (dots[i]) {
+                dots[i].style.background = stops[stopIdx].color;
+            }
+        });
+
+        const inputs = [threshInput1, threshInput2, threshInput3, threshInput4];
+        if (thresholds && thresholds.length === 4) {
+            thresholds.forEach((val, i) => {
+                if (inputs[i] && document.activeElement !== inputs[i]) {
+                    inputs[i].value = Number(val).toFixed(1);
+                }
+            });
+        }
+    }
+
     function updateLegendGradient(slant, metric) {
         const slider = document.getElementById('raster-slant-slider') || document.querySelector('.periodicity-heat-legend-bar');
         if (!slider) return;
         const active = metric || activeMetric;
         const isHigherBetter = (active === 'tir' || active === 'titr');
-        const s = (slant !== undefined && slant !== null) ? slant : rasterSlantValue;
-        const gamma = Math.pow(2, s);
-        const invGamma = 1.0 / gamma;
+        const stops = getBaseStops(isHigherBetter);
 
-        // Base color stops
-        const stops = isHigherBetter
-            ? [
-                { p: 0.00, color: '#ef4444' },
-                { p: 0.18, color: '#f97316' },
-                { p: 0.45, color: '#eab308' },
-                { p: 0.60, color: '#84cc16' },
-                { p: 0.78, color: '#10b981' },
-                { p: 1.00, color: '#065f46' }
-            ]
-            : [
-                { p: 0.00, color: '#065f46' },
-                { p: 0.22, color: '#10b981' },
-                { p: 0.40, color: '#84cc16' },
-                { p: 0.55, color: '#eab308' },
-                { p: 0.82, color: '#f97316' },
-                { p: 1.00, color: '#ef4444' }
-            ];
-
-        const gradStops = stops.map(stop => {
-            const shiftedP = Math.min(100, Math.max(0, Math.pow(stop.p, invGamma) * 100));
-            return `${stop.color} ${shiftedP.toFixed(1)}%`;
-        }).join(', ');
+        let gradStops;
+        if (customThresholds && customThresholds.length === 4) {
+            const pcts = [0, customThresholds[0], customThresholds[1], customThresholds[2], customThresholds[3], 100];
+            gradStops = stops.map((stop, i) => `${stop.color} ${pcts[i].toFixed(1)}%`).join(', ');
+        } else {
+            const s = (slant !== undefined && slant !== null) ? slant : rasterSlantValue;
+            const gamma = Math.pow(2, s);
+            const invGamma = 1.0 / gamma;
+            gradStops = stops.map(stop => {
+                const shiftedP = Math.min(100, Math.max(0, Math.pow(stop.p, invGamma) * 100));
+                return `${stop.color} ${shiftedP.toFixed(1)}%`;
+            }).join(', ');
+        }
 
         slider.style.background = `linear-gradient(to right, ${gradStops})`;
     }
 
-    function getHeatmapColor(t, metric, slant) {
+    function getHeatmapColor(norm, metric, slant) {
         const active = metric || activeMetric;
-        // When number is low: green for CV, TDD, MeanBG, SD. Green when high for TIR, TITR.
         const isHigherBetter = (active === 'tir' || active === 'titr');
-        const s = (slant !== undefined && slant !== null) ? slant : rasterSlantValue;
+        const stops = getBaseStops(isHigherBetter);
 
-        // Apply gamma slant to normalized value t (0 to 1)
-        const gamma = Math.pow(2, s);
-        const tPrime = Math.max(0, Math.min(1, Math.pow(Math.max(0, Math.min(1, t)), gamma)));
+        // Pentile ranking p from 0 to 100
+        const p = Math.max(0, Math.min(100, norm * 100));
 
-        // u ranges from 0 (best / dark pine green) to 1 (worst / red)
-        const u = isHigherBetter ? (1.0 - tPrime) : tPrime;
-        const clampedU = Math.max(0, Math.min(1, u));
+        const cutoffs = (customThresholds && customThresholds.length === 4)
+            ? customThresholds
+            : computeThresholdsForSlant(slant !== undefined && slant !== null ? slant : rasterSlantValue);
 
-        // 6 color stops with adjusted thresholds:
-        // 0.00: Deep Forest Green rgb(6, 95, 70)
-        // 0.22: Vibrant Emerald Green rgb(16, 185, 129)
-        // 0.40: Crisp Lime Green rgb(132, 204, 22)
-        // 0.55: Warm Amber-Yellow rgb(234, 179, 8)
-        // 0.82: Vivid Orange rgb(249, 115, 22)
-        // 1.00: Red rgb(239, 68, 68)
+        const P = [0, cutoffs[0], cutoffs[1], cutoffs[2], cutoffs[3], 100];
 
-        if (clampedU < 0.22) {
-            const f = clampedU / 0.22;
-            const r = Math.round(6 + f * (16 - 6));
-            const g = Math.round(95 + f * (185 - 95));
-            const b = Math.round(70 + f * (129 - 70));
-            return `rgb(${r}, ${g}, ${b})`;
-        } else if (clampedU < 0.40) {
-            const f = (clampedU - 0.22) / 0.18;
-            const r = Math.round(16 + f * (132 - 16));
-            const g = Math.round(185 + f * (204 - 185));
-            const b = Math.round(129 + f * (22 - 129));
-            return `rgb(${r}, ${g}, ${b})`;
-        } else if (clampedU < 0.55) {
-            const f = (clampedU - 0.40) / 0.15;
-            const r = Math.round(132 + f * (234 - 132));
-            const g = Math.round(204 + f * (179 - 204));
-            const b = Math.round(22 + f * (8 - 22));
-            return `rgb(${r}, ${g}, ${b})`;
-        } else if (clampedU < 0.82) {
-            const f = (clampedU - 0.55) / 0.27;
-            const r = Math.round(234 + f * (249 - 234));
-            const g = Math.round(179 + f * (115 - 179));
-            const b = Math.round(8 + f * (22 - 8));
-            return `rgb(${r}, ${g}, ${b})`;
+        let seg = 0;
+        if (p <= P[1]) {
+            seg = 0;
+        } else if (p <= P[2]) {
+            seg = 1;
+        } else if (p <= P[3]) {
+            seg = 2;
+        } else if (p <= P[4]) {
+            seg = 3;
         } else {
-            const f = (clampedU - 0.82) / 0.18;
-            const r = Math.round(249 + f * (239 - 249));
-            const g = Math.round(115 + f * (68 - 115));
-            const b = Math.round(22 + f * (68 - 22));
-            return `rgb(${r}, ${g}, ${b})`;
+            seg = 4;
         }
+
+        const pLo = P[seg];
+        const pHi = P[seg + 1];
+        const span = (pHi - pLo) > 1e-4 ? (pHi - pLo) : 1e-4;
+        const frac = Math.max(0, Math.min(1, (p - pLo) / span));
+
+        const cStart = stops[seg].rgb;
+        const cEnd = stops[seg + 1].rgb;
+        const r = Math.round(cStart[0] + frac * (cEnd[0] - cStart[0]));
+        const g = Math.round(cStart[1] + frac * (cEnd[1] - cStart[1]));
+        const b = Math.round(cStart[2] + frac * (cEnd[2] - cStart[2]));
+        return `rgb(${r}, ${g}, ${b})`;
     }
 
     // Event Wire-up
@@ -1083,7 +1127,11 @@
                     : `Palette Balance: ${rasterSlantValue > 0 ? '+' : ''}${rasterSlantValue.toFixed(2)} — Double-click to reset`;
                 slantSlider.title = titleText;
             }
-            updateLegendGradient(rasterSlantValue);
+
+            customThresholds = computeThresholdsForSlant(rasterSlantValue);
+            syncThresholdBoxes(customThresholds, activeMetric);
+
+            updateLegendGradient(rasterSlantValue, activeMetric);
             if (analysisData) {
                 renderCalendarRaster(analysisData);
             }
@@ -1105,6 +1153,75 @@
                 updateSlant(0.0);
             });
         }
+
+        const threshInputElements = [threshInput1, threshInput2, threshInput3, threshInput4];
+        threshInputElements.forEach((input, idx) => {
+            if (!input) return;
+            const handleThresholdCommit = () => {
+                if (!analysisData || !analysisData.raster) return;
+                const lo = analysisData.raster.p3;
+                const hi = analysisData.raster.p97;
+                let val = parseFloat(input.value);
+                if (isNaN(val)) {
+                    if (customThresholds && customThresholds[idx] !== undefined) {
+                        input.value = customThresholds[idx].toFixed(1);
+                    }
+                    return;
+                }
+                val = Math.max(1.0, Math.min(99.0, Math.round(val * 10) / 10));
+
+                if (!customThresholds || customThresholds.length !== 4) {
+                    customThresholds = computeThresholdsForSlant(rasterSlantValue);
+                }
+
+                customThresholds[idx] = val;
+
+                // Enforce monotonic ordering between pentile thresholds
+                for (let i = idx + 1; i < 4; i++) {
+                    if (customThresholds[i] <= customThresholds[i - 1]) {
+                        customThresholds[i] = Math.min(99.0 - (3 - i), Math.round((customThresholds[i - 1] + 1.0) * 10) / 10);
+                        if (threshInputElements[i]) threshInputElements[i].value = customThresholds[i].toFixed(1);
+                    }
+                }
+                for (let i = idx - 1; i >= 0; i--) {
+                    if (customThresholds[i] >= customThresholds[i + 1]) {
+                        customThresholds[i] = Math.max(1.0 + i, Math.round((customThresholds[i + 1] - 1.0) * 10) / 10);
+                        if (threshInputElements[i]) threshInputElements[i].value = customThresholds[i].toFixed(1);
+                    }
+                }
+                input.value = val.toFixed(1);
+
+                // Couple with the slider: compute implied slant from this pentile ranking
+                const baseStops = [0.20, 0.40, 0.60, 0.80];
+                const p_k = baseStops[idx];
+                const t_k = val / 100.0;
+
+                if (t_k > 0.01 && t_k < 0.99 && p_k > 0.01 && p_k < 0.99) {
+                    const invG = Math.log(t_k) / Math.log(p_k);
+                    if (invG > 0) {
+                        const impliedSlant = Math.max(-1.0, Math.min(1.0, Math.round(-Math.log2(invG) * 100) / 100));
+                        rasterSlantValue = impliedSlant;
+                        if (slantSlider) slantSlider.value = String(rasterSlantValue);
+                        if (slantLabel) {
+                            slantLabel.textContent = `${rasterSlantValue > 0 ? '+' : ''}${rasterSlantValue.toFixed(2)}`;
+                        }
+                    }
+                }
+
+                updateLegendGradient(rasterSlantValue, activeMetric);
+                if (analysisData) {
+                    renderCalendarRaster(analysisData);
+                }
+            };
+
+            input.addEventListener('change', handleThresholdCommit);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    handleThresholdCommit();
+                    input.blur();
+                }
+            });
+        });
 
         initPopovers();
     }

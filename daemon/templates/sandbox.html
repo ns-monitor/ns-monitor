@@ -417,12 +417,32 @@
             accent-color: var(--accent);
         }
         .periodicity-heat-legend-bar {
-            width: 120px;
+            width: 220px;
             height: 10px;
             border-radius: 4px;
             background: linear-gradient(to right, #065f46 0%, #10b981 22%, #84cc16 40%, #eab308 55%, #f97316 82%, #ef4444 100%);
             border: 1px solid var(--border-color);
             transition: background 0.05s ease;
+        }
+        .periodicity-thresh-input {
+            width: 44px;
+            background: var(--surface-inset);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            font-size: 0.72rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            border-radius: var(--radius-sm);
+            padding: 2px 3px;
+            text-align: center;
+            outline: none;
+            transition: border-color 0.15s ease;
+        }
+        .periodicity-thresh-input:focus {
+            border-color: var(--link-color);
+        }
+        .periodicity-thresh-input::-webkit-inner-spin-button,
+        .periodicity-thresh-input::-webkit-outer-spin-button {
+            opacity: 0.4;
         }
         .periodicity-slant-slider {
             appearance: none;
@@ -889,11 +909,12 @@
                         </p>
                     </div>
 
-                    <div style="display: flex; align-items: center; gap: var(--space-2); font-size: 0.75rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">
-                        <span style="color: var(--text-tertiary);">Low (<span id="rasterMinLabel">--</span>)</span>
-                        <input type="range" id="raster-slant-slider" class="periodicity-heat-legend-bar periodicity-slant-slider" min="-1.0" max="1.0" step="0.05" value="0.0" title="Palette Balance: Neutral (0.00) — Drag to shift dominance, double-click to reset">
-                        <span style="color: var(--text-tertiary);">High (<span id="rasterMaxLabel">--</span>)</span>
-                        <span id="rasterSlantLabel" style="color: var(--text-secondary); font-size: 0.7rem; min-width: 34px; cursor: pointer;" title="Double-click slider or click to reset">0.00</span>
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px; font-size: 0.75rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">
+                        <div style="display: flex; align-items: center; gap: var(--space-2);">
+                            <span style="color: var(--text-tertiary);">Low (<span id="rasterMinLabel">--</span>)</span>
+                            <input type="range" id="raster-slant-slider" class="periodicity-heat-legend-bar periodicity-slant-slider" min="-1.0" max="1.0" step="0.05" value="0.0" title="Palette Balance: Neutral (0.00) — Drag to shift dominance, double-click to reset">
+                            <span style="color: var(--text-tertiary);">High (<span id="rasterMaxLabel">--</span>)</span>
+                            <span id="rasterSlantLabel" style="color: var(--text-secondary); font-size: 0.7rem; min-width: 34px; cursor: pointer;" title="Double-click slider or click to reset">0.00</span>
                         <div class="periodicity-popover-wrapper" style="margin-left: var(--space-1);">
                             <button type="button" class="periodicity-popover-trigger" aria-label="Tier 2B Guide" title="Guide">
                                 <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
@@ -914,9 +935,33 @@
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div style="width: 100%; background: var(--surface-inset); padding: var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--border-color); box-sizing: border-box;">
+                    <div style="display: flex; align-items: center; gap: 6px; padding-right: 28px;">
+                        <span style="color: var(--text-tertiary); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em;">Percentiles:</span>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <div style="display: flex; align-items: center; gap: 2px;">
+                                <span id="rasterThreshDot1" style="width: 6px; height: 6px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
+                                <input type="number" id="rasterThresh1" class="periodicity-thresh-input" min="1" max="99" step="1" title="1st Percentile Cutoff (default 20%)">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 2px;">
+                                <span id="rasterThreshDot2" style="width: 6px; height: 6px; border-radius: 50%; background: #84cc16; display: inline-block;"></span>
+                                <input type="number" id="rasterThresh2" class="periodicity-thresh-input" min="1" max="99" step="1" title="2nd Percentile Cutoff (default 40%)">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 2px;">
+                                <span id="rasterThreshDot3" style="width: 6px; height: 6px; border-radius: 50%; background: #eab308; display: inline-block;"></span>
+                                <input type="number" id="rasterThresh3" class="periodicity-thresh-input" min="1" max="99" step="1" title="3rd Percentile Cutoff (default 60%)">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 2px;">
+                                <span id="rasterThreshDot4" style="width: 6px; height: 6px; border-radius: 50%; background: #f97316; display: inline-block;"></span>
+                                <input type="number" id="rasterThresh4" class="periodicity-thresh-input" min="1" max="99" step="1" title="4th Percentile Cutoff (default 80%)">
+                            </div>
+                            <span id="rasterThreshUnit" style="color: var(--text-tertiary); font-size: 0.68rem; min-width: 14px;">%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="width: 100%; background: var(--surface-inset); padding: var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--border-color); box-sizing: border-box;">
                     <canvas id="calendarRasterCanvas" style="width: 100%; height: 190px; display: block;"></canvas>
                 </div>
 
