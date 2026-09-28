@@ -1,8 +1,8 @@
 # Nightscout Monitor
 
-A high-performance, analytics and visualization suite for people using **Nightscout** and **AndroidAPS** (oref1 / openaps).
+A high-performance, analytics and visualisation suite for people using **Nightscout** and **AndroidAPS** (oref1 / openaps).  The app was built for my own personal use, so is heavily slanted towards AndroidAPS, Nightscout and Omnipod use. Other combinations are untested. 
 
-Built to run alongside your self-hosted Nightscout instance, **Nightscout Monitor** provides deep clinical insights, responsive trend exploration, AGP/Patterns analysis, continuous HbA1c estimation, and diary event tracking. It is designed to show graphs with sub-second query latency over multi-year datasets.
+**NS Monitor** provides deep clinical insights, responsive trend exploration, AGP/Patterns analysis, continuous HbA1c estimation, and diary event tracking. It is designed to show graphs with sub-second query latency over multi-year datasets.
 
 And full disclosure, the app was entirely Vibe Coded by AI.
 
@@ -10,14 +10,15 @@ And full disclosure, the app was entirely Vibe Coded by AI.
 
 ## Key Features
 
-- **Dynamic Scorecards & Key Metrics**: Real-time glucose metrics (TIR 3.9–10.0 mmol/L, Time Below Range, Time Above Range, Mean Glucose, CV%, GMI, Screen-matched IOB).
-- **Interactive Trace View (`/trace`)**: High-resolution 24-hour daily timeline showing sensor glucose, basal profiles, temp basals, boluses, SMBs, carb absorption (COB), and insulin on board (IOB) matching AndroidAPS homescreen calculations.
-- **Patterns & Ambulatory Glucose Profile (`/patterns`)**: 24-hour modal day percentiles (p5, p10, p25, p50, p75, p90, p95), hypo episode clusters, and comparative date ranges with instant ECharts filtering.
-- **Trends & Multi-Day Exploration (`/trends`)**: Long-term metric timelines, moving averages, standard deviation corridors, and custom metric toggles over weeks, months, or years.
-- **Continuous Kinetic HbA1c Engine (`/hba1c`)**: Dynamic HbA1c estimation using kinetic red-blood-cell age modeling calibrated against laboratory venous blood samples.
+- The dashboard provides an at-a-glance view of how you are going, with around 30 configurable widgets to choose from and a drag and drop layout to position each widget. Up to 6 dashboards can be adjusted for different screen sizes (computer, tablet, phone) and saved as part of the application configuration.
+-  **EChart Graphs**: Many of the graphs allow you to show whatever combination of available metrics you choose. You can format how you want to display it – colour and opacity, graph type, smoothing and Y-Axis scale.
+- **Trace (`/trace`)**: High-resolution 24-hour daily timeline showing any combination of Basal Profile, Basal Rate, BG, BGI, Bolus, Carbs, COB, DEV-BGI, Deviation, IOB, ISF. Useful when investigating what happened on a particular day or around a particular event.
+- **Patterns (`/patterns`)**: shows 24 hour modal overlays such as the standard Ambulatory Glucose Profile and Time in Range heat map. There are numerous other metrics to choose from - AGP, Basal Profile, COB (gms), Controller Effort (%), CV (%), Dynamic ISF, HBGI, Hyper AUC (>7.8), Hypo AUC (<3.9), IOB (U), LBGI, Low Event Count / hour, Median BG, Median BGI, Median Deviation, TIR (3.9-10), TIR Heat, TITR (3.9-7.8), Warning Event Count / hour. Use it to look for time-of-day patterns rather than individual days.
+- **Trends (`/trends`)**: Trends is for longer-term changes across weeks, months or years. It charts selected measures over time and supports comparisons, moving and monthly averages. Available metrics for display are Avg BG, Carbs (g), CV (%), GMI (%), GVI, HBGI, LBGI, TDD, TDD / Weight, TIR (%), TITR (%). This is the place to review whether a change in treatment, routine or settings has had a sustained effect.
+- **Calendar**: The calendar view gives a month-by-month overview of glucose measures and daily summaries. It makes it easier to spot unusually good or difficult days, gaps in data, and repeated patterns across a longer period. A wide range of filters and overlays can be constructed to adjust what is displayed on the calendar.
+- **Continuous HbA1c Engine (`/hba1c`)**: Dynamic HbA1c estimation using red-blood-cell age modeling calibrated against your own laboratory venous blood samples.
 - **Clinical Diary & Notes (`/diary`)**: Categorized clinical logging with auto-sync from AndroidAPS treatments and manual diary entry management.
-- **Automated Ingestion & Aggregation**: Periodic polling pipeline syncing CGM readings, treatments, and devicestatus with in-memory deduplication and automated 5-minute bucket aggregation (`layer2_five_minute_aggregate`).
-- **Zero-Friction Migrations**: Managed by `dbmate` container startup gates—safe, additive database migrations with zero risk of data loss.
+- **Automated Ingestion & Aggregation**: Periodic polling pipeline syncing CGM readings, treatments, and devicestatus with in-memory deduplication and automated 5-minute aggregation.
 
 ---
 
@@ -140,39 +141,12 @@ http://localhost:8080
 
 ## Upgrades & Maintenance
 
-Updates must be run from this application's own checkout directory. Git uses
-the hidden `.git` directory in the current folder to identify both the
-repository and branch to update; it does not choose a repository merely
-because you are logged in as `root`.
-
-For example, if you originally cloned the project to `/opt/ns-monitor`:
-
+To update to the latest release:
 ```bash
 cd /opt/ns-monitor
-git status --short
-git pull --ff-only
-docker compose restart nightscout_daemon
-docker compose ps
+git pull
+docker compose up -d --build
 ```
-
-An empty `git status --short` means there are no local project changes. If it
-prints files, review them before pulling. `--ff-only` prevents Git from making
-an unexpected merge into locally edited project files.
-
-After a successful pull, restart `nightscout_daemon` so its running Python
-process loads the updated application files. This does not recreate the
-database or change its data. `docker compose up -d --build` is needed only
-when you have changed the Docker build configuration or want to rebuild the
-image manually.
-
-The Compose commands affect only this project's services—`postgres`,
-`migration`, and `nightscout_daemon`. They do not pull, stop, restart, or
-remove unrelated Docker containers on the same host. The persistent database
-directory and your `.env` file are not overwritten by `git pull`.
-
-`dbmate` executes any new additive migration files (`db/migrations/00000x_*.sql`)
-before starting the daemon. Existing clinical data remains in the persistent
-database directory.
 
 ---
 
