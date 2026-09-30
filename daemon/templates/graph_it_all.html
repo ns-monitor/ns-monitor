@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graph-it-All — Exploratory Analytics Workbench</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <link rel="stylesheet" href="/static/css/graph-it-all.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+</head>
+
+<body>
+    {% include "sidebar.html" %}
+
+    <div class="container graph-it-all-container">
+        <header class="page-header">
+            <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <h1 class="panel-h1" style="margin-bottom: 0;">Graph-it-All</h1>
+                    <div class="gia-popover-wrapper">
+                        <button type="button" class="gia-popover-trigger" aria-label="Workbench Guide" title="Workbench Guide">
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                            </svg>
+                        </button>
+                        <div class="gia-guide-popover" onclick="event.stopPropagation()">
+                            <h4>Welcome to Graph-it-All</h4>
+                            <h5>What is this workbench for?</h5>
+                            <p>This is an open exploratory sandbox designed to let you freely cross-examine, correlate, and fold any Nightscout metrics across your entire history.</p>
+                            <h5>A candid heads-up:</h5>
+                            <p>Because you have total freedom to map any metric to any axis at any time grain, <strong>it is entirely possible to create completely clinically meaningless graphs</strong> (like <em>Total Daily Dose vs Time of Day</em> or <em>Basal Insulin vs Day of Month</em>) alongside <strong>genuinely insightful ones</strong> (like <em>Average Glucose vs Coefficient of Variation</em>, or <em>Insulin Sensitivity by Day of Week</em>).</p>
+                            <h5>High-speed guarded database engine:</h5>
+                            <p>Every time you click <em>Update Graph</em>, your request is compiled into a single optimized analytical SQL query. All aggregations run directly in PostgreSQL under a guarded <strong>6,000ms query budget statement</strong>. Queries typically return in a few dozen milliseconds, giving you instant answers without overloading the database.</p>
+                            <h5>Getting started:</h5>
+                            <p>Pick a time grain or periodic cycle fold in <strong>Box 1</strong>, choose metrics for your X and Y axes in <strong>Box 2</strong>, select a statistical curve fit in <strong>Box 3</strong>, and hit <strong>Update Graph</strong>!</p>
+                        </div>
+                    </div>
+                </div>
+                <p class="gia-page-subtitle">
+                    Freely cross-examine, correlate, and fold Nightscout metrics across any timescale or periodic cycle — featuring multi-grain aggregations, dual-axis overlays, closed-form statistical curve fits, and confidence corridors.
+                </p>
+            </div>
+            {% set date_state_namespace = 'graph_it_all' %}
+            {% set has_compare = false %}
+            {% include "_header_date_selector.html" %}
+        </header>
+
+        <!-- Ambient Co-pilot / Status Strip -->
+        <div class="gia-status-strip">
+            <div class="gia-status-info">
+                <i class="fa-solid fa-chart-line" style="color: var(--accent);"></i>
+                <span>Workbench Status:</span>
+                <span id="gia-status-meta" style="color: var(--text-color);">Ready</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                <button type="button" class="gia-btn-choice gia-btn-blue-highlight" id="gia-export-btn" title="Export displayed series data points to CSV">
+                    <i class="fa-solid fa-file-arrow-down"></i> Export This Data
+                </button>
+                <span class="gia-eyebrow-sub">Single &amp; Cross-Table Telemetry</span>
+            </div>
+        </div>
+
+        <!-- Ambient Error/Warning Alert Banner -->
+        <div class="gia-alert-banner" id="gia-alert-banner"></div>
+
+        <!-- 3-Column Control Deck -->
+        <div class="gia-deck">
+            <!-- Column 1: Grain & Visual Format -->
+            <div class="gia-card">
+                <div class="gia-card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="gia-card-title">
+                        <i class="fa-solid fa-layer-group"></i> 1. Grain &amp; Format
+                    </div>
+                    <div class="gia-popover-wrapper">
+                        <button type="button" class="gia-popover-trigger" aria-label="Grain and Format Guide" title="Grain & Format Guide">
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                            </svg>
+                        </button>
+                        <div class="gia-guide-popover" onclick="event.stopPropagation()">
+                            <h4>Grain &amp; Format Guide</h4>
+                            <h5>Observation Grain:</h5>
+                            <p>Determines how raw readings are bucketed into individual data points before plotting: from high-resolution 5-minute intervals up to monthly summaries.</p>
+                            <h5>Chart Format:</h5>
+                            <p><strong>Scatter:</strong> Best for observing correlation, clusters, and spread between two variables.<br>
+                            <strong>Line:</strong> Ideal for seeing progression across continuous time or cycles.<br>
+                            <strong>Bar:</strong> Great for discrete comparisons across days or categories.</p>
+                            <h5>Cycle Fold (Periodicity):</h5>
+                            <p>Instead of plotting one long continuous timeline, cycle folds compress and overlay your history onto repeating biological or calendar rhythms:
+                            <ul>
+                                <li><strong>Timeline:</strong> Standard chronological order.</li>
+                                <li><strong>24h Diurnal:</strong> Folds all selected days into a single 24-hour day (00:00–23:00) to reveal daily circadian patterns.</li>
+                                <li><strong>7d Week:</strong> Overlays your data by day of the week (Monday through Sunday) to uncover weekend vs weekday habits.</li>
+                                <li><strong>12m Annual:</strong> Folds multi-year history into 12 calendar months to highlight seasonal trends.</li>
+                                <li><strong>Custom X-d:</strong> Folds data into an arbitrary X-day cycle (e.g. 3-day pump pod sites, 10-day CGM sensor changes, or 28-day hormonal cycles) anchored to a specific reference date.</li>
+                            </ul>
+                            </p>
+                            <h5>Day of Week Filter:</h5>
+                            <p>Isolates specific days of the week (e.g. weekdays vs weekends) so you can eliminate routine disruptions from your analysis.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="gia-form-group">
+                    <label class="gia-label">Observation Grain</label>
+                    <div class="gia-btn-group">
+                        <button type="button" class="gia-btn-choice gia-grain-btn" data-grain="monthly">Monthly</button>
+                        <button type="button" class="gia-btn-choice gia-grain-btn" data-grain="weekly">Weekly</button>
+                        <button type="button" class="gia-btn-choice gia-grain-btn active" data-grain="daily">Daily</button>
+                        <button type="button" class="gia-btn-choice gia-grain-btn" data-grain="hourly">Hourly</button>
+                        <button type="button" class="gia-btn-choice gia-grain-btn" data-grain="5min">5-min</button>
+                    </div>
+                </div>
+
+                <div class="gia-form-group">
+                    <label class="gia-label">Chart Format</label>
+                    <div class="gia-btn-group">
+                        <button type="button" class="gia-btn-choice gia-format-btn active" data-format="scatter">Scatter</button>
+                        <button type="button" class="gia-btn-choice gia-format-btn" data-format="line">Line</button>
+                        <button type="button" class="gia-btn-choice gia-format-btn" data-format="bar">Bar</button>
+                    </div>
+                </div>
+
+                <div class="gia-form-group">
+                    <label class="gia-label" title="Fold chronological time into periodic cycles">Cycle Fold (Periodicity)</label>
+                    <div class="gia-btn-group" id="gia-cycle-btn-group">
+                        <button type="button" class="gia-btn-choice gia-cycle-btn active" data-cycle="none" title="Linear chronological timeline">Timeline</button>
+                        <button type="button" class="gia-btn-choice gia-cycle-btn" data-cycle="diurnal_24h" title="24-hour diurnal modal day (00:00 to 23:00)">24h Diurnal</button>
+                        <button type="button" class="gia-btn-choice gia-cycle-btn" data-cycle="weekly_7d" title="7-day weekly profile (Mon to Sun)">7d Week</button>
+                        <button type="button" class="gia-btn-choice gia-cycle-btn" data-cycle="annual_12m" title="12 calendar months seasonal profile (Jan to Dec)">12m Annual</button>
+                        <button type="button" class="gia-btn-choice gia-cycle-btn" data-cycle="custom_x" title="Custom X-day bioperiod modal (e.g. 3d pod, 10d sensor, 28d hormonal)">Custom X-d</button>
+                    </div>
+                </div>
+
+                <div class="gia-cycle-custom-row" id="gia-cycle-custom-row" style="display: none; margin-top: -4px; margin-bottom: 6px; padding: 6px 8px;">
+                    <div style="display: flex; gap: 10px; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <label class="gia-label" style="margin-bottom: 0; font-size: 11px;">Days:</label>
+                            <input type="number" id="gia-cycle-period-input" class="gia-input" style="width: 52px; padding: 3px 5px; font-size: 12px; background: var(--surface-inset); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 3px;" value="3.0" min="1" max="365" step="1">
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <label class="gia-label" style="margin-bottom: 0; font-size: 11px;">Anchor:</label>
+                            <input type="date" id="gia-cycle-anchor-input" class="gia-input" style="padding: 2px 5px; font-size: 11px; background: var(--surface-inset); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 3px;">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="gia-form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                        <label class="gia-label" style="margin-bottom: 0;">Day of Week Filter</label>
+                        <div class="gia-dow-quick-links" style="font-size: 11px; display: flex; gap: 5px; align-items: center;">
+                            <button type="button" class="gia-link-btn" id="gia-dow-all-btn" title="Select all 7 days">All</button>
+                            <span style="color: var(--border-color);">|</span>
+                            <button type="button" class="gia-link-btn" id="gia-dow-weekdays-btn" title="Select Monday to Friday">Weekdays</button>
+                            <span style="color: var(--border-color);">|</span>
+                            <button type="button" class="gia-link-btn" id="gia-dow-weekends-btn" title="Select Saturday and Sunday">Weekends</button>
+                        </div>
+                    </div>
+                    <div class="gia-dow-pill-group" id="gia-dow-pill-group">
+                        <button type="button" class="gia-dow-pill active" data-dow="1">Mon</button>
+                        <button type="button" class="gia-dow-pill active" data-dow="2">Tue</button>
+                        <button type="button" class="gia-dow-pill active" data-dow="3">Wed</button>
+                        <button type="button" class="gia-dow-pill active" data-dow="4">Thu</button>
+                        <button type="button" class="gia-dow-pill active" data-dow="5">Fri</button>
+                        <button type="button" class="gia-dow-pill active" data-dow="6">Sat</button>
+                        <button type="button" class="gia-dow-pill active" data-dow="7">Sun</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column 2: Axis Mapping (1 X + 1 Y + Secondary Y2) -->
+            <div class="gia-card">
+                <div class="gia-card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="gia-card-title">
+                        <i class="fa-solid fa-arrows-split-up-and-left"></i> 2. Axis Roles
+                    </div>
+                    <div class="gia-popover-wrapper">
+                        <button type="button" class="gia-popover-trigger" aria-label="Axis Roles Guide" title="Axis Roles Guide">
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                            </svg>
+                        </button>
+                        <div class="gia-guide-popover" onclick="event.stopPropagation()">
+                            <h4>Axis Roles Guide</h4>
+                            <h5>X Axis (Abscissa):</h5>
+                            <p>The independent variable plotted along the horizontal axis. In standard timeline mode, you can pick any metric (e.g., Carbs, Time, Sensor Glucose). When a Cycle Fold is active, the X axis automatically locks to the cycle's time buckets (e.g. Mon–Sun or Jan–Dec).</p>
+                            <h5>Y Axis (Primary Left Ordinate):</h5>
+                            <p>The primary dependent variable plotted on the left vertical axis (e.g. Total Daily Dose, Mean Glucose). <em>All trend fitting and confidence corridors in Box 3 are calculated against this primary Y axis.</em></p>
+                            <h5>Secondary Y₂ Axis (Right Ordinate):</h5>
+                            <p>Allows you to overlay an independent second metric with its own scale on the right edge of the chart (e.g., plotting Daily Carbs on Y₁ and Total Insulin on Y₂). Use the <strong>&lt;-&gt; Swap Y₁ ⇄ Y₂</strong> button to swap which metric receives statistical trend modeling!</p>
+                            <h5>Aggregation Functions:</h5>
+                            <p>When multiple readings exist in a time grain (e.g. dozens of CGM readings in a single day), this controls how they combine: Average, Sum, Median, Spread (SD, CV%, IQR), or Percentiles.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="gia-axis-layout">
+                    <!-- Left Side: X Axis Box -->
+                    <div class="gia-axis-left-col">
+                        <div class="gia-axis-box" id="gia-x-box">
+                            <div class="gia-label">X Axis (Abscissa)</div>
+                            <button type="button" class="gia-axis-badge-btn" id="gia-x-metric-btn">
+                                <span id="gia-x-metric-text">Total Carbs</span>
+                                <span class="gia-unit-tag" id="gia-x-metric-unit">[g]</span>
+                            </button>
+                            <div class="gia-form-group">
+                                <label class="gia-label" for="gia-x-agg-select">Aggregation</label>
+                                <select class="gia-select" id="gia-x-agg-select">
+                                    <optgroup label="Common">
+                                        <option value="sum">Sum</option>
+                                        <option value="avg">Average</option>
+                                        <option value="median">Median</option>
+                                        <option value="min">Min</option>
+                                        <option value="max">Max</option>
+                                    </optgroup>
+                                    <optgroup label="Variability &amp; Spread">
+                                        <option value="stddev">Standard Deviation (SD)</option>
+                                        <option value="cv">Coefficient of Variation (CV %)</option>
+                                        <option value="iqr">Interquartile Range (IQR)</option>
+                                        <option value="range">Range (Peak-to-Trough)</option>
+                                    </optgroup>
+                                    <optgroup label="Percentiles">
+                                        <option value="p10">10th Percentile (p10)</option>
+                                        <option value="p25">25th Percentile (p25)</option>
+                                        <option value="p75">75th Percentile (p75)</option>
+                                        <option value="p90">90th Percentile (p90)</option>
+                                    </optgroup>
+                                    <optgroup label="Counts &amp; Frequency">
+                                        <option value="count">Count (Readings)</option>
+                                        <option value="count_nonzero">Non-Zero Count (Events)</option>
+                                    </optgroup>
+                                    <optgroup label="Dynamics">
+                                        <option value="delta">Net Change (Last - First)</option>
+                                        <option value="first">First Reading</option>
+                                        <option value="last">Last Reading</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Horizontal Swap between X and Y -->
+                        <div class="gia-x-swap-wrap">
+                            <button type="button" class="gia-swap-btn" id="gia-swap-btn" title="Swap X and Y₁ Axes (Abscissa ⇄ Ordinate)">
+                                <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Right Side: Y1 and Y2 Stacks -->
+                    <div class="gia-axis-right-col">
+                        <!-- Primary Y Axis Box -->
+                        <div class="gia-axis-box" id="gia-y-box">
+                            <div class="gia-label">Y Axis (Left Ordinate)</div>
+                            <button type="button" class="gia-axis-badge-btn" id="gia-y-metric-btn">
+                                <span id="gia-y-metric-text">Total Daily Dose</span>
+                                <span class="gia-unit-tag" id="gia-y-metric-unit">[U]</span>
+                            </button>
+                            <div class="gia-form-group">
+                                <label class="gia-label" for="gia-y-agg-select">Aggregation</label>
+                                <select class="gia-select" id="gia-y-agg-select">
+                                    <optgroup label="Common">
+                                        <option value="sum">Sum</option>
+                                        <option value="avg">Average</option>
+                                        <option value="median">Median</option>
+                                        <option value="min">Min</option>
+                                        <option value="max">Max</option>
+                                    </optgroup>
+                                    <optgroup label="Variability &amp; Spread">
+                                        <option value="stddev">Standard Deviation (SD)</option>
+                                        <option value="cv">Coefficient of Variation (CV %)</option>
+                                        <option value="iqr">Interquartile Range (IQR)</option>
+                                        <option value="range">Range (Peak-to-Trough)</option>
+                                    </optgroup>
+                                    <optgroup label="Percentiles">
+                                        <option value="p10">10th Percentile (p10)</option>
+                                        <option value="p25">25th Percentile (p25)</option>
+                                        <option value="p75">75th Percentile (p75)</option>
+                                        <option value="p90">90th Percentile (p90)</option>
+                                    </optgroup>
+                                    <optgroup label="Counts &amp; Frequency">
+                                        <option value="count">Count (Readings)</option>
+                                        <option value="count_nonzero">Non-Zero Count (Events)</option>
+                                    </optgroup>
+                                    <optgroup label="Dynamics">
+                                        <option value="delta">Net Change (Last - First)</option>
+                                        <option value="first">First Reading</option>
+                                        <option value="last">Last Reading</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Vertical Swap Button between Y1 and Y2 -->
+                        <div class="gia-y-swap-row">
+                            <button type="button" class="gia-y-swap-btn" id="gia-y1-y2-swap-btn" title="Swap Left (Y₁) and Right (Y₂) Axes">
+                                <i class="fa-solid fa-arrows-up-down"></i>
+                                <span>&lt;-&gt; Swap Y₁ ⇄ Y₂</span>
+                            </button>
+                        </div>
+
+                        <!-- Secondary Y2 Axis Box (Formatted same size as primary Y box, sitting directly beneath it) -->
+                        <div class="gia-axis-box gia-y2-box inactive" id="gia-y2-box">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div class="gia-label" style="margin-bottom: 0;">Y₂ Axis (Right Ordinate)</div>
+                                <label class="gia-checkbox-row" style="margin: 0; font-size: 0.75rem;">
+                                    <input type="checkbox" id="gia-y2-enable-toggle">
+                                    <span style="font-size: 0.72rem; color: var(--text-secondary);">Enable</span>
+                                </label>
+                            </div>
+                            <button type="button" class="gia-axis-badge-btn" id="gia-y2-metric-btn">
+                                <span id="gia-y2-metric-text">Select Secondary Metric...</span>
+                                <span class="gia-unit-tag" id="gia-y2-metric-unit"></span>
+                            </button>
+                            <div class="gia-form-group">
+                                <label class="gia-label" for="gia-y2-agg-select">Aggregation</label>
+                                <select class="gia-select" id="gia-y2-agg-select">
+                                    <optgroup label="Common">
+                                        <option value="avg" selected>Average</option>
+                                        <option value="sum">Sum</option>
+                                        <option value="median">Median</option>
+                                        <option value="min">Min</option>
+                                        <option value="max">Max</option>
+                                    </optgroup>
+                                    <optgroup label="Variability &amp; Spread">
+                                        <option value="stddev">Standard Deviation (SD)</option>
+                                        <option value="cv">Coefficient of Variation (CV %)</option>
+                                        <option value="iqr">Interquartile Range (IQR)</option>
+                                        <option value="range">Range (Peak-to-Trough)</option>
+                                    </optgroup>
+                                    <optgroup label="Percentiles">
+                                        <option value="p10">10th Percentile (p10)</option>
+                                        <option value="p25">25th Percentile (p25)</option>
+                                        <option value="p75">75th Percentile (p75)</option>
+                                        <option value="p90">90th Percentile (p90)</option>
+                                    </optgroup>
+                                    <optgroup label="Counts &amp; Frequency">
+                                        <option value="count">Count (Readings)</option>
+                                        <option value="count_nonzero">Non-Zero Count (Events)</option>
+                                    </optgroup>
+                                    <optgroup label="Dynamics">
+                                        <option value="delta">Net Change (Last - First)</option>
+                                        <option value="first">First Reading</option>
+                                        <option value="last">Last Reading</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column 3: Statistical Overlays & Action -->
+            <div class="gia-card">
+                <div class="gia-card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="gia-card-title">
+                        <i class="fa-solid fa-calculator"></i> 3. Models &amp; Action
+                    </div>
+                    <div class="gia-popover-wrapper">
+                        <button type="button" class="gia-popover-trigger" aria-label="Models and Action Guide" title="Models & Action Guide">
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                            </svg>
+                        </button>
+                        <div class="gia-guide-popover gia-popover-right" onclick="event.stopPropagation()">
+                            <h4>Statistical Models Guide</h4>
+                            <h5>Trend Fit Model:</h5>
+                            <p>Mathematically fits a curve through your primary observations to uncover underlying relationships:
+                            <ul>
+                                <li><strong>Linear (y = mx + c):</strong> Checks for a direct, proportional relationship.</li>
+                                <li><strong>Quadratic (y = ax² + bx + c):</strong> Captures U-shaped or inverted curves (e.g., diminishing returns).</li>
+                                <li><strong>Exponential / Power Law:</strong> Models non-linear compound changes.</li>
+                                <li><strong>LOESS Smoothing:</strong> Non-parametric local regression that smoothly bends to follow the data organically without imposing an equation.</li>
+                            </ul>
+                            </p>
+                            <h5>Confidence vs Prediction Corridors:</h5>
+                            <p>
+                            <ul>
+                                <li><strong>95% Mean Confidence Corridor:</strong> Shows where the <em>true average</em> relationship lies with 95% certainty. A narrow band indicates high certainty in the overall trend line.</li>
+                                <li><strong>95% Prediction Interval:</strong> Shows the corridor where 95% of <em>individual future observations</em> are expected to fall. It is wider because it accounts for day-to-day scatter.</li>
+                                <li><strong>Quantile Ribbons (IQR / AGP):</strong> Shaded percentiles (such as the standard 25th–75th interquartile range) calculated directly from observation bins.</li>
+                            </ul>
+                            </p>
+                            <p><em>Note: Statistical models operate strictly on the Primary Y (Left) Axis. Use the &lt;-&gt; Swap Y₁ ⇄ Y₂ button if you want to model your secondary metric.</em></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="gia-form-group">
+                    <label class="gia-label" for="gia-trend-select">Trend Fit Model</label>
+                    <select class="gia-select" id="gia-trend-select">
+                        <option value="none">None (Raw Observations)</option>
+                        <option value="linear" selected>Linear OLS (y = mx + c)</option>
+                        <option value="quadratic">Quadratic OLS (y = ax² + bx + c)</option>
+                        <option value="exponential">Exponential (y = a·eᵇˣ)</option>
+                        <option value="power">Power Law (y = a·xᵇ)</option>
+                        <option value="loess">LOESS Non-Parametric Smoothing</option>
+                    </select>
+                </div>
+
+                <div class="gia-form-group">
+                    <label class="gia-label" for="gia-corridor-select">Confidence Band / Quantile Ribbon</label>
+                    <select class="gia-select" id="gia-corridor-select">
+                        <option value="none">None (Fit Line Only)</option>
+                        <optgroup label="Model Uncertainty (Mean)">
+                            <option value="ci95" selected>95% Mean Confidence Corridor (p &lt; 0.05)</option>
+                            <option value="ci99">99% Mean Confidence Corridor (p &lt; 0.01)</option>
+                        </optgroup>
+                        <optgroup label="Observation Quantile Ribbons">
+                            <option value="agp_fan">AGP Fan Chart (5/95 + 25/75 + p50)</option>
+                            <option value="q5_95">5th–95th Percentile (AGP Envelope)</option>
+                            <option value="q20_80">20th–80th Percentile</option>
+                            <option value="q25_75">25th–75th Percentile (IQR Core)</option>
+                        </optgroup>
+                        <optgroup label="Prediction Intervals">
+                            <option value="pi95">95% Individual Prediction Interval</option>
+                            <option value="both_95">Both: 95% Mean + 95% Prediction</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <div style="margin-top: auto; display: flex; gap: var(--space-2);">
+                    <button type="button" class="gia-action-btn" id="gia-run-btn" style="flex: 1;">
+                        <i class="fa-solid fa-bolt"></i> Update Graph
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stage Card (Chart & Saved Views Toolbar) -->
+        <div class="gia-stage-card">
+            <div class="gia-stage-header">
+                <div>
+                    <div class="gia-chart-title" id="gia-chart-title">Total Daily Dose vs Total Carbs</div>
+                    <div class="gia-stage-stats" id="gia-stage-stats"></div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <!-- NSViews Manager Pill Button -->
+                    <div class="view-pill-container" style="position: relative;">
+                        <button type="button" class="view-pill-btn" id="view-pill-btn" onclick="toggleViewDropdown(event)" title="Saved Views">
+                            <i class="fa-solid fa-layer-group"></i>
+                            <span id="active-view-label">Select View</span>
+                            <i class="fa-solid fa-chevron-down" style="font-size: 10px; opacity: 0.7;"></i>
+                        </button>
+
+                        <!-- NSViews Dropdown Popover (Immediate Sibling) -->
+                        <div class="view-dropdown-popover" id="view-dropdown-popover" onclick="event.stopPropagation()">
+                            <div class="view-dropdown-header">Saved Views</div>
+                            <div class="view-list" id="all-views-list"></div>
+                            <div class="view-save-section">
+                                <div class="view-save-prompt-row" id="view-save-prompt-row" onclick="showSaveViewInput()">
+                                    <i class="fa-solid fa-plus"></i> Save current setup as new view...
+                                </div>
+                                <div class="view-save-input-row" id="view-save-input-row" style="display: none;">
+                                    <input type="text" class="view-save-input" id="new-view-name" placeholder="View name..." maxlength="25" onkeydown="if(event.key==='Enter') saveCurrentView(); if(event.key==='Escape') cancelSaveView();">
+                                    <button type="button" class="view-save-btn" onclick="saveCurrentView()">Save</button>
+                                    <button type="button" class="view-save-cancel" onclick="cancelSaveView()">✕</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hidden settings anchor for NSViews compatibility -->
+                    <div style="position: relative; display: none;">
+                        <button type="button" id="gia-settings-btn"></button>
+                        <div class="settings-popover" id="gia-settings-popover"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ECharts Stage Canvas -->
+            <div style="position: relative;">
+                <div id="graph-it-all-chart"></div>
+                <div id="gia-axis-pillars" class="axis-pillars-container"></div>
+                <div class="gia-empty-state" id="gia-empty-state">
+                    No data points found for this selection and date range.
+                </div>
+            </div>
+
+            <div class="gia-disclaimer-foot">
+                <span><i class="fa-solid fa-circle-info"></i> Clinical Disclaimer: Descriptive association, not causal inference.</span>
+                <span>Postgres statement budget: 6000ms • Zero silent truncation</span>
+            </div>
+        </div>
+
+        <!-- NSViews Tab Context Menu -->
+        <div class="tab-context-menu" id="tab-context-menu" onclick="event.stopPropagation()">
+            <div class="tab-context-header" id="tab-context-header">View Options</div>
+            <div class="tab-context-item" id="ctx-update" onclick="onContextUpdate()">
+                <i class="fa-solid fa-floppy-disk"></i> Update with current setup
+            </div>
+            <div class="tab-context-item" id="ctx-duplicate" onclick="onContextDuplicate()">
+                <i class="fa-solid fa-copy"></i> Duplicate as new view...
+            </div>
+            <div class="tab-context-item" id="ctx-rename" onclick="onContextRename()">
+                <i class="fa-solid fa-pen-to-square"></i> Rename view...
+            </div>
+            <div class="tab-context-item danger" id="ctx-delete" onclick="onContextDelete()">
+                <i class="fa-solid fa-trash"></i> Delete view
+            </div>
+        </div>
+
+        <footer class="page-footer">{{ footer_text }}</footer>
+    </div>
+
+    <!-- Metric Selection Modal / Drawer -->
+    <div class="gia-drawer-backdrop" id="gia-drawer-backdrop"></div>
+    <div class="gia-drawer" id="gia-drawer">
+        <div class="gia-drawer-header">
+            <div class="gia-drawer-title" id="gia-drawer-title">Select Metric</div>
+            <button type="button" class="btn-reset-axis" id="gia-drawer-close-btn" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.1rem;">✕</button>
+        </div>
+        <div class="gia-drawer-search">
+            <input type="text" class="gia-drawer-input" id="gia-drawer-search-input" placeholder="Search metric name or ID...">
+        </div>
+        <div class="gia-drawer-body" id="gia-drawer-body"></div>
+    </div>
+
+    <!-- Floating Axis Scale Hint Badge -->
+    <div id="axis-scale-hint" class="axis-scale-hint" style="display: none;"></div>
+
+    <!-- Script Inclusions -->
+    <script src="/static/js/ns-date-selector.js"></script>
+    <script src="/static/js/ns-view-manager.js"></script>
+    <script src="/static/js/ns-axis-pillars.js"></script>
+    <script src="/static/js/graph-it-all-catalog.js"></script>
+    <script src="/static/js/graph-it-all-renderer.js"></script>
+    <script src="/static/js/graph-it-all-builder.js"></script>
+</body>
+
+</html>

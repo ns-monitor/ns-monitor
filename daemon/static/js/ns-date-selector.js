@@ -199,7 +199,7 @@
 
     function updateNavLinks(sVal, eVal) {
         if (!sVal || !eVal) return;
-        const datePages = ['/patterns', '/trends', '/timeline', '/omnipod', '/cgm', '/clinical_reports', '/clinical-reports', '/novel_reports', '/novel-reports', '/sandbox'];
+        const datePages = ['/patterns', '/trends', '/timeline', '/omnipod', '/cgm', '/clinical_reports', '/clinical-reports', '/novel_reports', '/novel-reports', '/sandbox', '/graph-it-all'];
         const navLinks = document.querySelectorAll('.sb-link, a.btn');
         navLinks.forEach(b => {
             if (!b.href) return;
