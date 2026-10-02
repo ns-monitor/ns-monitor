@@ -134,7 +134,7 @@ def get_profile_history(conn, start_date: str, end_date: str) -> List[Dict[str, 
          the fetch at end_date made that switch invisible, so the last era
          in range always looked like it was still active ("to: present")
          even when a later real change was known to exist -- exactly the
-         bug Harry hit querying July 2026 for a profile that in reality
+         bug the project hit querying July 2026 for a profile that in reality
          changed again in mid-August.
     The window-overlap filter (Pass 4 below) still limits what's actually
     *displayed* to eras overlapping [start_date, end_date]; only the
@@ -186,7 +186,7 @@ def get_profile_history(conn, start_date: str, end_date: str) -> List[Dict[str, 
 
     # --- Pass 2: drop eras shorter than MIN_ERA_SECONDS ----------------------
     # Dropped eras leave a small gap; neighbouring eras' boundaries are left
-    # exactly as they were (no absorption), per Harry's call.
+    # exactly as they were (no absorption), per the project's call.
     kept = []
     for seg in raw_segments:
         if seg["end_ts"] is not None:

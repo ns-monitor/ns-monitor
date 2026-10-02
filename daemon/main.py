@@ -32,6 +32,8 @@ import queue
 app = Flask(__name__)
 from graph_it_all import graph_it_all_bp
 app.register_blueprint(graph_it_all_bp)
+from autotune import autotune_bp
+app.register_blueprint(autotune_bp)
 
 
 @app.after_request
@@ -52,7 +54,7 @@ def add_no_cache_headers(response):
 
 # CENTRAL LOGGING SETUP (Rotates daily at local midnight, retains 7 days, in-memory SSE ring buffer)
 def _sync_process_tz():
-    tz_name = getattr(config, "TIMEZONE", "Australia/Perth")
+    tz_name = getattr(config, "TIMEZONE", "UTC")
     tz_name = os.environ.get("TIMEZONE", tz_name)
     if hasattr(time, "tzset"):
         os.environ["TZ"] = tz_name
@@ -200,24 +202,14 @@ def refresh_worker(start_date=None, end_date=None):
     conn = None
     try:
         conn = database.get_conn()
-        # Use the app's configured local timezone (Perth) for "today", not the
-        # container's system date (UTC). date.today() previously returned the
-        # UTC calendar date, which lags Perth's actual local date by one day
-        # during the first ~8 hours of each Perth day (Perth is UTC+8). That
-        # meant the default effective_end below was a day too early during
-        # that window, so compute_basal_for_date_range's live window never
-        # covered "this morning" until the UTC date caught up -- leaving
-        # layer2_basal_5min without rows for those early-morning buckets at
-        # the moment populate_5min_aggregate ran for them, which permanently
-        # baked a NULL scheduled_basal into layer2_five_minute_aggregate for
-        # that stretch (nothing re-visits an already-aggregated bucket later).
-        # Fixed 23 Aug 2026 -- see STATUS.md.
         tz_name = getattr(config, "TIMEZONE", "UTC")
         try:
             db_config = database.get_system_config(conn)
             tz_name = db_config.get("TIMEZONE", tz_name)
         except Exception:
             pass
+        # Use the configured local timezone for today, rather than the
+        # container's UTC date, which may lag the local calendar date.
         today = datetime.now(ZoneInfo(tz_name)).date()
         # If a specific start date is provided (e.g. from a backfill segment), use it.
         # Otherwise fall back to the last 7 days (correct for the normal poll cycle path).
@@ -458,15 +450,8 @@ def run_backfill():
                 backfill_devicestatus_windowed(conn, seg_start, seg_end, url=final_url, secret=final_secret)
                 
             # Compute basal for this backfilled segment (permanent storage).
-            # Use the segment's own local calendar date (year, month, day, from
-            # get_daily_segments) rather than seg_start.date()/seg_end.date() --
-            # those are UTC-aware timestamps, so .date() returns the UTC
-            # calendar date, not the local one. For Perth (UTC+8), seg_start's
-            # UTC date is one day *earlier* than the local day this segment
-            # actually represents, silently expanding every segment's basal
-            # recompute to cover the previous local day too. Harmless in that
-            # it's over-inclusive rather than missing data, but it doubled the
-            # work of every backfill segment. Fixed 23 Aug 2026 -- see STATUS.md.
+            # Use the local calendar date from get_daily_segments rather
+            # than .date() on UTC timestamps, which can select an adjacent day.
             seg_local_date = datetime(year, month, day).date()
             database.compute_basal_for_date_range(conn, seg_local_date, seg_local_date)
             # Generate 5-minute aggregate timeline for the segment
@@ -1072,7 +1057,7 @@ def api_carpet_plot():
     conn = database.get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT COALESCE((SELECT value FROM system_config WHERE key = 'TIMEZONE' LIMIT 1), 'Australia/Perth')")
+        cur.execute("SELECT COALESCE((SELECT value FROM system_config WHERE key = 'TIMEZONE' LIMIT 1), 'UTC')")
         tz_name = cur.fetchone()[0]
 
         cur.execute("""
@@ -1143,6 +1128,19 @@ def dashboard_daily():
     today_local = datetime.now(_tz).strftime("%Y-%m-%d")
     target_date = request.args.get('date', today_local)
     return render_template("dashboard_daily.html", target_date=target_date, today_local=today_local)
+
+@app.route("/basal-eval")
+@app.route("/basal_eval")
+def basal_eval_page():
+    today_local, start_date_str, end_date_str, _, _ = _trends_date_range()
+    resp = make_response(render_template(
+        "basal_eval.html",
+        start_date=start_date_str,
+        end_date=end_date_str,
+        today_local=today_local
+    ))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 @app.route("/calendar")
 def calendar_page():
@@ -1359,6 +1357,26 @@ def api_daily_chart_data_range():
         basal_events = database.get_exact_basal_events_range(conn, start_date, end_date)
         database.return_conn(conn)
         return jsonify({"data": data, "basal_events": basal_events})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/v1/basal_eval_data")
+def api_basal_eval_data():
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+    if not start_date or not end_date:
+        return jsonify({"error": "Missing start or end parameter"}), 400
+
+    try:
+        from daemon import basal_eval
+    except ImportError:
+        import basal_eval
+
+    try:
+        conn = database.get_conn()
+        payload = basal_eval.get_basal_eval_dataset(conn, start_date, end_date)
+        database.return_conn(conn)
+        return jsonify(payload)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -2475,7 +2493,7 @@ def update_settings():
         try:
             ZoneInfo(timezone_name)
         except Exception:
-            return jsonify({"status": "error", "message": "Timezone must be a valid IANA name, such as Australia/Perth."}), 400
+            return jsonify({"status": "error", "message": "Timezone must be a valid IANA name, such as Etc/UTC."}), 400
         data['TIMEZONE'] = timezone_name
     try:
         conn = database.get_conn()
@@ -3667,7 +3685,7 @@ def advanced_metrics_poincare():
     ax.set_facecolor('#1a1a1a')
 
     # Baked into the image itself (not an HTML overlay) so this chart is a
-    # true standalone printout -- per Harry, if the date range changes the
+    # true standalone printout -- per the project, if the date range changes the
     # chart gets regenerated anyway, so there's no separate "keep it in sync"
     # concern the way there would be with an HTML-side date span.
     _date_range_str = f"{_dt.strptime(start_date, '%Y-%m-%d').strftime('%d/%m/%Y')} \u2013 {_dt.strptime(end_date, '%Y-%m-%d').strftime('%d/%m/%Y')}"
@@ -4023,6 +4041,34 @@ def api_diary_delete_note(note_id: int):
     finally:
         if conn is not None:
             database.return_conn(conn)
+
+
+@app.route("/api/v1/diary/import_csv", methods=["POST"])
+def api_diary_import_csv():
+    payload = request.get_json(silent=True)
+    if not payload or not isinstance(payload, dict):
+        return jsonify({"error": "Request body must be a JSON object"}), 400
+
+    rows = payload.get("rows")
+    if not rows or not isinstance(rows, list):
+        return jsonify({"error": "Payload must contain a non-empty 'rows' list"}), 400
+
+    skip_duplicates = bool(payload.get("skip_duplicates", True))
+
+    conn = None
+    try:
+        conn = database.get_conn()
+        res = database.import_diary_notes_batch(conn, rows, skip_duplicates=skip_duplicates)
+        return jsonify(res), 200
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        logger.error(f"Error importing diary CSV batch: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn is not None:
+            database.return_conn(conn)
+
 
 
 

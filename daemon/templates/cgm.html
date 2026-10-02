@@ -100,7 +100,7 @@
 
         // Green at a perfect day, sliding to red as fresh-data coverage
         // drops -- lets a bad day register at a glance without reading the
-        // axis, which is the point Harry's "I don't understand the graph"
+        // axis, which is the point the project's "I don't understand the graph"
         // feedback was making: a plain minutes-based line didn't say
         // "good day" or "bad day" without close reading.
         function pctFreshColor(pct) {
@@ -127,7 +127,7 @@
             // syntax, not valid here. Without a real x-value each point
             // defaulted to ~0, which a time axis reads as 1 Jan 1970 -- that
             // dragged the whole shared axis back to the 1970s and crushed
-            // the real bar data into a sliver at the right edge (Harry's
+            // the real bar data into a sliver at the right edge (the project's
             // "not respecting date boundaries" report, 1 Sep 2026).
             const gapMarkers = (gapsData ? gapsData.gaps : []).map(g => ({
                 name: g.cause,

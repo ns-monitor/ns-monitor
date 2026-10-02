@@ -199,101 +199,110 @@
                 </div>
 
                 <div class="gia-axis-layout">
-                    <!-- Left Side: X Axis Box -->
-                    <div class="gia-axis-left-col">
-                        <div class="gia-axis-box" id="gia-x-box">
-                            <div class="gia-label">X Axis (Abscissa)</div>
-                            <button type="button" class="gia-axis-badge-btn" id="gia-x-metric-btn">
-                                <span id="gia-x-metric-text">Total Carbs</span>
-                                <span class="gia-unit-tag" id="gia-x-metric-unit">[g]</span>
-                            </button>
-                            <div class="gia-form-group">
-                                <label class="gia-label" for="gia-x-agg-select">Aggregation</label>
-                                <select class="gia-select" id="gia-x-agg-select">
-                                    <optgroup label="Common">
-                                        <option value="sum">Sum</option>
-                                        <option value="avg">Average</option>
-                                        <option value="median">Median</option>
-                                        <option value="min">Min</option>
-                                        <option value="max">Max</option>
-                                    </optgroup>
-                                    <optgroup label="Variability &amp; Spread">
-                                        <option value="stddev">Standard Deviation (SD)</option>
-                                        <option value="cv">Coefficient of Variation (CV %)</option>
-                                        <option value="iqr">Interquartile Range (IQR)</option>
-                                        <option value="range">Range (Peak-to-Trough)</option>
-                                    </optgroup>
-                                    <optgroup label="Percentiles">
-                                        <option value="p10">10th Percentile (p10)</option>
-                                        <option value="p25">25th Percentile (p25)</option>
-                                        <option value="p75">75th Percentile (p75)</option>
-                                        <option value="p90">90th Percentile (p90)</option>
-                                    </optgroup>
-                                    <optgroup label="Counts &amp; Frequency">
-                                        <option value="count">Count (Readings)</option>
-                                        <option value="count_nonzero">Non-Zero Count (Events)</option>
-                                    </optgroup>
-                                    <optgroup label="Dynamics">
-                                        <option value="delta">Net Change (Last - First)</option>
-                                        <option value="first">First Reading</option>
-                                        <option value="last">Last Reading</option>
-                                    </optgroup>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- Horizontal Swap between X and Y -->
-                        <div class="gia-x-swap-wrap">
-                            <button type="button" class="gia-swap-btn" id="gia-swap-btn" title="Swap X and Y₁ Axes (Abscissa ⇄ Ordinate)">
-                                <i class="fa-solid fa-arrow-right-arrow-left"></i>
-                            </button>
+                    <!-- Col 1, Row 1: X Axis Box -->
+                    <div class="gia-axis-box" id="gia-x-box">
+                        <div class="gia-label">X Axis (Abscissa)</div>
+                        <button type="button" class="gia-axis-badge-btn" id="gia-x-metric-btn">
+                            <span id="gia-x-metric-text">Total Carbs</span>
+                            <span class="gia-unit-tag" id="gia-x-metric-unit">[g]</span>
+                        </button>
+                        <div class="gia-form-group">
+                            <label class="gia-label" for="gia-x-agg-select">Aggregation</label>
+                            <select class="gia-select" id="gia-x-agg-select">
+                                <optgroup label="Common">
+                                    <option value="sum">Sum</option>
+                                    <option value="avg">Average</option>
+                                    <option value="median">Median</option>
+                                    <option value="min">Min</option>
+                                    <option value="max">Max</option>
+                                </optgroup>
+                                <optgroup label="Variability &amp; Spread">
+                                    <option value="stddev">Standard Deviation (SD)</option>
+                                    <option value="cv">Coefficient of Variation (CV %)</option>
+                                    <option value="iqr">Interquartile Range (IQR)</option>
+                                    <option value="range">Range (Peak-to-Trough)</option>
+                                </optgroup>
+                                <optgroup label="Percentiles">
+                                    <option value="p10">10th Percentile (p10)</option>
+                                    <option value="p25">25th Percentile (p25)</option>
+                                    <option value="p75">75th Percentile (p75)</option>
+                                    <option value="p90">90th Percentile (p90)</option>
+                                </optgroup>
+                                <optgroup label="Sample Size &amp; Observations">
+                                    <option value="count">Sample Size / Points (N)</option>
+                                    <option value="count_nonzero">Non-Zero Points (N &gt; 0)</option>
+                                </optgroup>
+                                <optgroup label="Dynamics">
+                                    <option value="delta">Net Change (Last - First)</option>
+                                    <option value="first">First Reading</option>
+                                    <option value="last">Last Reading</option>
+                                </optgroup>
+                            </select>
                         </div>
                     </div>
 
-                    <!-- Right Side: Y1 and Y2 Stacks -->
-                    <div class="gia-axis-right-col">
-                        <!-- Primary Y Axis Box -->
-                        <div class="gia-axis-box" id="gia-y-box">
-                            <div class="gia-label">Y Axis (Left Ordinate)</div>
-                            <button type="button" class="gia-axis-badge-btn" id="gia-y-metric-btn">
-                                <span id="gia-y-metric-text">Total Daily Dose</span>
-                                <span class="gia-unit-tag" id="gia-y-metric-unit">[U]</span>
-                            </button>
-                            <div class="gia-form-group">
-                                <label class="gia-label" for="gia-y-agg-select">Aggregation</label>
-                                <select class="gia-select" id="gia-y-agg-select">
-                                    <optgroup label="Common">
-                                        <option value="sum">Sum</option>
-                                        <option value="avg">Average</option>
-                                        <option value="median">Median</option>
-                                        <option value="min">Min</option>
-                                        <option value="max">Max</option>
-                                    </optgroup>
-                                    <optgroup label="Variability &amp; Spread">
-                                        <option value="stddev">Standard Deviation (SD)</option>
-                                        <option value="cv">Coefficient of Variation (CV %)</option>
-                                        <option value="iqr">Interquartile Range (IQR)</option>
-                                        <option value="range">Range (Peak-to-Trough)</option>
-                                    </optgroup>
-                                    <optgroup label="Percentiles">
-                                        <option value="p10">10th Percentile (p10)</option>
-                                        <option value="p25">25th Percentile (p25)</option>
-                                        <option value="p75">75th Percentile (p75)</option>
-                                        <option value="p90">90th Percentile (p90)</option>
-                                    </optgroup>
-                                    <optgroup label="Counts &amp; Frequency">
-                                        <option value="count">Count (Readings)</option>
-                                        <option value="count_nonzero">Non-Zero Count (Events)</option>
-                                    </optgroup>
-                                    <optgroup label="Dynamics">
-                                        <option value="delta">Net Change (Last - First)</option>
-                                        <option value="first">First Reading</option>
-                                        <option value="last">Last Reading</option>
-                                    </optgroup>
-                                </select>
-                            </div>
-                        </div>
+                    <!-- Col 2, Row 1: Horizontal Swap between X and Y -->
+                    <div class="gia-x-swap-wrap">
+                        <button type="button" class="gia-swap-btn" id="gia-swap-btn" title="Swap X and Y₁ Axes (Abscissa ⇄ Ordinate)">
+                            <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                        </button>
+                    </div>
 
+                    <!-- Col 3, Row 1: Primary Y Axis Box -->
+                    <div class="gia-axis-box" id="gia-y-box">
+                        <div class="gia-label">Y Axis (Left Ordinate)</div>
+                        <button type="button" class="gia-axis-badge-btn" id="gia-y-metric-btn">
+                            <span id="gia-y-metric-text">Total Daily Dose</span>
+                            <span class="gia-unit-tag" id="gia-y-metric-unit">[U]</span>
+                        </button>
+                        <div class="gia-form-group">
+                            <label class="gia-label" for="gia-y-agg-select">Aggregation</label>
+                            <select class="gia-select" id="gia-y-agg-select">
+                                <optgroup label="Common">
+                                    <option value="sum">Sum</option>
+                                    <option value="avg">Average</option>
+                                    <option value="median">Median</option>
+                                    <option value="min">Min</option>
+                                    <option value="max">Max</option>
+                                </optgroup>
+                                <optgroup label="Variability &amp; Spread">
+                                    <option value="stddev">Standard Deviation (SD)</option>
+                                    <option value="cv">Coefficient of Variation (CV %)</option>
+                                    <option value="iqr">Interquartile Range (IQR)</option>
+                                    <option value="range">Range (Peak-to-Trough)</option>
+                                </optgroup>
+                                <optgroup label="Percentiles">
+                                    <option value="p10">10th Percentile (p10)</option>
+                                    <option value="p25">25th Percentile (p25)</option>
+                                    <option value="p75">75th Percentile (p75)</option>
+                                    <option value="p90">90th Percentile (p90)</option>
+                                </optgroup>
+                                <optgroup label="Sample Size &amp; Observations">
+                                    <option value="count">Sample Size / Points (N)</option>
+                                    <option value="count_nonzero">Non-Zero Points (N &gt; 0)</option>
+                                </optgroup>
+                                <optgroup label="Dynamics">
+                                    <option value="delta">Net Change (Last - First)</option>
+                                    <option value="first">First Reading</option>
+                                    <option value="last">Last Reading</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Col 1, Row 2: Right-aligned Enable checkbox under X box -->
+                    <div class="gia-y2-toggle-col">
+                        <label class="gia-checkbox-row gia-y2-enable-label" for="gia-y2-enable-toggle">
+                            <input type="checkbox" id="gia-y2-enable-toggle">
+                            <span>Enable Y₂ Axis (Right)</span>
+                        </label>
+                    </div>
+
+                    <!-- Col 2, Row 2: Spacer matching swap button width -->
+                    <div class="gia-swap-spacer"></div>
+
+                    <!-- Col 3, Row 2: Y1/Y2 swap & Y2 Box (collapsible under Y1 box) -->
+                    <div class="gia-y2-box-col collapsed" id="gia-y2-container">
                         <!-- Vertical Swap Button between Y1 and Y2 -->
                         <div class="gia-y-swap-row">
                             <button type="button" class="gia-y-swap-btn" id="gia-y1-y2-swap-btn" title="Swap Left (Y₁) and Right (Y₂) Axes">
@@ -302,15 +311,9 @@
                             </button>
                         </div>
 
-                        <!-- Secondary Y2 Axis Box (Formatted same size as primary Y box, sitting directly beneath it) -->
+                        <!-- Secondary Y2 Axis Box -->
                         <div class="gia-axis-box gia-y2-box inactive" id="gia-y2-box">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <div class="gia-label" style="margin-bottom: 0;">Y₂ Axis (Right Ordinate)</div>
-                                <label class="gia-checkbox-row" style="margin: 0; font-size: 0.75rem;">
-                                    <input type="checkbox" id="gia-y2-enable-toggle">
-                                    <span style="font-size: 0.72rem; color: var(--text-secondary);">Enable</span>
-                                </label>
-                            </div>
+                            <div class="gia-label" style="margin-bottom: 0;">Y₂ Axis (Right Ordinate)</div>
                             <button type="button" class="gia-axis-badge-btn" id="gia-y2-metric-btn">
                                 <span id="gia-y2-metric-text">Select Secondary Metric...</span>
                                 <span class="gia-unit-tag" id="gia-y2-metric-unit"></span>
@@ -337,9 +340,9 @@
                                         <option value="p75">75th Percentile (p75)</option>
                                         <option value="p90">90th Percentile (p90)</option>
                                     </optgroup>
-                                    <optgroup label="Counts &amp; Frequency">
-                                        <option value="count">Count (Readings)</option>
-                                        <option value="count_nonzero">Non-Zero Count (Events)</option>
+                                    <optgroup label="Sample Size &amp; Observations">
+                                        <option value="count">Sample Size / Points (N)</option>
+                                        <option value="count_nonzero">Non-Zero Points (N &gt; 0)</option>
                                     </optgroup>
                                     <optgroup label="Dynamics">
                                         <option value="delta">Net Change (Last - First)</option>

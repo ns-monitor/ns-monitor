@@ -181,34 +181,78 @@
 /* Axis Role Deck Column 2 */
 .gia-axis-layout {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-3);
-    align-items: start;
+    grid-template-columns: 1fr 34px 1fr;
+    column-gap: var(--space-2);
+    row-gap: var(--space-2);
+    align-items: center;
 }
 
-@media (max-width: 600px) {
-    .gia-axis-layout {
-        grid-template-columns: 1fr;
-    }
-}
-
-.gia-axis-left-col {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-}
-
-.gia-axis-right-col {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
+.gia-axis-layout .gia-axis-box {
+    width: 100%;
 }
 
 .gia-x-swap-wrap {
     display: flex;
     justify-content: center;
     align-items: center;
-    margin-top: 4px;
+}
+
+.gia-y2-toggle-col {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    align-self: start;
+    padding-top: 6px;
+}
+
+.gia-y2-enable-label {
+    margin: 0;
+    font-size: 0.76rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s;
+}
+
+.gia-y2-enable-label:hover {
+    color: var(--text-color);
+}
+
+.gia-y2-enable-label input[type="checkbox"] {
+    accent-color: var(--link-color);
+    cursor: pointer;
+}
+
+.gia-swap-spacer {
+    width: 34px;
+}
+
+.gia-y2-box-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    align-self: start;
+}
+
+.gia-y2-box-col.collapsed {
+    display: none;
+}
+
+@media (max-width: 600px) {
+    .gia-axis-layout {
+        display: flex;
+        flex-direction: column;
+    }
+    .gia-y2-toggle-col {
+        justify-content: flex-start;
+    }
+    .gia-swap-spacer {
+        display: none;
+    }
 }
 
 .gia-y-swap-row {

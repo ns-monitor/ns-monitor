@@ -724,6 +724,263 @@
                 color: #000000 !important;
             }
         }
+
+        /* -------------------------------------------------------------
+           CSV IMPORT & HELP POPOVER STYLES
+           ------------------------------------------------------------- */
+        .diary-popover-wrapper {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .diary-popover-trigger {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary, #8b949e);
+            cursor: pointer;
+            padding: 2px 4px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: color 0.15s ease, background 0.15s ease;
+        }
+
+        .diary-popover-trigger:hover,
+        .diary-popover-trigger.active {
+            color: var(--accent, #2f81f7);
+            background: rgba(47, 129, 247, 0.1);
+        }
+
+        .diary-guide-popover {
+            display: none;
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            width: 320px;
+            background: var(--card-bg, #161b22);
+            border: 1px solid var(--border-color, #30363d);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+            border-radius: var(--radius-md, 6px);
+            padding: 14px 16px;
+            z-index: 1100;
+            font-size: 12px;
+            line-height: 1.45;
+            color: var(--text-color, #e6edf3);
+        }
+
+        .diary-guide-popover.active {
+            display: block;
+        }
+
+        .diary-guide-popover h4 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-color, #e6edf3);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .diary-guide-popover h5 {
+            margin: 8px 0 3px 0;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent, #2f81f7);
+        }
+
+        .diary-guide-popover p {
+            margin: 0 0 6px 0;
+            color: var(--text-secondary, #8b949e);
+        }
+
+        .diary-guide-popover p:last-child {
+            margin-bottom: 0;
+        }
+
+        .diary-guide-popover ul {
+            margin: 4px 0 6px 18px;
+            padding: 0;
+            color: var(--text-secondary, #8b949e);
+        }
+
+        .diary-guide-popover li {
+            margin-bottom: 3px;
+        }
+
+        /* Modal Dialog */
+        .diary-modal-backdrop {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .diary-modal-dialog {
+            background: var(--card-bg, #161b22);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 8px;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
+            width: 100%;
+            max-width: 900px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            animation: fadeIn 0.15s ease-out;
+        }
+
+        .diary-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border-color, #30363d);
+            background: var(--surface-raised, #21262d);
+        }
+
+        .diary-modal-title {
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-color, #e6edf3);
+        }
+
+        .diary-modal-close {
+            background: transparent;
+            border: none;
+            font-size: 20px;
+            line-height: 1;
+            color: var(--text-secondary, #8b949e);
+            cursor: pointer;
+            padding: 0 4px;
+        }
+        .diary-modal-close:hover {
+            color: var(--text-color, #e6edf3);
+        }
+
+        .diary-modal-body {
+            padding: 16px 18px;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .import-preview-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .import-summary-badges {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .import-format-selector {
+            display: flex;
+            align-items: center;
+        }
+
+        .import-alert-box {
+            background: rgba(47, 129, 247, 0.1);
+            border: 1px solid rgba(47, 129, 247, 0.3);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: var(--text-color, #e6edf3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .import-table-container {
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 6px;
+            overflow-x: auto;
+            max-height: 380px;
+            background: var(--bg-color, #0d1117);
+        }
+
+        .import-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            text-align: left;
+        }
+
+        .import-table th {
+            background: var(--surface-raised, #21262d);
+            color: var(--text-secondary, #8b949e);
+            font-weight: 600;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border-color, #30363d);
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+
+        .import-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid rgba(48, 54, 61, 0.5);
+            color: var(--text-color, #e6edf3);
+            vertical-align: middle;
+        }
+
+        .import-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .import-cat-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .import-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-secondary, #8b949e);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .diary-modal-footer {
+            padding: 12px 18px;
+            border-top: 1px solid var(--border-color, #30363d);
+            background: var(--surface-raised, #21262d);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .import-footer-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
     </style>
 </head>
 <body class="diary-body">
@@ -735,7 +992,41 @@
             <div class="panel-header-left">
                 <h1 class="panel-h1"><i class="fa-solid fa-book-medical" style="color:var(--text-color); margin-right:8px;"></i>Diary</h1>
             </div>
-            <div class="panel-header-right">
+            <div class="panel-header-right" style="display: flex; align-items: center; gap: 8px;">
+                <!-- Hidden file input for CSV upload -->
+                <input type="file" id="diary-csv-file-input" accept=".csv,text/csv" style="display: none;" onchange="handleDiaryCsvFile(this)">
+
+                <button type="button" class="btn btn-secondary" id="btn-import-csv" onclick="triggerDiaryCsvImport()" title="Import notes from CSV file">
+                    <i class="fa-solid fa-file-import"></i> Import CSV
+                </button>
+
+                <!-- Strategic (i) Help Popover -->
+                <div class="diary-popover-wrapper">
+                    <button type="button" class="diary-popover-trigger" aria-label="CSV Import Guide" title="CSV Import Guide">
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                            <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                        </svg>
+                    </button>
+                    <div class="diary-guide-popover" onclick="event.stopPropagation()">
+                        <h4><i class="fa-solid fa-file-csv"></i> CSV Import Format</h4>
+                        <h5>Required Header Columns:</h5>
+                        <p>Your CSV file should have a header row with 4 columns:</p>
+                        <div style="background: var(--surface-raised, #21262d); padding: 4px 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-bottom: 8px;">
+                            date, time, category, value
+                        </div>
+                        <h5>Column Specifications:</h5>
+                        <ul>
+                            <li><strong>date:</strong> <code>YYYY-MM-DD</code> (recommended) or <code>DD/MM/YYYY</code>.</li>
+                            <li><strong>time:</strong> 24-hour <code>HH:MM</code>. <em>Leave blank</em> or write <code>all-day</code> for timeless notes.</li>
+                            <li><strong>category:</strong> Note category (e.g. <code>Exercise</code>, <code>Illness</code>, <code>Weight</code>). Matched case-insensitively. Missing categories are automatically created.</li>
+                            <li><strong>value:</strong> Note description or numeric measurement (e.g. <code>74.5</code> for Weight).</li>
+                        </ul>
+                        <h5>Pre-Commit Verification:</h5>
+                        <p>Selecting a file will open a preview table showing all parsed rows, duplicate checks, and newly detected categories for your review before committing.</p>
+                    </div>
+                </div>
+
                 <button type="button" class="btn btn-primary" id="btn-new-note" onclick="createNewNote()">
                     <i class="fa-solid fa-plus"></i> New Note
                 </button>
@@ -979,6 +1270,7 @@
 
         document.addEventListener('DOMContentLoaded', function () {
             initResizers();
+            initDiaryHelpPopovers();
             loadCategories().then(function () {
                 // Check query params
                 var params = new URLSearchParams(window.location.search);
@@ -1834,6 +2126,445 @@
             var mNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
             return p[2] + ' ' + mNames[parseInt(p[1], 10) - 1];
         }
+
+        // -------------------------------------------------------------------
+        // CSV IMPORT & PREVIEW MODAL LOGIC
+        // -------------------------------------------------------------------
+        var rawCsvContent = '';
+        var parsedImportRows = [];
+
+        function initDiaryHelpPopovers() {
+            document.querySelectorAll('.diary-popover-trigger').forEach(function (trigger) {
+                trigger.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    var popover = this.parentElement.querySelector('.diary-guide-popover');
+                    if (!popover) return;
+                    var wasActive = popover.classList.contains('active');
+                    document.querySelectorAll('.diary-guide-popover.active').forEach(function (p) { p.classList.remove('active'); });
+                    document.querySelectorAll('.diary-popover-trigger.active').forEach(function (t) { t.classList.remove('active'); });
+                    if (!wasActive) {
+                        popover.classList.add('active');
+                        this.classList.add('active');
+                    }
+                });
+            });
+
+            document.addEventListener('click', function (e) {
+                if (!e.target.closest('.diary-popover-wrapper')) {
+                    document.querySelectorAll('.diary-guide-popover.active').forEach(function (p) { p.classList.remove('active'); });
+                    document.querySelectorAll('.diary-popover-trigger.active').forEach(function (t) { t.classList.remove('active'); });
+                }
+            });
+        }
+
+        function triggerDiaryCsvImport() {
+            var fileInput = document.getElementById('diary-csv-file-input');
+            if (fileInput) {
+                fileInput.value = '';
+                fileInput.click();
+            }
+        }
+
+        function handleDiaryCsvFile(input) {
+            if (!input.files || input.files.length === 0) return;
+            var file = input.files[0];
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                rawCsvContent = e.target.result;
+                processAndPreviewCsv(rawCsvContent);
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCsvText(text) {
+            var lines = text.split(/\r\n|\n|\r/);
+            var rows = [];
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim();
+                if (!line) continue;
+                var row = [];
+                var inQuotes = false;
+                var currentToken = '';
+                for (var c = 0; c < line.length; c++) {
+                    var ch = line[c];
+                    if (ch === '"') {
+                        if (inQuotes && line[c + 1] === '"') {
+                            currentToken += '"';
+                            c++;
+                        } else {
+                            inQuotes = !inQuotes;
+                        }
+                    } else if (ch === ',' && !inQuotes) {
+                        row.push(currentToken.trim());
+                        currentToken = '';
+                    } else {
+                        currentToken += ch;
+                    }
+                }
+                row.push(currentToken.trim());
+                rows.push(row);
+            }
+            return rows;
+        }
+
+        function normalizeDateString(rawDate, formatChoice) {
+            if (!rawDate) return null;
+            rawDate = rawDate.trim();
+            var isoMatch = rawDate.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+            if (isoMatch) {
+                var y = isoMatch[1], m = isoMatch[2].padStart(2, '0'), d = isoMatch[3].padStart(2, '0');
+                return y + '-' + m + '-' + d;
+            }
+            var parts = rawDate.split(/[-/.]/);
+            if (parts.length === 3) {
+                var p0 = parseInt(parts[0], 10);
+                var p1 = parseInt(parts[1], 10);
+                var p2 = parseInt(parts[2], 10);
+                var year = p2 < 100 ? (2000 + p2) : p2;
+                var month, day;
+                if (formatChoice === 'MM/DD/YYYY') {
+                    month = p0;
+                    day = p1;
+                } else {
+                    day = p0;
+                    month = p1;
+                }
+                if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1990 && year <= 2099) {
+                    return String(year) + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+                }
+            }
+            return null;
+        }
+
+        function normalizeTimeString(rawTime) {
+            if (!rawTime) return { isTimeless: true, timeStr: '' };
+            var t = rawTime.trim().toLowerCase();
+            if (t === '' || t === 'all-day' || t === 'allday' || t === 'all day' || t === '-' || t === 'none' || t === 'null') {
+                return { isTimeless: true, timeStr: '' };
+            }
+            var m24 = t.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+            if (m24) {
+                var h = parseInt(m24[1], 10);
+                var m = parseInt(m24[2], 10);
+                if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+                    return { isTimeless: false, timeStr: String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') };
+                }
+            }
+            var m12 = t.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/);
+            if (m12) {
+                var h12 = parseInt(m12[1], 10);
+                var m_min = parseInt(m12[2], 10);
+                var mer = m12[3];
+                if (h12 >= 1 && h12 <= 12 && m_min >= 0 && m_min <= 59) {
+                    if (mer === 'pm' && h12 < 12) h12 += 12;
+                    if (mer === 'am' && h12 === 12) h12 = 0;
+                    return { isTimeless: false, timeStr: String(h12).padStart(2, '0') + ':' + String(m_min).padStart(2, '0') };
+                }
+            }
+            return { isTimeless: false, timeStr: rawTime, error: 'Invalid time' };
+        }
+
+        function processAndPreviewCsv(csvText) {
+            var rawRows = parseCsvText(csvText);
+            if (rawRows.length < 2) {
+                alert('CSV file must contain a header row and at least one data row.');
+                return;
+            }
+
+            var header = rawRows[0].map(function (h) { return h.toLowerCase().trim(); });
+            var dateIdx = header.indexOf('date');
+            var timeIdx = header.indexOf('time');
+            var catIdx = header.indexOf('category');
+            var valIdx = header.indexOf('value');
+
+            if (dateIdx === -1) dateIdx = 0;
+            if (timeIdx === -1) timeIdx = 1;
+            if (catIdx === -1) catIdx = 2;
+            if (valIdx === -1) valIdx = 3;
+
+            var formatSelect = document.getElementById('preview-date-format');
+            var formatChoice = formatSelect ? formatSelect.value : 'YYYY-MM-DD';
+
+            for (var i = 1; i < Math.min(rawRows.length, 10); i++) {
+                var dStr = rawRows[i][dateIdx] || '';
+                if (dStr.indexOf('/') !== -1 || (dStr.indexOf('-') !== -1 && dStr.split('-')[0].length < 4)) {
+                    var parts = dStr.split(/[-/.]/);
+                    if (parts.length === 3) {
+                        var p0 = parseInt(parts[0], 10);
+                        var p1 = parseInt(parts[1], 10);
+                        if (p0 > 12 && p1 <= 12) {
+                            formatChoice = 'DD/MM/YYYY';
+                            if (formatSelect) formatSelect.value = 'DD/MM/YYYY';
+                            break;
+                        } else if (p1 > 12 && p0 <= 12) {
+                            formatChoice = 'MM/DD/YYYY';
+                            if (formatSelect) formatSelect.value = 'MM/DD/YYYY';
+                            break;
+                        }
+                    }
+                }
+            }
+
+            renderPreviewTable(rawRows, dateIdx, timeIdx, catIdx, valIdx, formatChoice);
+        }
+
+        function reparseCurrentCsv() {
+            if (rawCsvContent) {
+                processAndPreviewCsv(rawCsvContent);
+            }
+        }
+
+        function renderPreviewTable(rawRows, dateIdx, timeIdx, catIdx, valIdx, formatChoice) {
+            var tbody = document.getElementById('import-table-body');
+            tbody.innerHTML = '';
+            parsedImportRows = [];
+
+            var newCatsSet = new Set();
+            var dupeCount = 0;
+            var errorCount = 0;
+
+            var existingCatLowerMap = {};
+            categoriesList.forEach(function (c) {
+                existingCatLowerMap[c.name.trim().toLowerCase()] = c;
+            });
+
+            for (var r = 1; r < rawRows.length; r++) {
+                var rowData = rawRows[r];
+                var rawDate = rowData[dateIdx] || '';
+                var rawTime = rowData[timeIdx] || '';
+                var rawCat = (rowData[catIdx] || 'General').trim();
+                var rawVal = (rowData[valIdx] || '').trim();
+
+                var isoDate = normalizeDateString(rawDate, formatChoice);
+                var timeObj = normalizeTimeString(rawTime);
+
+                var isFuture = false;
+                if (isoDate && TODAY_LOCAL && isoDate > TODAY_LOCAL) {
+                    isFuture = true;
+                }
+
+                var isDateValid = isoDate !== null && !isFuture;
+                var isTimeValid = !timeObj.error;
+                var hasError = !isDateValid || !isTimeValid;
+
+                var matchedCat = existingCatLowerMap[rawCat.toLowerCase()];
+                var isNewCat = !matchedCat;
+                if (isNewCat && rawCat) {
+                    newCatsSet.add(rawCat);
+                }
+
+                var catDisplayName = matchedCat ? matchedCat.name : rawCat;
+                var catColor = matchedCat ? matchedCat.color : '#3498db';
+
+                // Check duplicate against currently loaded notes
+                var isDupe = false;
+                if (isoDate && currentNotes) {
+                    isDupe = currentNotes.some(function (n) {
+                        var sameDate = n.date === isoDate;
+                        var sameTime = timeObj.isTimeless ? n.is_timeless : (n.time_created === timeObj.timeStr);
+                        var sameText = n.text_content && (n.text_content.indexOf(rawVal) !== -1 || rawVal.indexOf(n.text_content) !== -1);
+                        return sameDate && sameTime && sameText;
+                    });
+                }
+                if (isDupe) dupeCount++;
+                if (hasError) errorCount++;
+
+                var rowRecord = {
+                    date: isoDate || rawDate,
+                    time: timeObj.isTimeless ? '' : timeObj.timeStr,
+                    category: catDisplayName,
+                    value: rawVal
+                };
+                parsedImportRows.push(rowRecord);
+
+                var tr = document.createElement('tr');
+                if (hasError) tr.style.background = 'rgba(248, 81, 73, 0.08)';
+
+                var statusHtml = '';
+                if (!isDateValid) {
+                    statusHtml = '<span class="badge badge-danger">' + (isFuture ? 'Future Date' : 'Invalid Date') + '</span>';
+                } else if (!isTimeValid) {
+                    statusHtml = '<span class="badge badge-danger">Invalid Time</span>';
+                } else if (isDupe) {
+                    statusHtml = '<span class="badge badge-warn">Duplicate</span>';
+                } else {
+                    statusHtml = '<span class="badge badge-safe">Valid</span>';
+                }
+
+                tr.innerHTML = '<td>' + r + '</td>' +
+                    '<td style="font-family:monospace; font-weight:600;' + (!isDateValid ? 'color:var(--danger);' : '') + '">' + escapeHtml(isoDate || rawDate) + '</td>' +
+                    '<td>' + (timeObj.isTimeless ? '<span class="badge badge-info" style="font-size:10px;">All Day</span>' : '<span style="font-family:monospace;">' + escapeHtml(timeObj.timeStr) + '</span>') + '</td>' +
+                    '<td><span class="import-cat-pill" style="background:rgba(255,255,255,0.06); border-left:3px solid ' + escapeHtml(catColor) + ';"><span class="cat-color-dot" style="background:' + escapeHtml(catColor) + ';"></span> ' + escapeHtml(catDisplayName) + '</span>' + (isNewCat ? ' <span class="badge badge-info" style="font-size:9px; padding:1px 4px;">New</span>' : '') + '</td>' +
+                    '<td style="max-width:320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + escapeHtml(rawVal) + '">' + escapeHtml(rawVal) + '</td>' +
+                    '<td>' + statusHtml + '</td>';
+
+                tbody.appendChild(tr);
+            }
+
+            document.getElementById('preview-badge-total').textContent = parsedImportRows.length + ' Records';
+
+            var newCatBadge = document.getElementById('preview-badge-new-cats');
+            var newCatAlert = document.getElementById('import-new-cats-alert');
+            var newCatText = document.getElementById('import-new-cats-text');
+            if (newCatsSet.size > 0) {
+                newCatBadge.style.display = 'inline-flex';
+                newCatBadge.textContent = newCatsSet.size + ' New Categories';
+                newCatAlert.style.display = 'flex';
+                newCatText.textContent = 'New categories to be created: ' + Array.from(newCatsSet).join(', ');
+            } else {
+                newCatBadge.style.display = 'none';
+                newCatAlert.style.display = 'none';
+            }
+
+            var dupeBadge = document.getElementById('preview-badge-dupes');
+            if (dupeCount > 0) {
+                dupeBadge.style.display = 'inline-flex';
+                dupeBadge.textContent = dupeCount + ' Duplicates';
+            } else {
+                dupeBadge.style.display = 'none';
+            }
+
+            var proceedBtn = document.getElementById('btn-proceed-import');
+            if (errorCount > 0) {
+                proceedBtn.disabled = true;
+                proceedBtn.title = 'Resolve invalid dates/times before proceeding';
+            } else {
+                proceedBtn.disabled = false;
+                proceedBtn.title = '';
+            }
+
+            document.getElementById('diary-import-preview-modal').style.display = 'flex';
+        }
+
+        function closeDiaryImportModal(e) {
+            if (e && e.target && e.target.id !== 'diary-import-preview-modal' && !e.target.classList.contains('diary-modal-close')) {
+                return;
+            }
+            document.getElementById('diary-import-preview-modal').style.display = 'none';
+            var fileInput = document.getElementById('diary-csv-file-input');
+            if (fileInput) fileInput.value = '';
+        }
+
+        function executeDiaryImport() {
+            if (!parsedImportRows || parsedImportRows.length === 0) return;
+
+            var proceedBtn = document.getElementById('btn-proceed-import');
+            var proceedText = document.getElementById('btn-proceed-text');
+            var skipDupes = document.getElementById('import-skip-duplicates').checked;
+
+            proceedBtn.disabled = true;
+            proceedText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Importing...';
+
+            fetch('/api/v1/diary/import_csv', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    rows: parsedImportRows,
+                    skip_duplicates: skipDupes
+                })
+            })
+            .then(function (res) {
+                if (!res.ok) {
+                    return res.json().then(function (err) { throw new Error(err.error || 'Import failed'); });
+                }
+                return res.json();
+            })
+            .then(function (result) {
+                document.getElementById('diary-import-preview-modal').style.display = 'none';
+                var msg = 'Successfully imported ' + result.imported_count + ' notes!';
+                if (result.skipped_count > 0) {
+                    msg += ' (' + result.skipped_count + ' duplicates skipped)';
+                }
+                if (result.new_categories && result.new_categories.length > 0) {
+                    msg += '\nNew categories created: ' + result.new_categories.join(', ');
+                }
+                alert(msg);
+
+                loadCategories().then(function () {
+                    loadNotes(activeFilter);
+                });
+            })
+            .catch(function (err) {
+                alert('Import Error: ' + err.message);
+            })
+            .finally(function () {
+                proceedBtn.disabled = false;
+                proceedText.textContent = 'Proceed with Import';
+            });
+        }
+
     </script>
+
+    <!-- Diary CSV Import Verification Modal -->
+    <div id="diary-import-preview-modal" class="diary-modal-backdrop" style="display: none;" onclick="closeDiaryImportModal(event)">
+        <div class="diary-modal-dialog" onclick="event.stopPropagation()">
+            <div class="diary-modal-header">
+                <div class="diary-modal-title">
+                    <i class="fa-solid fa-file-import" style="color: var(--accent);"></i>
+                    <span>Preview CSV Import</span>
+                </div>
+                <button type="button" class="diary-modal-close" onclick="closeDiaryImportModal()">&times;</button>
+            </div>
+
+            <div class="diary-modal-body">
+                <!-- Summary bar & Date format selector -->
+                <div class="import-preview-toolbar">
+                    <div class="import-summary-badges">
+                        <span class="badge badge-safe" id="preview-badge-total">0 Records</span>
+                        <span class="badge badge-info" id="preview-badge-new-cats" style="display: none;">0 New Categories</span>
+                        <span class="badge badge-warn" id="preview-badge-dupes" style="display: none;">0 Duplicates</span>
+                    </div>
+                    <div class="import-format-selector">
+                        <label for="preview-date-format" style="font-size: 11px; color: var(--text-secondary); margin-right: 6px;">Date Format:</label>
+                        <select id="preview-date-format" class="form-select form-select-sm" style="width: auto; padding: 2px 8px; font-size: 11px;" onchange="reparseCurrentCsv()">
+                            <option value="YYYY-MM-DD" selected>YYYY-MM-DD (ISO)</option>
+                            <option value="DD/MM/YYYY">DD/MM/YYYY (Day first)</option>
+                            <option value="MM/DD/YYYY">MM/DD/YYYY (Month first)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="import-new-cats-alert" class="import-alert-box" style="display: none;">
+                    <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--accent);"></i>
+                    <span id="import-new-cats-text">New categories will be created: ...</span>
+                </div>
+
+                <!-- Scrollable Table -->
+                <div class="import-table-container">
+                    <table class="import-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">#</th>
+                                <th style="width: 100px;">Date</th>
+                                <th style="width: 85px;">Time</th>
+                                <th style="width: 140px;">Category</th>
+                                <th>Value / Content</th>
+                                <th style="width: 110px;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="import-table-body">
+                            <!-- Injected rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="diary-modal-footer">
+                <div class="import-footer-left">
+                    <label class="import-checkbox-label">
+                        <input type="checkbox" id="import-skip-duplicates" checked>
+                        <span>Skip duplicate records already in diary</span>
+                    </label>
+                </div>
+                <div class="import-footer-right">
+                    <button type="button" class="btn btn-secondary" onclick="closeDiaryImportModal()">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="btn-proceed-import" onclick="executeDiaryImport()">
+                        <i class="fa-solid fa-check"></i> <span id="btn-proceed-text">Proceed with Import</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>

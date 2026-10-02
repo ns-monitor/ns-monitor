@@ -320,6 +320,12 @@
         const isY2Active = !!(state.y2 && state.y2.enabled);
         if (y2Toggle) y2Toggle.checked = isY2Active;
 
+        const y2Container = document.getElementById('gia-y2-container');
+        if (y2Container) {
+            y2Container.classList.toggle('active', isY2Active);
+            y2Container.classList.toggle('collapsed', !isY2Active);
+        }
+
         const y2Box = document.getElementById('gia-y2-box');
         if (y2Box) {
             if (isY2Active) {
@@ -683,6 +689,10 @@
             showAlert('Cannot swap axes when Calendar Date is the X-axis.', true, 'warning');
             return;
         }
+        if (window.NSAxisPillars) {
+            window.NSAxisPillars.resetBound('y1');
+            window.NSAxisPillars.resetBound('y2');
+        }
         const temp = JSON.parse(JSON.stringify(state.x));
         state.x = JSON.parse(JSON.stringify(state.y));
         state.y = temp;
@@ -694,6 +704,10 @@
         if (!state.y2 || !state.y2.enabled) {
             showAlert('Secondary Y₂ axis must be enabled to swap left and right axes.', true, 'info');
             return;
+        }
+        if (window.NSAxisPillars) {
+            window.NSAxisPillars.resetBound('y1');
+            window.NSAxisPillars.resetBound('y2');
         }
         const tempMetric = state.y.metricId;
         const tempAgg = state.y.aggregation;
@@ -829,6 +843,9 @@
         if (yBtn) {
             yBtn.addEventListener('click', () => {
                 GIACatalog.openDrawer('y', (selected) => {
+                    if (state.y.metricId !== selected.id && window.NSAxisPillars) {
+                        window.NSAxisPillars.resetBound('y1');
+                    }
                     state.y.metricId = selected.id;
                     state.y.aggregation = selected.default_aggregation || 'avg';
                     syncControlsFromState();
@@ -842,6 +859,9 @@
         if (y2Btn) {
             y2Btn.addEventListener('click', () => {
                 GIACatalog.openDrawer('y2', (selected) => {
+                    if (state.y2.metricId !== selected.id && window.NSAxisPillars) {
+                        window.NSAxisPillars.resetBound('y2');
+                    }
                     state.y2.metricId = selected.id;
                     state.y2.aggregation = selected.default_aggregation || 'avg';
                     syncControlsFromState();

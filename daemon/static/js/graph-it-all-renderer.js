@@ -9,6 +9,8 @@
     let chartInstance = null;
     let lastRenderArgs = null;
     let lastLayout = null;
+    let lastRenderedY1MetricId = null;
+    let lastRenderedY2MetricId = null;
 
     function initChart(domId) {
         const el = document.getElementById(domId || 'graph-it-all-chart');
@@ -69,13 +71,18 @@
         const domain = (metric.domain || '').toLowerCase();
         const unit = (metric.unit || '').toLowerCase();
 
+        // Rate of change metrics require higher precision to avoid rounding to 0.0
+        if (id === 'bg_roc' || unit.includes('/m')) return 3;
+        if (id === 'basal_delta' || id === 'temp_basal_impact') return 2;
+
         // Explicit requirements: Carbs=0, cob=1, Insulin=1, IOB=1, In range stats=1, blood sugar=1
         if (id === 'cob') return 1;
         if (id === 'iob') return 1;
+        if (unit === 'count' || id.endsWith('_count') || id === 'meal_count' || id === 'readings_count') return 0;
         if (id === 'total_carbs' || id === 'carbs' || domain === 'carbs' || unit === 'g') return 0;
         if (domain === 'insulin' || unit === 'u' || unit === 'u/hr' || id === 'tdd' || id.includes('bolus') || id.includes('basal')) return 1;
         if (unit === '%' || id.startsWith('tir') || id.startsWith('tbr') || id.startsWith('tar') || id === 'sensor_active_pct' || id.startsWith('gri')) return 1;
-        if (domain === 'glucose' || unit === 'mmol/l' || id === 'mean_glucose' || id === 'glucose' || id === 'hba1c' || id === 'hbgi' || id === 'lbgi' || id === 'bgi' || id === 'bg_roc') return 1;
+        if (domain === 'glucose' || unit === 'mmol/l' || id === 'mean_glucose' || id === 'glucose' || id === 'hba1c' || id === 'hbgi' || id === 'lbgi' || id === 'bgi') return 1;
 
         return 1;
     }
@@ -124,6 +131,20 @@
         const ym = yMetric || { id: 'y', name: (meta && meta.y_column) || 'Y Axis', unit: '' };
         const y2m = hasY2 ? (y2Metric || { id: 'y2', name: meta.y2_metric || 'Y2 Axis', unit: meta.y2_unit || '' }) : null;
 
+        // If metric changed on an axis, reset stale manual bounds quietly so the new metric auto-scales cleanly
+        const y1Changed = lastRenderedY1MetricId && lastRenderedY1MetricId !== ym.id;
+        const y2Changed = hasY2 && lastRenderedY2MetricId && lastRenderedY2MetricId !== (y2m ? y2m.id : null);
+
+        lastRenderedY1MetricId = ym.id;
+        lastRenderedY2MetricId = hasY2 && y2m ? y2m.id : null;
+
+        if (window.NSAxisPillars && (y1Changed || y2Changed)) {
+            const currentBounds = NSAxisPillars.getAllBounds() || {};
+            if (y1Changed) delete currentBounds.y1;
+            if (y2Changed) delete currentBounds.y2;
+            NSAxisPillars.setAllBounds(currentBounds);
+        }
+
         const isXDate = (xm.id === 'date') || isCycle;
         const xTitle = (isCycle && meta.x_metric) ? meta.x_metric : xm.name;
         const xUnit = (!isCycle && xm.unit) ? ` (${xm.unit})` : '';
@@ -161,7 +182,7 @@
                             <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
                         </svg>
                     </button>
-                    <div class="gia-guide-popover gia-popover-right" onclick="event.stopPropagation()">
+                    <div class="gia-guide-popover" onclick="event.stopPropagation()">
                         <h4>Scorecard Statistics Guide</h4>
                         <h5>Points:</h5>
                         <p>The total number of aggregated data points plotted on the chart for the selected date range and grain.</p>
@@ -220,15 +241,18 @@
             y1CalcMax += 1;
         }
 
-        const y1Step = ym.unit === 'mmol/L' ? 1.0 : ((y1CalcMax - y1CalcMin > 50) ? 5 : 1);
+        const isRocY1 = ym.id === 'bg_roc' || (ym.unit || '').includes('/m');
+        const y1Step = isRocY1 ? 0.01 : (ym.unit === 'mmol/L' ? 1.0 : ((y1CalcMax - y1CalcMin > 50) ? 5 : 1));
+        const y1Decimals = getMetricDecimals(ym);
+        const y1Factor = Math.pow(10, Math.min(y1Decimals, 3));
         const y1AxisInfo = {
             group: 'y1',
             name: ym.name,
             color: hasY2 ? '#0969da' : '#57606a',
             step: y1Step,
-            decimals: getMetricDecimals(ym),
-            calculatedMin: Math.floor(y1CalcMin * 10) / 10,
-            calculatedMax: Math.ceil(y1CalcMax * 10) / 10
+            decimals: y1Decimals,
+            calculatedMin: Math.floor(y1CalcMin * y1Factor) / y1Factor,
+            calculatedMax: Math.ceil(y1CalcMax * y1Factor) / y1Factor
         };
 
         // Compute calculated data min/max for Y2
@@ -242,15 +266,18 @@
                 y2CalcMin -= 1;
                 y2CalcMax += 1;
             }
-            const y2Step = (y2m.unit === 'mmol/L') ? 1.0 : ((y2CalcMax - y2CalcMin > 50) ? 5 : 1);
+            const isRocY2 = y2m && (y2m.id === 'bg_roc' || (y2m.unit || '').includes('/m'));
+            const y2Step = isRocY2 ? 0.01 : ((y2m.unit === 'mmol/L') ? 1.0 : ((y2CalcMax - y2CalcMin > 50) ? 5 : 1));
+            const y2Decimals = getMetricDecimals(y2m);
+            const y2Factor = Math.pow(10, Math.min(y2Decimals, 3));
             y2AxisInfo = {
                 group: 'y2',
                 name: y2m.name,
                 color: '#cf222e',
                 step: y2Step,
-                decimals: getMetricDecimals(y2m),
-                calculatedMin: Math.floor(y2CalcMin * 10) / 10,
-                calculatedMax: Math.ceil(y2CalcMax * 10) / 10
+                decimals: y2Decimals,
+                calculatedMin: Math.floor(y2CalcMin * y2Factor) / y2Factor,
+                calculatedMax: Math.ceil(y2CalcMax * y2Factor) / y2Factor
             };
         }
 

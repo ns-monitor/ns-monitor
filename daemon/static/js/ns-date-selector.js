@@ -329,7 +329,7 @@
         if (!sEl || !eEl) return;
 
         // No page here has data past today, so no reason to be able to
-        // query into the future (Harry's report, 1 Sep 2026). Belt-and-
+        // query into the future (the project's report, 1 Sep 2026). Belt-and-
         // braces on top of the inputs' own max="{{ today_local }}" --
         // that's not reliably enforced for every input interaction across
         // browsers, this is the one place all custom-range edits funnel

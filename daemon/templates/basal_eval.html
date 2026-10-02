@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modal Basal Evaluation — Closed-Loop Therapy Audit</title>
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <link rel="stylesheet" href="/static/css/basal-eval.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+</head>
+
+<body>
+    {% include "sidebar.html" %}
+
+    <div class="container basal-eval-container">
+        <header class="page-header">
+            <div>
+                <div class="be-header-row">
+                    <h1 class="panel-h1" style="margin-bottom: 0;">
+                        <i class="fa-solid fa-chart-area"></i> Modal Basal Evaluation
+                    </h1>
+                    <!-- Strategic Help (i) Popover: Page Overview -->
+                    <div class="be-popover-wrapper">
+                        <button type="button" class="be-popover-trigger" aria-label="Modal Basal Evaluation Guide" title="Modal Basal Evaluation Guide">
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                            </svg>
+                        </button>
+                        <div class="be-guide-popover" onclick="event.stopPropagation()">
+                            <h4><i class="fa-solid fa-chart-area"></i> Modal Basal Evaluation</h4>
+                            <h5>What is Modal Basal Evaluation?</h5>
+                            <p>A non-invasive clinical audit that evaluates 24-hour diurnal basal rate adequacy using observational closed-loop data, without requiring disruptive open-loop fasting days.</p>
+                            <h5>How It Works:</h5>
+                            <p>Aggregates observational data into <strong>288 5-minute diurnal bins</strong> across the selected date range. By systematically excluding confounding meal absorption, active carbs, and rescue carbs, it isolates time windows where glucose behavior reflects underlying pump basal settings.</p>
+                            <h5>The 3 Synchronized Perspectives:</h5>
+                            <ul>
+                                <li><strong>Equilibrium (Panel 1):</strong> Did the loop persistently run a net insulin surplus or deficit?</li>
+                                <li><strong>Actionable Delta (Panel 2):</strong> What pump rate changes are indicated, and when (accounting for the 1.5h–2h insulin depot shift)?</li>
+                                <li><strong>Root Cause (Panel 3):</strong> Was glucose in equilibrium, persistently dropping (sensitive), or rising (resistant)?</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <p class="be-page-subtitle">
+                    24-hour diurnal basal adequacy and equilibrium analysis derived from observational closed-loop data without requiring open-loop fasting.
+                </p>
+            </div>
+            {% set date_state_namespace = 'basal_eval' %}
+            {% set has_compare = false %}
+            {% include "_header_date_selector.html" %}
+        </header>
+
+        <!-- Filter Controls Toolbar -->
+        <div class="be-toolbar">
+            <div class="be-toolbar-left">
+                <button type="button" class="btn btn-secondary" id="be-toggle-filters-btn">
+                    <i class="fa-solid fa-sliders"></i> Filter Rules
+                </button>
+                <!-- Strategic Help (i) Popover: Filter Toolbar Overview -->
+                <div class="be-popover-wrapper">
+                    <button type="button" class="be-popover-trigger" aria-label="Filter Rules Guide" title="Filter Rules Guide">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                            <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                        </svg>
+                    </button>
+                    <div class="be-guide-popover" onclick="event.stopPropagation()">
+                        <h4><i class="fa-solid fa-filter"></i> Exclusion Filters Purpose</h4>
+                        <h5>Why Filter Closed-Loop Data?</h5>
+                        <p>Automated insulin delivery continuously doses temp basals and micro-boluses to counteract food, exercise, and glucose excursions. To accurately evaluate basal rates, confounding meal absorption and unannounced carb rises must be ring-fenced.</p>
+                        <h5>Balancing Purity vs Sample Size:</h5>
+                        <p>More aggressive filters yield cleaner fasting data but fewer valid 5-minute bins. Default settings are clinically optimized for automated systems.</p>
+                    </div>
+                </div>
+                <div class="be-chip-group">
+                    <span class="be-chip" id="chip-meal-tail">Meal Tail: <strong>3.0h</strong></span>
+                    <span class="be-chip" id="chip-cob-cutoff">COB: <strong>0g</strong></span>
+                    <span class="be-chip" id="chip-uam-tail">UAM Tail: <strong>2.0h</strong></span>
+                    <span class="be-chip" id="chip-smb-mode">SMB: <strong>Effective Basal</strong></span>
+                </div>
+            </div>
+            <div class="be-toolbar-right">
+                <span class="be-confidence-badge" id="be-confidence-badge">
+                    <i class="fa-solid fa-circle-check"></i> <span id="be-confidence-text">Calculating...</span>
+                </span>
+                <button type="button" class="btn btn-secondary" id="be-reset-filters-btn" title="Reset all exclusion filters to recommended defaults">
+                    <i class="fa-solid fa-arrow-rotate-left"></i> Defaults
+                </button>
+            </div>
+        </div>
+
+        <!-- Filter Settings Drawer (Interactive User Sliders) -->
+        <div class="be-filter-drawer" id="be-filter-drawer">
+            <div class="be-filter-grid">
+                <!-- 1. Meal Tail Duration -->
+                <div class="be-filter-item">
+                    <label for="filter-meal-tail">
+                        <span>
+                            Meal Bolus Exclusion Tail
+                            <span class="be-popover-wrapper">
+                                <button type="button" class="be-popover-trigger" aria-label="Meal Tail Guide" title="Meal Tail Guide">
+                                    <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/></svg>
+                                </button>
+                                <div class="be-guide-popover" onclick="event.stopPropagation()">
+                                    <h4>Meal Bolus Exclusion Tail</h4>
+                                    <h5>What It Does:</h5>
+                                    <p>Excludes all 5-minute bins for the specified number of hours following any manual bolus or meal wizard entry.</p>
+                                    <h5>Why It Matters:</h5>
+                                    <p>Postprandial insulin surges and gut absorption dynamics disguise true basal needs for 3–5 hours after eating. Default: <strong>3.0 hours</strong>.</p>
+                                </div>
+                            </span>
+                        </span>
+                        <span class="val-display" id="disp-meal-tail">3.0 hrs</span>
+                    </label>
+                    <input type="range" class="be-slider" id="filter-meal-tail" min="1.0" max="6.0" step="0.5" value="3.0">
+                    <span class="be-filter-desc">Exclude buckets following any manual/wizard meal bolus.</span>
+                </div>
+
+                <!-- 2. Active COB Cutoff -->
+                <div class="be-filter-item">
+                    <label for="filter-cob-cutoff">
+                        <span>
+                            Active COB Threshold
+                            <span class="be-popover-wrapper">
+                                <button type="button" class="be-popover-trigger" aria-label="COB Threshold Guide" title="COB Threshold Guide">
+                                    <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/></svg>
+                                </button>
+                                <div class="be-guide-popover" onclick="event.stopPropagation()">
+                                    <h4>Active COB Threshold</h4>
+                                    <h5>What It Does:</h5>
+                                    <p>Excludes bins whenever estimated active Carbs on Board (COB) exceed this threshold.</p>
+                                    <h5>Why It Matters:</h5>
+                                    <p>High-fat or high-protein meals can absorb well past 3 hours. Setting this to <strong>0.0 g</strong> guarantees all active food has finished digesting before evaluating basal equilibrium.</p>
+                                </div>
+                            </span>
+                        </span>
+                        <span class="val-display" id="disp-cob-cutoff">0.0 g</span>
+                    </label>
+                    <input type="range" class="be-slider" id="filter-cob-cutoff" min="0" max="10" step="1" value="0">
+                    <span class="be-filter-desc">Exclude buckets with active Carbs on Board above this cutoff.</span>
+                </div>
+
+                <!-- 3. UAM Excursion Tail -->
+                <div class="be-filter-item">
+                    <label for="filter-uam-tail">
+                        <span>
+                            UAM Excursion Exclusion Tail
+                            <span class="be-popover-wrapper">
+                                <button type="button" class="be-popover-trigger" aria-label="UAM Tail Guide" title="UAM Tail Guide">
+                                    <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/></svg>
+                                </button>
+                                <div class="be-guide-popover" onclick="event.stopPropagation()">
+                                    <h4>UAM Excursion Exclusion Tail</h4>
+                                    <h5>What It Does:</h5>
+                                    <p>Excludes bins following Unannounced Meals (rapid unexplained glucose rises without entered carbs).</p>
+                                    <h5>Why It Matters:</h5>
+                                    <p>When snacks or meals are unannounced, the loop algorithm boosts insulin via UAM logic. Excluding these periods prevents food rises from being mistaken for a basal deficit. Default: <strong>2.0 hours</strong>.</p>
+                                </div>
+                            </span>
+                        </span>
+                        <span class="val-display" id="disp-uam-tail">2.0 hrs</span>
+                    </label>
+                    <input type="range" class="be-slider" id="filter-uam-tail" min="0.5" max="4.0" step="0.5" value="2.0">
+                    <span class="be-filter-desc">Exclude buckets following true unannounced meal upward excursions.</span>
+                </div>
+
+                <!-- 4. SMB Ring-Fencing Mode -->
+                <div class="be-filter-item">
+                    <label>
+                        <span>
+                            SMB Handling Strategy
+                            <span class="be-popover-wrapper">
+                                <button type="button" class="be-popover-trigger" aria-label="SMB Mode Guide" title="SMB Mode Guide">
+                                    <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/></svg>
+                                </button>
+                                <div class="be-guide-popover popover-right" onclick="event.stopPropagation()">
+                                    <h4>SMB Handling Strategy</h4>
+                                    <h5>Modes Explained:</h5>
+                                    <ul>
+                                        <li><strong>Effective Basal (Default):</strong> Translates micro-boluses into an equivalent continuous hourly delivery rate (U/hr). Keeps all clean data intact and maximizes statistical power.</li>
+                                        <li><strong>Burst Filter:</strong> Excludes 60 minutes after sudden aggressive bolus bursts (&gt;0.3 U in 30m), but retains routine maintenance micro-dosing.</li>
+                                        <li><strong>Strict 30m:</strong> Enforces a strict 30-minute blackout after any micro-bolus. Clinically pure, but severely reduces available data points.</li>
+                                    </ul>
+                                </div>
+                            </span>
+                        </span>
+                    </label>
+                    <div class="be-seg-switch" id="filter-smb-mode-switch">
+                        <button type="button" class="be-seg-btn active" data-mode="effective" title="Keep data; express SMBs as equivalent basal delivery rate in Panel 2">Effective Basal</button>
+                        <button type="button" class="be-seg-btn" data-mode="burst" title="Exclude only large bolus bursts (>0.3 U in 30 min) with 60m recovery">Burst Exclusion</button>
+                        <button type="button" class="be-seg-btn" data-mode="strict" title="Blanket blackout after any micro-bolus (reduces sample size)">Strict 30m</button>
+                    </div>
+                    <span class="be-filter-desc" id="disp-smb-mode-desc">Translates SMBs into equivalent delivery rate; preserves statistical power.</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3 Synchronized Panels Stack -->
+        <div class="be-panels-stack" style="position: relative;">
+            <div class="be-loading-overlay" id="be-loading-overlay" style="display: none;">
+                <div class="be-spinner"></div>
+                <span style="font-weight: 500; font-size: 0.9rem; color: var(--text-color);">Extracting 5-minute buckets &amp; compiling statistics...</span>
+            </div>
+
+            <!-- PANEL 1: Filtered Net IOB Modal Ribbon (Equilibrium View) -->
+            <div class="card" id="be-card-iob">
+                <div class="be-card-header">
+                    <div class="be-card-title">
+                        <i class="fa-solid fa-scale-balanced" style="color: var(--accent);"></i>
+                        <span>Filtered Net IOB Equilibrium (Volume &amp; Balance)</span>
+                        <div class="be-popover-wrapper">
+                            <button type="button" class="be-popover-trigger" aria-label="Net IOB Equilibrium Guide" title="Net IOB Equilibrium Guide">
+                                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                    <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                                </svg>
+                            </button>
+                            <div class="be-guide-popover" onclick="event.stopPropagation()">
+                                <h4><i class="fa-solid fa-scale-balanced"></i> Panel 1: Net IOB Equilibrium</h4>
+                                <h5>What It Shows:</h5>
+                                <p>Net IOB represents the insulin on board delivered <em>above or below</em> your pump's scheduled profile during clean periods. The <strong>solid blue line</strong> is the diurnal median; the <strong>blue ribbon</strong> represents the 25th–75th interquartile range (IQR).</p>
+                                <h5>How to Interpret:</h5>
+                                <ul>
+                                    <li><strong>Near Zero Line (Dashed):</strong> Perfect equilibrium. Scheduled basal matches physiological fasting requirements.</li>
+                                    <li><strong>Median Above Zero (&gt;0 U):</strong> The loop consistently had to dose extra insulin to maintain target BG. Scheduled basal is <strong>too low</strong> (under-basaled).</li>
+                                    <li><strong>Median Below Zero (&lt;0 U):</strong> The loop had to suspend or throttle delivery to avoid lows. Scheduled basal is <strong>too high</strong> (over-basaled).</li>
+                                    <li><strong>Wide Shaded Ribbon:</strong> High day-to-day variability; check lifestyle, activity, or meal timing consistency.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <span class="be-card-badge">Zero Line = Perfect Profile Equilibrium</span>
+                </div>
+                <div class="be-chart-container">
+                    <div id="be-chart-iob" style="width: 100%; height: 275px;"></div>
+                </div>
+            </div>
+
+            <!-- PANEL 2: Scheduled vs Enacted Basal Rate (Actionable Programming View) -->
+            <div class="card" id="be-card-basal">
+                <div class="be-card-header">
+                    <div class="be-card-title">
+                        <i class="fa-solid fa-syringe" style="color: #58a6ff;"></i>
+                        <span>Scheduled vs Enacted Delivery Rate (Actionable Setting Delta)</span>
+                        <div class="be-popover-wrapper">
+                            <button type="button" class="be-popover-trigger" aria-label="Scheduled vs Enacted Delivery Guide" title="Scheduled vs Enacted Delivery Guide">
+                                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                    <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                                </svg>
+                            </button>
+                            <div class="be-guide-popover" onclick="event.stopPropagation()">
+                                <h4><i class="fa-solid fa-syringe"></i> Panel 2: Scheduled vs Enacted Rates</h4>
+                                <h5>What It Shows:</h5>
+                                <ul>
+                                    <li><strong>Light Blue Dashed Line:</strong> Baseline scheduled basal profile in your pump.</li>
+                                    <li><strong>Dark Blue Line:</strong> Median enacted basal rate delivered by the loop.</li>
+                                    <li><strong>Orange Line:</strong> Effective delivery rate including micro-boluses (SMBs).</li>
+                                </ul>
+                                <h5>The 1.5h – 2.0h Depot Shift Rule:</h5>
+                                <p><strong>Crucial Clinical Rule:</strong> Subcutaneous rapid insulin takes 60–90 minutes to peak. If enacted delivery rises at 06:00 to fight dawn phenomenon, the pump profile adjustment must be programmed <strong>1.5 to 2 hours earlier (at 04:00–04:30)</strong> so the insulin is active in the blood when the need arrives.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <span class="be-card-badge">Depot Shift Rule: Apply adjustments 1.5h - 2h prior</span>
+                </div>
+                <div class="be-chart-container">
+                    <div id="be-chart-basal" style="width: 100%; height: 295px;"></div>
+                </div>
+            </div>
+
+            <!-- PANEL 3: Modal Deviation State Composition Strip (Root Cause View) -->
+            <div class="card" id="be-card-dev">
+                <div class="be-card-header">
+                    <div class="be-card-title">
+                        <i class="fa-solid fa-chart-column" style="color: #3fb950;"></i>
+                        <span>Modal Deviation State Breakdown (Root Cause Distribution)</span>
+                        <div class="be-popover-wrapper">
+                            <button type="button" class="be-popover-trigger" aria-label="Deviation State Breakdown Guide" title="Deviation State Breakdown Guide">
+                                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                    <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                                </svg>
+                            </button>
+                            <div class="be-guide-popover" onclick="event.stopPropagation()">
+                                <h4><i class="fa-solid fa-chart-column"></i> Panel 3: Deviation Composition</h4>
+                                <h5>What It Shows:</h5>
+                                <p>Displays the proportion of 5-minute intervals at each time of day classified into 3 physiological deviation states:</p>
+                                <ul>
+                                    <li><strong>Dark Gray (Neutral / EQUAL):</strong> BG matched model expectations (|deviation| &lt; 2.0). Ideal equilibrium.</li>
+                                    <li><strong>Red (Sensitivity / SENS):</strong> BG dropped faster or rose slower than expected. Indicates excess insulin or increased sensitivity.</li>
+                                    <li><strong>Green (Resistance / RES):</strong> BG rose faster or dropped slower than expected. Indicates insulin resistance, dawn phenomenon, or unannounced carbs.</li>
+                                </ul>
+                                <h5>Diagnostic Value:</h5>
+                                <p>Reveals whether an abnormal Net IOB in Panel 1 is driven by persistent resistance vs volatile over-corrections.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <span class="be-card-badge">Black: Neutral (|dev| &lt; 2.0) | Red: SENS | Green: RES</span>
+                </div>
+                <div class="be-chart-container">
+                    <div id="be-chart-dev" style="width: 100%; height: 180px;"></div>
+                </div>
+            </div>
+
+            <!-- FOOTER: Sample Density & Confidence Gauge -->
+            <div class="card" id="be-card-density">
+                <div class="be-card-header">
+                    <div class="be-card-title">
+                        <i class="fa-solid fa-database" style="color: var(--text-secondary);"></i>
+                        <span>Sample Density &amp; Statistical Confidence</span>
+                        <div class="be-popover-wrapper">
+                            <button type="button" class="be-popover-trigger" aria-label="Sample Density Guide" title="Sample Density Guide">
+                                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                    <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                                </svg>
+                            </button>
+                            <div class="be-guide-popover" onclick="event.stopPropagation()">
+                                <h4><i class="fa-solid fa-database"></i> Panel 4: Sample Density &amp; Confidence</h4>
+                                <h5>What It Shows:</h5>
+                                <p>Shows the count of clean, un-excluded days that contributed data to each 5-minute diurnal bin. Bars are color-coded by statistical reliability:</p>
+                                <ul>
+                                    <li><strong style="color: #2ea02e;">Green (High):</strong> Robust sample size (&gt;35% of total days). Recommendations are statistically sound.</li>
+                                    <li><strong style="color: #d29922;">Yellow (Moderate):</strong> Moderate sample (15–35%). Review alongside clinical context.</li>
+                                    <li><strong style="color: #f85149;">Red / Dark (Sparse):</strong> Low sample (&lt;15%). Daytime hours often have low sample due to frequent meals; do not over-interpret sparse peaks.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <span class="be-card-badge" id="be-density-stat">Valid Days per 5-min Bin</span>
+                </div>
+                <div class="be-chart-container">
+                    <div id="be-chart-density" style="width: 100%; height: 120px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/ns-date-selector.js"></script>
+    <script src="/static/js/basal-eval-engine.js"></script>
+    <script src="/static/js/basal-eval.js"></script>
+</body>
+
+</html>

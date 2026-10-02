@@ -1,0 +1,415 @@
+/* =============================================================================
+   autotune.css -- Styling for Autotune Parameter Recommendation page
+   Consumes design tokens from ns-shared.css. Isolated from all other pages.
+   ============================================================================= */
+
+/* Page Header & Guide Popovers */
+.autotune-header-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.autotune-page-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    max-width: 780px;
+    margin-top: 4px;
+}
+
+/* Strategic Help (i) Popovers (modeled after Graph-it-All) */
+.at-popover-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+}
+
+.at-popover-trigger {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.at-popover-trigger:hover,
+.at-popover-trigger.active {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(47, 129, 247, 0.12);
+}
+
+.at-guide-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: auto;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color-strong);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    width: 330px;
+    max-width: min(350px, calc(100vw - 32px));
+    max-height: 440px;
+    overflow-y: auto;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+    z-index: 1300;
+    display: none;
+    color: var(--text-color);
+    font-size: 0.8rem;
+    line-height: 1.45;
+    text-align: left;
+    box-sizing: border-box;
+}
+
+.at-guide-popover.popover-right {
+    left: auto;
+    right: 0;
+}
+
+.at-guide-popover.active {
+    display: block;
+}
+
+.at-guide-popover h4 {
+    margin: 0 0 10px 0;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text-color);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.at-guide-popover h5 {
+    margin: 10px 0 4px 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.at-guide-popover p {
+    margin: 0 0 8px 0;
+    color: var(--text-color);
+}
+
+.at-guide-popover ul {
+    margin: 4px 0 8px 16px;
+    padding: 0;
+}
+
+.at-guide-popover li {
+    margin-bottom: 4px;
+    color: var(--text-secondary);
+}
+
+/* Card 1: Day Checklist Grid */
+.toolbar-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.day-grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.day-card {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.day-card:hover {
+    border-color: var(--border-color-strong);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.day-card.selected {
+    border-color: var(--accent);
+    background: rgba(47, 129, 247, 0.08);
+}
+
+.day-card input[type="checkbox"] {
+    margin-top: 3px;
+    accent-color: var(--accent);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+}
+
+.day-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+}
+
+.day-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.day-span {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+
+.day-stat-pill {
+    font-size: 11px;
+    margin-top: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    border-radius: 10px;
+}
+
+/* -------------------------------------------------------------
+   Refined 2-Row Config Bar Layout
+   ------------------------------------------------------------- */
+.config-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+}
+
+.config-row-top {
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    width: 100%;
+}
+
+.profile-field {
+    flex: 1;
+    min-width: 0;
+}
+
+.config-action-cell {
+    flex-shrink: 0;
+}
+
+.btn-run {
+    height: 38px;
+    padding: 0 24px;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    border-radius: var(--radius-md);
+}
+
+.config-row-params {
+    display: grid;
+    grid-template-columns: 180px 180px 1fr;
+    gap: 20px;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 12px 18px;
+    align-items: center;
+}
+
+.config-field label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-bottom: 6px;
+    white-space: nowrap;
+}
+
+.input-with-unit {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.input-with-unit .form-input {
+    width: 90px;
+    flex-shrink: 0;
+}
+
+.unit-suffix {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+/* Scorecard Grid */
+.scorecard-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+.metric-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    position: relative;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.metric-title {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.metric-comparison {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.val-base {
+    font-size: 1.15rem;
+    color: var(--text-color);
+    font-family: var(--font-mono);
+    font-weight: 600;
+}
+
+.val-base.has-tuned {
+    text-decoration: line-through;
+    color: var(--text-secondary);
+    opacity: 0.75;
+}
+
+.val-arrow {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.val-tuned {
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: var(--accent);
+    font-family: var(--font-mono);
+}
+
+.val-tuned.placeholder {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+.metric-delta {
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.delta-positive { color: var(--accent); }
+.delta-negative { color: var(--warning); }
+.delta-neutral { color: var(--text-secondary); }
+
+/* Chart Container */
+.chart-box {
+    width: 100%;
+    height: 400px;
+}
+
+/* Tabs & Audit Code Box */
+.tabs-header {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid var(--border-color);
+    padding: 0 16px;
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s ease;
+}
+
+.tab-btn:hover {
+    color: var(--text-color);
+}
+
+.tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+}
+
+.code-pre {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: #d1d5db;
+    overflow-x: auto;
+    line-height: 1.6;
+}
+
+.tabular-num {
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+/* Badges */
+.badge-clean { background: rgba(46, 204, 113, 0.15); color: var(--success); }
+.badge-warn { background: rgba(241, 196, 15, 0.15); color: var(--warning); }
+.badge-safe { background: rgba(46, 204, 113, 0.15); color: var(--success); border: 1px solid rgba(46, 204, 113, 0.3); }
+
+/* Responsive */
+@media (max-width: 1100px) {
+    .scorecard-grid { grid-template-columns: repeat(2, 1fr); }
+    .config-row-params { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 768px) {
+    .scorecard-grid { grid-template-columns: 1fr; }
+    .config-row-top { flex-direction: column; align-items: stretch; }
+    .config-row-params { grid-template-columns: 1fr; }
+    .day-grid-container { grid-template-columns: 1fr; }
+}

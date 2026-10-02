@@ -32,7 +32,7 @@
    1. TOKENS
    Colour values: MAJORITY palette (13 of 17 pages already looked this
    way) -- not a redesign, just picking what's already mostly true.
-   Confirmed with Harry 23 Aug: the "Advanced Analytics" family
+   Confirmed with the project 23 Aug: the "Advanced Analytics" family
    (Clinical/Novel/Advanced Analytics/Omnipod, visibly darker at
    #121212/#1e1e1e) will shift tone on retrofit -- expected, accepted.
 
@@ -60,7 +60,7 @@
      2. --danger swapped to the palette's own --destructive rather than
         kept as the old #e74c3c -- same semantic role, and the palette
         actually supplies a value for it (unlike success/warning, which
-        have no equivalent and stay hand-picked, per Harry 30 Aug).
+        have no equivalent and stay hand-picked, per the project 30 Aug).
    ----------------------------------------------------------------------- */
 /* RETHEMED 5 Sep 2026 -- GitHub Dark / Linear-style cool slate palette.
    Deep slate-black canvas (#0d1117), elevated card surfaces (#161b22 / #21262d),
@@ -228,7 +228,7 @@ footer.page-footer {
 }
 
 /* Auto-fitting stat/summary card grid -- index/import/logs family. */
-/* .stat-grid/.stat-value/.stat-label removed 24 Aug 2026 -- Harry's call:
+/* .stat-grid/.stat-value/.stat-label removed 24 Aug 2026 -- the project's call:
    .score-block (section 9 below) is now THE single scoring system, not one
    of two competing ones. This class was never actually consumed by any
    live page even before removal (index/import/logs.html each have their
@@ -246,7 +246,7 @@ footer.page-footer {
    everywhere, never diffed the body. It doesn't agree: box-shadow
    opacity was .1 on some pages and .2 on others, margin-bottom was
    16px/20px/absent, border and position:relative were present on some
-   pages and not others. Averaged per Harry's instruction (opacity ->
+   pages and not others. Averaged per the project's instruction (opacity ->
    .15, a defensible middle value) rather than arbitrarily picking one
    page's exact numbers. position:relative kept (harmless, useful as an
    anchor for absolutely-positioned children like .loading-overlay).
@@ -383,7 +383,7 @@ footer.page-footer {
    `color` declarations still win when combined with .btn-sm -- matters
    for the AND/OR toggle pill (also .btn.btn-sm, primary when active),
    which must keep --accent-foreground's dark text for contrast against
-   its light accent background. Harry's steer, 31 Aug 2026: match "Add
+   its light accent background. the project's steer, 31 Aug 2026: match "Add
    Modifier"'s existing look/size, tone down the others to match. */
 .btn-sm {
     font-size: 0.82rem;
@@ -478,7 +478,7 @@ footer.page-footer {
        harsh against the dark --surface-inset background, most visible on
        a plain text field like Filter Name. Softened to match
        .sentence-select/.sentence-input's already-approved tone (31 Aug
-       2026, Harry's direct comparison against the TDD/clause-builder
+       2026, the project's direct comparison against the TDD/clause-builder
        fields) -- same --sentence-control-text value and weight 500,
        reused rather than duplicated as a new token. This is a site-wide
        change: every .form-input/.form-select on every page (Filter Name,
@@ -1881,7 +1881,7 @@ header.page-header .date-pill {
 
 .sentence-root-phrase {
     /* 0.95rem -> 0.82rem: unified with every other field/label/button in
-       the filter form (31 Aug 2026, Harry's steer -- match "Add
+       the filter form (31 Aug 2026, the project's steer -- match "Add
        Modifier"'s size across the whole form, title excepted). */
     font-size: 0.82rem;
     font-weight: 600;
@@ -1889,7 +1889,7 @@ header.page-header .date-pill {
        .sentence-nested-connector's var(--text-secondary) right below it
        even though both are the same "condition group header" role at
        two nesting depths. Matched to --text-secondary (31 Aug 2026,
-       Harry's direct comparison of the two). */
+       the project's direct comparison of the two). */
     color: var(--text-secondary);
     display: inline-flex;
     align-items: center;
@@ -2152,7 +2152,7 @@ header.page-header .date-pill {
        .cal-day-month-start rule sets `color: var(--text-color) !important`
        (light text, for the plain "1 Sep" label on month-boundary days).
        Against a light --accent pill background that's light-on-light --
-       exactly the low-contrast "hard to read" pill Harry flagged when a
+       exactly the low-contrast "hard to read" pill the project flagged when a
        note landed on the 1st of a month. Without !important here too,
        that page-local !important always wins regardless of specificity;
        with it, the compound selector (two classes) beats the single-class
@@ -2252,7 +2252,7 @@ header.page-header .date-pill {
     width: 100%;
 }
 
-/* Native <input type="color"> swatch reset -- Harry's ask: "just a colour
+/* Native <input type="color"> swatch reset -- the project's ask: "just a colour
    circle is good", nothing more. Unstyled, this renders wildly differently
    per platform: Firefox draws a rectangle with a heavy grey/white border,
    iOS/iPadOS draws a circle but with its own multicoloured ring chrome

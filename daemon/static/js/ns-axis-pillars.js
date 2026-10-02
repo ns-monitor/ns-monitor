@@ -7,7 +7,7 @@
  * double-click an axis to change its range on ANY chart page in this app —
  * STOP. That code already exists, here, and is shared by Patterns (agp.html),
  * Trends (timeline.html) and Trace (dashboard_daily.html). Extend this file
- * and its per-page config, or ask Harry before writing a fourth copy.
+ * and its per-page config, or ask the project before writing a fourth copy.
  *
  * WHY THIS FILE EXISTS
  * ---------------------

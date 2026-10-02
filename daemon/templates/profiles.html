@@ -204,7 +204,7 @@
         // new one, wipe the freshly-rendered panels via its own
         // listEl.innerHTML reset, and re-append its own (wrong-range) panels
         // using the same profile-chart-N ids -- which is exactly what
-        // produced the duplicated panels / charts-that-never-render Harry
+        // produced the duplicated panels / charts-that-never-render the project
         // saw (getElementById only ever finds the first of two same-id
         // nodes, so the second copy's chart div was permanently orphaned).
         let profilesRequestSeq = 0;

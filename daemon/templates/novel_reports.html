@@ -80,7 +80,7 @@
         </header>
 
         <!-- PANEL TABS -->
-        <!-- Radar/BG Dist/GRI removed 23 Aug 2026 (Harry's call) -- Novel
+        <!-- Radar/BG Dist/GRI removed 23 Aug 2026 (the project's call) -- Novel
              Reports keeps Poincare/J-Index/CONGA/Smoothness; those three
              live on Clinical Reports instead. Poincare is now first + the
              default tab (was Radar). See STATUS.md for the split notes. -->
@@ -216,7 +216,7 @@
                 </div>
             </div>
             <div class="col-70">
-                <!-- Per Harry (24 Aug 2026): unlike Poincare/Smoothness's title-left/
+                <!-- Per the project (24 Aug 2026): unlike Poincare/Smoothness's title-left/
                      date-right header, this one has the date centred at the top and
                      the title text centred at the bottom, under the chart. -->
                 <div id="conga-date-range" class="text-muted chart-date-range"></div>
@@ -224,7 +224,7 @@
                 <h3 class="panel-h3 chart-title-footer">24-Hour Reproducibility Profile</h3>
             </div>
             <!-- Explanation moved out of col-30 and below the score+chart row,
-                 full width, as 2 columns -- per Harry (24 Aug 2026). Relies on
+                 full width, as 2 columns -- per the project (24 Aug 2026). Relies on
                  .split-card's flex-wrap: wrap -- flex: 0 0 100% has no room
                  left in the col-30+col-70 row, so it wraps onto its own line. -->
             <div class="split-card-full-row">
@@ -260,7 +260,7 @@
                      "This Period" / "Comparison Period" label lengths. -->
                 <div id="kurtosis-legend" class="chart-legend-grid"></div>
                 <div id="kurtosis-chart" style="height: 410px; width: 100%;"></div>
-                <!-- Per Harry (24 Aug 2026): title moved to centred bottom,
+                <!-- Per the project (24 Aug 2026): title moved to centred bottom,
                      matching CONGA's layout. Dates aren't repeated here --
                      the legend's "This Period" row already shows the
                      primary range. -->
@@ -882,7 +882,7 @@
 
         // ─── Panel tabs ────────────────────────────────────────────────
         // Radar/BG Dist/GRI removed from TAB_IDS -- see the tab bar comment
-        // above. Default fallback changed 'radar' -> 'poincare' (Harry's
+        // above. Default fallback changed 'radar' -> 'poincare' (the project's
         // call) in both places below. The old spider-edit-form defensive
         // reset removed too -- that element no longer exists on this page.
         const TAB_IDS = ['poincare', 'jindex', 'conga', 'smoothness'];

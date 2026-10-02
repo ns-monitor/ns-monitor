@@ -3,6 +3,8 @@ import math
 import shutil
 import time
 import json
+import html
+import re
 import logging
 import threading
 import psycopg2
@@ -969,19 +971,22 @@ def _classify_deviations(rows):
             else:
                 dev_type = 'non-meal'
 
-        # Colour precedence. AAPS defaults to deviationBlack and only overrides
-        # it for a specific pastSensitivity char or type, so '=' falls through
-        # to the default rather than being matched explicitly.
-        if dev_type == 'csf':
-            row['dev_class'] = 'COB'      # grey
-        elif dev_type == 'uam':
-            row['dev_class'] = 'UAM'      # yellow
-        elif abs(dev) < DEVIATION_TO_BE_EQUAL:
+        # Colour precedence:
+        # 1. |dev| < DEVIATION_TO_BE_EQUAL (2.0 mg/dL): noise floor (EQUAL / black).
+        # 2. Meal carbs absorbing (csf): active meal absorption (COB / grey).
+        # 3. dev < 0: dropping faster than expected (SENS / red).
+        # 4. dev_type == 'uam': genuine unannounced rise >= 2.0 mg/dL (UAM / yellow).
+        # 5. Fallback positive deviation: un-modeled rise / resistance (RES / green).
+        if abs(dev) < DEVIATION_TO_BE_EQUAL:
             row['dev_class'] = 'EQUAL'    # black -- the noise floor
-        elif dev > 0:
-            row['dev_class'] = 'RES'      # green -- resistance
+        elif dev_type == 'csf':
+            row['dev_class'] = 'COB'      # grey -- active carb absorption
+        elif dev < 0:
+            row['dev_class'] = 'SENS'     # red -- sensitivity / dropping faster than expected
+        elif dev_type == 'uam':
+            row['dev_class'] = 'UAM'      # yellow -- genuine unannounced rise >= 2.0 mg/dL
         else:
-            row['dev_class'] = 'SENS'     # red -- sensitivity
+            row['dev_class'] = 'RES'      # green -- resistance
 
     return rows
 
@@ -1984,7 +1989,7 @@ def run_maintenance(conn):
 # Safe to delete outright along with its route + template block if the feature
 # doesn't earn its place.
 #
-# Semantics (agreed with Harry before building):
+# Semantics (agreed with the project before building):
 #   - A "candidate" is a window of `period_days` ending on a given date and
 #     looking BACKWARDS. The [start_date, end_date] range bounds which END
 #     DATES are tested, NOT which raw data may be read -- so a candidate ending
@@ -2009,14 +2014,14 @@ def run_maintenance(conn):
 #         length (not by rows present) so a genuinely missing day counts as
 #         0%, not a shrunk denominator.
 #   - CV is ALWAYS the mean of the daily trailing-14-day CV (cv_14d) across
-#     the window, for every period length -- Harry's standing convention, so
+#     the window, for every period length -- the project's standing convention, so
 #     CVs from different period lengths stay comparable. Daily CV is
 #     deliberately never used.
 #   - "Best" direction: TIR/TITR high; Avg BG/GMI/CV/TAR/TBR low (standard
 #     clinical sense -- less time out of range, less variability, lower
 #     average, is better). TDD/Carbs are a DELIBERATE EXCEPTION -- there's no
 #     clinical "better" direction for insulin dose or carb intake in
-#     isolation, so per Harry's explicit instruction, "best" = higher for
+#     isolation, so per the project's explicit instruction, "best" = higher for
 #     these two. This isn't a clinical claim, just the ranking convention
 #     for this tool -- flagged in the UI notes since it's the one direction
 #     that isn't self-evident from the metric's own meaning.
@@ -3074,9 +3079,8 @@ def get_notes_for_date(conn, date_str: str) -> list:
     """All clinical_notes rows for one calendar day, oldest first -- the
     Day Note Popup's single query. time_created is converted to local
     wall-clock time here (not left as the stored UTC instant) -- otherwise
-    a note genuinely created at 4pm Perth time shows an 8am time-of-day
-    input, which is exactly the bug Harry caught testing the AAPS-synced
-    note."""
+    a note created at a local wall-clock time must retain that time when
+    converted for display."""
     tz_sql = _tz_sql()
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(f"""
@@ -3583,6 +3587,228 @@ def _serialize_diary_note_row(row: dict) -> dict:
         row["hba1c_percent"] = float(row["hba1c_percent"])
 
     return row
+
+
+def import_diary_notes_batch(conn, rows: list, skip_duplicates: bool = True) -> dict:
+    """
+    Import a batch of diary notes from parsed CSV rows in a single atomic transaction.
+    - Validates row fields (date, time, category, value).
+    - Enforces row count limit (<= 500 rows).
+    - Case-insensitively matches or auto-creates categories in note_categories.
+    - Accurately parses numeric vs text values for biomarkers (Weight & HbA1c).
+    - Converts plain text values to editor-compatible escaped HTML paragraphs.
+    - Optionally skips identical duplicate notes.
+    - Rolls back entire transaction if any unexpected error occurs.
+    """
+    if not isinstance(rows, list):
+        raise ValueError("Rows must be a list")
+    if len(rows) == 0:
+        raise ValueError("No rows provided for import")
+    if len(rows) > 500:
+        raise ValueError("Import exceeds maximum limit of 500 rows per batch")
+
+    tz_sql = _tz_sql()
+    palette = ["#3498db", "#e67e22", "#1abc9c", "#9b59b6", "#e74c3c", "#f1c40f", "#2ecc71", "#34495e"]
+
+    # Query today local date for future-date guard
+    with conn.cursor() as cur:
+        cur.execute(f"SELECT (NOW() AT TIME ZONE {tz_sql})::date")
+        today_local = cur.fetchone()[0]
+
+    imported_count = 0
+    skipped_count = 0
+    new_categories_created = []
+    dates_processed = []
+
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # 1. Load existing categories into case-insensitive map
+            cur.execute("SELECT id, name, color, is_builtin FROM note_categories")
+            cat_rows = cur.fetchall()
+            cat_map = {r["name"].strip().lower(): dict(r) for r in cat_rows}
+
+            # 2. Identify missing categories and insert them safely
+            palette_idx = len(cat_rows)
+            for row in rows:
+                raw_cat = (row.get("category") or "").strip()
+                if not raw_cat:
+                    raw_cat = "General"
+                cat_key = raw_cat.lower()
+                if cat_key not in cat_map:
+                    color = palette[palette_idx % len(palette)]
+                    palette_idx += 1
+                    cur.execute("""
+                        INSERT INTO note_categories (name, color, is_builtin)
+                        VALUES (%s, %s, FALSE)
+                        ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+                        RETURNING id, name, color, is_builtin
+                    """, (raw_cat, color))
+                    new_cat = dict(cur.fetchone())
+                    cat_map[cat_key] = new_cat
+                    new_categories_created.append(new_cat["name"])
+
+            # 3. Process each row
+            for idx, r in enumerate(rows, start=1):
+                raw_date = (r.get("date") or "").strip()
+                if not raw_date:
+                    raise ValueError(f"Row {idx}: Date is required")
+
+                try:
+                    parsed_date = datetime.strptime(raw_date, "%Y-%m-%d").date()
+                except ValueError:
+                    raise ValueError(f"Row {idx}: Invalid date '{raw_date}'. Must be ISO YYYY-MM-DD")
+
+                if parsed_date > today_local:
+                    raise ValueError(f"Row {idx}: Date '{raw_date}' is in the future")
+
+                date_str = parsed_date.isoformat()
+                dates_processed.append(date_str)
+
+                # Time parsing
+                raw_time = (r.get("time") or "").strip().lower()
+                is_timeless = raw_time in ("", "all-day", "allday", "all day", "-", "none", "null")
+                time_created_val = None
+
+                if not is_timeless:
+                    parts = raw_time.split(":")
+                    if len(parts) in (2, 3):
+                        try:
+                            h, m = int(parts[0]), int(parts[1])
+                            if not (0 <= h <= 23 and 0 <= m <= 59):
+                                raise ValueError()
+                            time_created_val = f"{date_str} {h:02d}:{m:02d}:00"
+                        except ValueError:
+                            raise ValueError(f"Row {idx}: Invalid time '{r.get('time')}'. Must be 24-hour HH:MM")
+                    else:
+                        raise ValueError(f"Row {idx}: Invalid time '{r.get('time')}'. Must be 24-hour HH:MM")
+
+                # Category identification
+                raw_cat = (r.get("category") or "").strip() or "General"
+                cat_info = cat_map[raw_cat.lower()]
+                cat_id = cat_info["id"]
+                cat_name = cat_info["name"]
+
+                # Value & biomarker processing
+                raw_value = str(r.get("value") or "").strip()
+                weight_kg = None
+                hba1c_percent = None
+                hba1c_mmol_mol = None
+                note_type = "user"
+
+                # Check built-in biomarker categories
+                if cat_name.lower() == "weight":
+                    num_match = re.search(r"^[-+]?([0-9]+(?:\.[0-9]+)?)", raw_value)
+                    if num_match:
+                        try:
+                            weight_kg = float(num_match.group(1))
+                            note_type = "weight"
+                        except ValueError:
+                            weight_kg = None
+                elif cat_name.lower() == "hba1c":
+                    num_match = re.search(r"^[-+]?([0-9]+(?:\.[0-9]+)?)", raw_value)
+                    if num_match:
+                        try:
+                            val_num = float(num_match.group(1))
+                            note_type = "hba1c"
+                            if val_num <= 20.0:
+                                hba1c_percent = val_num
+                                hba1c_mmol_mol = hba1c_percent_to_mmol_mol(val_num)
+                            else:
+                                hba1c_mmol_mol = round(val_num)
+                                hba1c_percent = hba1c_mmol_mol_to_percent(val_num)
+                        except ValueError:
+                            pass
+
+                # Convert plain text to rich HTML editor paragraphs safely
+                escaped_lines = [html.escape(line) for line in raw_value.splitlines() if line.strip()]
+                if escaped_lines:
+                    text_content = "".join(f"<p>{l}</p>" for l in escaped_lines)
+                else:
+                    if weight_kg is not None:
+                        text_content = f"<p>{weight_kg} kg</p>"
+                    elif hba1c_percent is not None:
+                        text_content = f"<p>HbA1c: {hba1c_percent}% ({hba1c_mmol_mol} mmol/mol)</p>"
+                    else:
+                        text_content = "<p></p>"
+
+                # Duplicate detection check
+                if skip_duplicates:
+                    if time_created_val is not None:
+                        cur.execute(f"""
+                            SELECT n.id FROM clinical_notes n
+                            JOIN note_category_map m ON n.id = m.note_id
+                            WHERE n.date = %s
+                              AND n.time_created = (%s::timestamp AT TIME ZONE {tz_sql})
+                              AND m.category_id = %s
+                              AND n.text_content = %s
+                            LIMIT 1
+                        """, (date_str, time_created_val, cat_id, text_content))
+                    else:
+                        cur.execute("""
+                            SELECT n.id FROM clinical_notes n
+                            JOIN note_category_map m ON n.id = m.note_id
+                            WHERE n.date = %s
+                              AND n.time_created IS NULL
+                              AND m.category_id = %s
+                              AND n.text_content = %s
+                            LIMIT 1
+                        """, (date_str, cat_id, text_content))
+
+                    if cur.fetchone():
+                        skipped_count += 1
+                        continue
+
+                # Insert note
+                if time_created_val is not None:
+                    cur.execute(f"""
+                        INSERT INTO clinical_notes
+                            (date, time_created, is_timeless, title, note_type,
+                             text_content, weight_kg, hba1c_percent, hba1c_mmol_mol,
+                             is_edited, created_at, updated_at)
+                        VALUES (%s, (%s::timestamp AT TIME ZONE {tz_sql}), %s, NULL, %s, %s, %s, %s, %s, FALSE, NOW(), NOW())
+                        RETURNING id
+                    """, (date_str, time_created_val, is_timeless, note_type,
+                          text_content, weight_kg, hba1c_percent, hba1c_mmol_mol))
+                else:
+                    cur.execute("""
+                        INSERT INTO clinical_notes
+                            (date, time_created, is_timeless, title, note_type,
+                             text_content, weight_kg, hba1c_percent, hba1c_mmol_mol,
+                             is_edited, created_at, updated_at)
+                        VALUES (%s, NULL, %s, NULL, %s, %s, %s, %s, %s, FALSE, NOW(), NOW())
+                        RETURNING id
+                    """, (date_str, is_timeless, note_type,
+                          text_content, weight_kg, hba1c_percent, hba1c_mmol_mol))
+
+                new_note_id = cur.fetchone()["id"]
+
+                # Link category in note_category_map
+                cur.execute("""
+                    INSERT INTO note_category_map (note_id, category_id)
+                    VALUES (%s, %s)
+                    ON CONFLICT DO NOTHING
+                """, (new_note_id, cat_id))
+
+                imported_count += 1
+
+        # Commit single atomic batch
+        conn.commit()
+
+        min_d = min(dates_processed) if dates_processed else None
+        max_d = max(dates_processed) if dates_processed else None
+
+        return {
+            "success": True,
+            "imported_count": imported_count,
+            "skipped_count": skipped_count,
+            "new_categories": list(set(new_categories_created)),
+            "min_date": min_d,
+            "max_date": max_d
+        }
+    except Exception:
+        conn.rollback()
+        raise
+
 
 
 # ---------------------------------------------------------------------------

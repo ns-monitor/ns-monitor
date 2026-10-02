@@ -1,20 +1,10 @@
-"""
-cgm_health.py -- CGM data-quality intelligence: how much of the expected
-CGM stream actually arrived, how fresh it was when the loop needed it, and
-what (of the things Harry can actually influence -- phone battery, being
-away from the rig) explains the gaps.
+"""CGM data-quality intelligence: coverage, freshness, and context that can
+help explain missing readings.
 
-Deliberately excludes sensor lifespan/warm-up tracking: Harry runs a hacked
-G6 transmitter (~50min warm-up, not the standard ~2h), sometimes G7, and
-dual overlapping xDrip/AAPS setups, so `Sensor Change` treatments don't
-reliably correspond to when a sensor actually started feeding AAPS. That
-data isn't trustworthy enough to build on, and it's not something Harry is
-interested in besides.
-
-Coverage/staleness numbers here are also intended as the source of truth
-for a possible future footnote on Patterns/Trace/Trends ("X% CGM coverage
-this period") -- kept as small, cheap, self-contained queries for that
-reason rather than folded into a bigger combined query.
+Sensor lifespan and warm-up estimates are omitted because sensor change
+records do not reliably represent sensor activation across device setups.
+Coverage and staleness remain small, self-contained queries for reuse by
+other views.
 """
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -27,38 +17,23 @@ from filter_engine import _tz_sql
 # and not worth surfacing individually -- only counted toward coverage%.
 GAP_THRESHOLD_MINUTES = 15
 
-# AAPS's own approximate cutoff for refusing to act on stale BG. Not read
-# from AAPS source here -- treated as a labelled reference line on the
-# staleness chart, not asserted as exact.
+# AAPS approximate cutoff for refusing to act on stale BG. This is a labelled
+# reference line on the staleness chart, not asserted as an exact limit.
 LOOP_STALENESS_REFERENCE_MINUTES = 15
 
-# A reading arriving this much later than it was actually taken is treated
-# as backfilled/batch-uploaded rather than real-time.
+# Readings arriving later than this are treated as backfilled/batch-uploaded.
 BACKFILL_LAG_THRESHOLD_MINUTES = 20
 
-# Last known uploader battery level below this, in the run-up to a gap, is
-# treated as a plausible "phone died" explanation. Deliberately close to
-# true dead-battery territory (Harry's correction, 1 Sep 2026) rather than
-# "getting low" -- 20% was catching gaps that had nothing to do with the
-# battery actually running out.
+# Battery levels below this threshold can explain a sensor-data gap.
 LOW_BATTERY_THRESHOLD_PCT = 3
 
 
 def get_coverage_stats(conn, start_date: str, end_date: str) -> Dict[str, Any]:
-    """Coverage% (actual 5-min readings vs theoretical slots in range) and
-    the real-time vs backfilled split, from created_at/dateString lag.
+    """Coverage and real-time versus backfilled reading counts.
 
-    start_date/end_date are local calendar dates as picked in the UI. The
-    WHERE boundaries below convert them to the actual UTC instants of local
-    midnight via _tz_sql() -- the same pattern get_loop_staleness() already
-    uses below. Comparing bare ::date literals directly against ts
-    (timestamptz) without this conversion resolves against Postgres' own
-    session timezone (UTC in this container), not Harry's configured
-    Australia/Perth -- silently shifting the window 8 hours later than the
-    calendar days actually selected. Caught 3 Sep 2026: "1-2 September"
-    showed ~88% coverage from this bug; the true local-day figure is ~99.5%
-    -- the window was dropping a fully-populated 8h block off the start and
-    counting an as-yet-unelapsed, necessarily-empty 8h block at the end.
+    The requested dates are local calendar dates. Convert their boundaries
+    using the configured application timezone rather than the database session
+    timezone.
     """
     tz_sub = _tz_sql()
     query = f"""
@@ -112,8 +87,8 @@ def get_loop_staleness(conn, start_date: str, end_date: str) -> Dict[str, Any]:
     loop cycles that had BG no older than LOOP_STALENESS_REFERENCE_MINUTES
     -- a 0-100% "how good was this day" score, which is a much more direct
     answer to "is the sensor driving loop decisions" than a raw minutes
-    figure (Harry's 1 Sep 2026 feedback: the original minutes-based chart
-    didn't communicate anything at a glance). max_staleness_min is kept
+    figure, which makes the daily freshness score easier to scan at a glance.
+    max_staleness_min is kept
     alongside for tooltip detail on the worst moment of a bad day, not as
     the chart's primary series."""
     tz_sub = _tz_sql()

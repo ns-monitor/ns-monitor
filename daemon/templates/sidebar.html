@@ -360,7 +360,7 @@
 
         <!-- Reports & Clinical Dropdown (formerly Therapy, now including Lab) -->
         <div class="nav-dropdown">
-            <button type="button" class="nav-dropdown-trigger {{ 'active' if request.path in ['/profiles', '/omnipod', '/cgm', '/hba1c', '/clinical_reports', '/clinical-reports', '/carpet_plot', '/carpet-plot', '/summary_table', '/summary-table', '/best_worst', '/best-worst', '/novel_reports', '/novel-reports', '/sandbox', '/graph-it-all'] else '' }}">
+            <button type="button" class="nav-dropdown-trigger {{ 'active' if request.path in ['/profiles', '/autotune', '/reports/autotune', '/basal-eval', '/basal_eval', '/omnipod', '/cgm', '/hba1c', '/clinical_reports', '/clinical-reports', '/carpet_plot', '/carpet-plot', '/summary_table', '/summary-table', '/best_worst', '/best-worst', '/novel_reports', '/novel-reports', '/sandbox', '/graph-it-all'] else '' }}">
                 <i class="fa-solid fa-file-lines"></i>
                 <span>Reports</span>
                 <i class="fa-solid fa-chevron-down caret"></i>
@@ -400,6 +400,12 @@
                 <div class="nav-dropdown-header">Lab</div>
                 <a href="/novel_reports" class="nav-dropdown-item {{ 'active' if request.path in ['/novel_reports', '/novel-reports'] else '' }}">
                     <i class="fa-solid fa-vial"></i><span>Novel Reports</span>
+                </a>
+                <a href="/autotune" class="nav-dropdown-item {{ 'active' if request.path in ['/autotune', '/reports/autotune'] else '' }}">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i><span>Autotune</span>
+                </a>
+                <a href="/basal-eval" class="nav-dropdown-item {{ 'active' if request.path in ['/basal-eval', '/basal_eval'] else '' }}">
+                    <i class="fa-solid fa-chart-area"></i><span>Basal Evaluation</span>
                 </a>
                 <a href="/sandbox" class="nav-dropdown-item {{ 'active' if request.path == '/sandbox' else '' }}">
                     <i class="fa-solid fa-flask-vial"></i><span>Sandbox Studio</span>

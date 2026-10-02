@@ -571,7 +571,7 @@
             gap: 10px;
         }
         /* Unify font-size across the whole Smart Filter form (31 Aug 2026,
-           Harry's steer -- match "Add Modifier"'s size everywhere except
+           the project's steer -- match "Add Modifier"'s size everywhere except
            the modal title, which lives in .modal-header, outside this
            scope). .form-input/.form-select use font-size: inherit, so
            Filter Name/Description/Display Defaults fields pick this up
@@ -1141,7 +1141,7 @@
             // alignment never drifts), inside a fixed-height scrollable
             // viewport (see .cal-days-grid CSS).
             //
-            // Data separation (per Harry 30 Aug, extended 31 Aug for
+            // Data separation (per the project 30 Aug, extended 31 Aug for
             // simultaneous multi-overlay rendering): overlayCache is keyed
             // by overlay id, each slot holding just that overlay's values
             // for the buffered range -- cheap, one number or one boolean
@@ -1307,7 +1307,7 @@
             // (per docs/analysis/calendar-cell-content-model.md -- 35-42
             // real chart instances for the visible buffer would be heavy).
             // points: [[minute_of_day, bg], ...], already time-ordered.
-            // First pass (31 Aug 2026, Harry's steer): linear axis,
+            // First pass (31 Aug 2026, the project's steer): linear axis,
             // hardcoded yMin/yMax from the registry entry (2-15 mmol/L) --
             // values outside that range clamp to the axis edge rather than
             // being excluded, so the line stays continuous through a real
@@ -1326,7 +1326,7 @@
                     return h - ((clamped - yMin) / (yMax - yMin)) * h;
                 }
 
-                // Reference bands (31 Aug 2026, Harry's steer) -- drawn
+                // Reference bands (31 Aug 2026, the project's steer) -- drawn
                 // first so the BG line paints on top of them. Both
                 // deliberately light/low-opacity; overlapping each other or
                 // another active overlay's fill where they intersect is
@@ -1355,7 +1355,7 @@
                     '</svg>';
             }
 
-            // Simultaneous multi-overlay rendering (31 Aug 2026, Harry's
+            // Simultaneous multi-overlay rendering (31 Aug 2026, the project's
             // steer): every currently-active overlay contributes its own
             // content, not just the first. Deliberately simple z-order/
             // collision handling, no slot system (the anchor/slot mechanism
@@ -1857,7 +1857,7 @@
                 });
             }
 
-            // Wheel damping (per Harry, 30 Aug): native momentum scroll can't
+            // Wheel damping (per the project, 30 Aug): native momentum scroll can't
             // be throttled after the fact once the browser owns it, so wheel
             // deltas are intercepted and applied manually at a damped rate
             // instead -- same 0.25x-style damping factor already established
@@ -2864,7 +2864,7 @@
 
                 // Time-of-day is only meaningful for free-text notes --
                 // Weight and HbA1c are logged against a day, not a moment,
-                // and Harry doesn't want a time field cluttering those two
+                // and the project doesn't want a time field cluttering those two
                 // panel types (per his direct feedback after using it).
                 // The row still needs *a* time_created value for the DB's
                 // NOT NULL column/ordering, so we default to 00:00 for
@@ -3019,7 +3019,7 @@
                 return payload;
             }
 
-            // Harry caught this in testing: saving a Weight entry with no
+            // the project caught this in testing: saving a Weight entry with no
             // weight typed in silently "succeeded" (an empty row with
             // nothing to show for it). Validate the field that actually
             // matters per type before hitting the network at all.

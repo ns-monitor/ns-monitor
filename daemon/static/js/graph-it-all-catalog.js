@@ -8,6 +8,7 @@
     const DOMAINS = {
         glucose: { label: 'Glucose & Glycemic', order: 1 },
         insulin: { label: 'Insulin Regimen', order: 2 },
+        events: { label: 'Events & Frequency', order: 2.5 },
         carbs: { label: 'Carbs & Nutrition', order: 3 },
         hardware: { label: 'Hardware Kinetics', order: 4 },
         clinical: { label: 'Clinical & Glycemic Risk', order: 5 },

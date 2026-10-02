@@ -459,7 +459,7 @@
     // every render -- the same reason the row's own onclick/oncontextmenu are
     // inline attributes rather than JS-attached listeners.
     //
-    // Deliberately hold-down only for this first pass, per Harry's direction
+    // Deliberately hold-down only for this first pass, per the project's direction
     // (no kebab/hamburger trigger) -- see
     // docs/analysis/ipad-touch-support-plan.md Phase C. Gated on
     // pointerType !== 'mouse' so mouse users keep using real right-click,

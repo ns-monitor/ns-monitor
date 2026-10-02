@@ -40,7 +40,7 @@ services:
       - .env
     environment:
       PYTHONUNBUFFERED: 1
-      TZ: ${TIMEZONE:-Australia/Perth}
+      TZ: ${TIMEZONE:-UTC}
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-8080}:8080"
@@ -53,15 +53,3 @@ services:
     command: ["python", "-u", "main.py"]
     volumes:
       - ./daemon:/app
-
-  e2e_tester:
-    image: mcr.microsoft.com/playwright/python:v1.40.0-jammy
-    profiles: ["test"]
-    environment:
-      - BASE_URL=http://nightscout_daemon:8080
-    working_dir: /opt/nightscout-monitor
-    volumes:
-      - .:/opt/nightscout-monitor
-    depends_on:
-      - nightscout_daemon
-    command: ["bash", "-c", "pip install playwright==1.40.0 && python3 tests/e2e/run_tests.py"]

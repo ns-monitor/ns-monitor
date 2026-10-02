@@ -191,14 +191,14 @@ METRIC_CATALOGUE = {
     },
     "total_bolus": {
         "id": "total_bolus",
-        "name": "Bolus Insulin Total",
+        "name": "Total Bolus Delivered (U)",
         "domain": "insulin",
         "unit": "U",
         "source_table": "layer2_daily_band_stats",
         "column_expr": "smb + meal_bolus + correction_bolus",
         "valid_aggregations": ["sum", "avg", "median", "min", "max"],
         "default_aggregation": "sum",
-        "valid_grains": ["daily", "weekly", "monthly"],
+        "valid_grains": ["daily", "weekly", "monthly", "hourly", "5min"],
         "status": "verified_phase1",
     },
     "basal_ratio": {
@@ -228,7 +228,7 @@ METRIC_CATALOGUE = {
     "meal_count": {
         "id": "meal_count",
         "name": "Meal Count (Carb Entries)",
-        "domain": "carbs",
+        "domain": "events",
         "unit": "count",
         "source_table": "treatments",
         "column_expr": "carbs",
@@ -283,6 +283,30 @@ METRIC_CATALOGUE = {
         "valid_aggregations": ["avg", "median", "min", "max"],
         "default_aggregation": "avg",
         "valid_grains": ["hourly", "5min"],
+        "status": "verified_phase2",
+    },
+    "basal_delta": {
+        "id": "basal_delta",
+        "name": "Enacted Basal Delta",
+        "domain": "insulin",
+        "unit": "U/hr",
+        "source_table": "layer2_five_minute_aggregate",
+        "column_expr": "(basal_rate - COALESCE(scheduled_basal, 0))",
+        "valid_aggregations": ["avg", "median", "min", "max"],
+        "default_aggregation": "avg",
+        "valid_grains": ["5min", "hourly", "daily", "weekly", "monthly"],
+        "status": "verified_phase2",
+    },
+    "zero_temp_ratio": {
+        "id": "zero_temp_ratio",
+        "name": "Zero-Temp Suspension Ratio",
+        "domain": "insulin",
+        "unit": "%",
+        "source_table": "layer2_five_minute_aggregate",
+        "column_expr": "(CASE WHEN COALESCE(basal_rate, 0) <= 0.001 THEN 100.0 ELSE 0.0 END)",
+        "valid_aggregations": ["avg", "min", "max"],
+        "default_aggregation": "avg",
+        "valid_grains": ["hourly", "daily", "weekly", "monthly"],
         "status": "verified_phase2",
     },
     "bolus_insulin": {
@@ -408,7 +432,7 @@ METRIC_CATALOGUE = {
     "episode_count": {
         "id": "episode_count",
         "name": "Hypo Episode Count",
-        "domain": "clinical",
+        "domain": "events",
         "unit": "count",
         "source_table": "layer2_daily_risk_stats",
         "column_expr": "episode_count",
@@ -486,41 +510,101 @@ METRIC_CATALOGUE = {
         "column_expr": "temp_basal_impact",
         "valid_aggregations": ["sum", "avg", "median", "min", "max"],
         "default_aggregation": "sum",
-        "valid_grains": ["daily", "weekly", "monthly"],
+        "valid_grains": ["daily", "weekly", "monthly", "hourly", "5min"],
         "status": "verified_phase1",
     },
     "smb_bolus": {
         "id": "smb_bolus",
-        "name": "Super Micro Bolus (SMB)",
+        "name": "SMB Insulin Delivered (U)",
         "domain": "insulin",
         "unit": "U",
         "source_table": "layer2_daily_band_stats",
         "column_expr": "smb",
         "valid_aggregations": ["sum", "avg", "median", "min", "max"],
         "default_aggregation": "sum",
-        "valid_grains": ["daily", "weekly", "monthly"],
+        "valid_grains": ["daily", "weekly", "monthly", "hourly", "5min"],
         "status": "verified_phase1",
     },
     "meal_bolus": {
         "id": "meal_bolus",
-        "name": "Meal Bolus Delivered",
+        "name": "Meal Bolus Delivered (U)",
         "domain": "insulin",
         "unit": "U",
         "source_table": "layer2_daily_band_stats",
         "column_expr": "meal_bolus",
         "valid_aggregations": ["sum", "avg", "median", "min", "max"],
         "default_aggregation": "sum",
-        "valid_grains": ["daily", "weekly", "monthly"],
+        "valid_grains": ["daily", "weekly", "monthly", "hourly", "5min"],
         "status": "verified_phase1",
     },
     "correction_bolus": {
         "id": "correction_bolus",
-        "name": "Correction Bolus Delivered",
+        "name": "Correction Bolus Delivered (U)",
         "domain": "insulin",
         "unit": "U",
         "source_table": "layer2_daily_band_stats",
         "column_expr": "correction_bolus",
         "valid_aggregations": ["sum", "avg", "median", "min", "max"],
+        "default_aggregation": "sum",
+        "valid_grains": ["daily", "weekly", "monthly", "hourly", "5min"],
+        "status": "verified_phase1",
+    },
+    "smb_count": {
+        "id": "smb_count",
+        "name": "Super Micro Bolus (SMB) Count",
+        "domain": "events",
+        "unit": "count",
+        "source_table": "treatments",
+        "column_expr": "smb_count",
+        "valid_aggregations": ["sum", "avg", "min", "max"],
+        "default_aggregation": "sum",
+        "valid_grains": ["daily", "weekly", "monthly", "hourly", "5min"],
+        "status": "verified_phase2",
+    },
+    "meal_bolus_count": {
+        "id": "meal_bolus_count",
+        "name": "Meal Bolus Count",
+        "domain": "events",
+        "unit": "count",
+        "source_table": "treatments",
+        "column_expr": "meal_bolus_count",
+        "valid_aggregations": ["sum", "avg", "min", "max"],
+        "default_aggregation": "sum",
+        "valid_grains": ["daily", "weekly", "monthly", "hourly", "5min"],
+        "status": "verified_phase2",
+    },
+    "total_bolus_count": {
+        "id": "total_bolus_count",
+        "name": "Total Bolus Count",
+        "domain": "events",
+        "unit": "count",
+        "source_table": "treatments",
+        "column_expr": "total_bolus_count",
+        "valid_aggregations": ["sum", "avg", "min", "max"],
+        "default_aggregation": "sum",
+        "valid_grains": ["daily", "weekly", "monthly", "hourly", "5min"],
+        "status": "verified_phase2",
+    },
+    "temp_basal_count": {
+        "id": "temp_basal_count",
+        "name": "Temp Basal Change Count",
+        "domain": "events",
+        "unit": "count",
+        "source_table": "treatments",
+        "column_expr": "temp_basal_count",
+        "valid_aggregations": ["sum", "avg", "min", "max"],
+        "default_aggregation": "sum",
+        "valid_grains": ["daily", "weekly", "monthly", "hourly", "5min"],
+        "status": "verified_phase2",
+    },
+    "hypo_count": {
+        "id": "hypo_count",
+        "name": "Hypo Episode Count",
+        "domain": "events",
+        "unit": "count",
+        "source_table": "layer2_daily_risk_stats",
+        "column_expr": "episode_count",
+        "valid_aggregations": ["sum", "avg", "min", "max"],
         "default_aggregation": "sum",
         "valid_grains": ["daily", "weekly", "monthly"],
         "status": "verified_phase1",
@@ -567,7 +651,7 @@ DATE_METRIC = {
 
 
 def _get_tz():
-    tz_name = getattr(config, "TIMEZONE", "Australia/Perth")
+    tz_name = getattr(config, "TIMEZONE", "UTC")
     try:
         return ZoneInfo(tz_name)
     except Exception:
@@ -911,6 +995,9 @@ FIVE_MIN_EXPR_MAP = {
     "iob": "iob",
     "cob": "cob",
     "basal_rate": "basal_rate",
+    "basal_delta": "(basal_rate - COALESCE(scheduled_basal, 0))",
+    "temp_basal_impact": "(basal_rate - COALESCE(scheduled_basal, 0))",
+    "zero_temp_ratio": "(CASE WHEN COALESCE(basal_rate, 0) <= 0.001 THEN 100.0 ELSE 0.0 END)",
     "bolus_insulin": "bolus_insulin",
     "isf": "isf",
     "deviation": "deviation",
@@ -925,6 +1012,9 @@ HOURLY_AGG_MAP = {
     "iob": "AVG(iob)",
     "cob": "AVG(cob)",
     "basal_rate": "AVG(basal_rate)",
+    "basal_delta": "AVG(basal_rate - COALESCE(scheduled_basal, 0))",
+    "temp_basal_impact": "AVG(basal_rate - COALESCE(scheduled_basal, 0))",
+    "zero_temp_ratio": "100.0 * COUNT(CASE WHEN COALESCE(basal_rate, 0) <= 0.001 THEN 1 END) / NULLIF(COUNT(*), 0)",
     "bolus_insulin": "SUM(bolus_insulin)",
     "isf": "AVG(isf)",
     "deviation": "AVG(deviation)",
@@ -988,19 +1078,297 @@ def build_sql_aggregation(col, requested_agg, order_col=None):
         return f"AVG({col})"
 
 
+TREATMENT_METRIC_CONFIG = {
+    "smb_count": {
+        "is_count": True,
+        "from_table": "treatments",
+        "where": "(smb_flag = true OR event_type = 'SMB' OR notes ILIKE '%%SMB%%')",
+        "val_col": None,
+    },
+    "meal_bolus_count": {
+        "is_count": True,
+        "from_table": "treatments",
+        "where": "(smb_flag IS NOT TRUE AND (notes NOT ILIKE '%%SMB%%' OR notes IS NULL)) AND (event_type NOT ILIKE '%%Correction%%' OR event_type IS NULL) AND insulin > 0",
+        "val_col": None,
+    },
+    "total_bolus_count": {
+        "is_count": True,
+        "from_table": "treatments",
+        "where": "insulin > 0",
+        "val_col": None,
+    },
+    "temp_basal_count": {
+        "is_count": True,
+        "from_table": """(SELECT ts,
+                                 COALESCE(absolute, rate) AS rate,
+                                 LAG(COALESCE(absolute, rate)) OVER (ORDER BY ts ASC) AS prev_rate,
+                                 LAG(ts) OVER (ORDER BY ts ASC) AS prev_ts,
+                                 LAG(duration) OVER (ORDER BY ts ASC) AS prev_dur
+                          FROM treatments
+                          WHERE event_type = 'Temp Basal'
+                            AND ts >= ((%(start)s || ' 00:00:00')::timestamp AT TIME ZONE %(tz)s - interval '1 day')
+                            AND ts < (((%(end)s::date + 1) || ' 00:00:00')::timestamp AT TIME ZONE %(tz)s + interval '1 day')
+                         ) tb""",
+        "where": "(prev_rate IS NULL OR rate != prev_rate OR ts > (prev_ts + (COALESCE(prev_dur, 30) || ' minutes')::interval))",
+        "val_col": None,
+    },
+    "meal_count": {
+        "is_count": True,
+        "from_table": "treatments",
+        "where": "carbs > 0",
+        "val_col": None,
+    },
+    "smb_bolus": {
+        "is_count": False,
+        "from_table": "treatments",
+        "where": "(smb_flag = true OR event_type = 'SMB' OR notes ILIKE '%%SMB%%')",
+        "val_col": "insulin",
+    },
+    "meal_bolus": {
+        "is_count": False,
+        "from_table": "treatments",
+        "where": "(smb_flag IS NOT TRUE AND (notes NOT ILIKE '%%SMB%%' OR notes IS NULL)) AND (event_type NOT ILIKE '%%Correction%%' OR event_type IS NULL) AND insulin > 0",
+        "val_col": "insulin",
+    },
+    "correction_bolus": {
+        "is_count": False,
+        "from_table": "treatments",
+        "where": "(event_type ILIKE '%%Correction%%' OR notes ILIKE '%%Correction%%') AND insulin > 0",
+        "val_col": "insulin",
+    },
+    "total_bolus": {
+        "is_count": False,
+        "from_table": "treatments",
+        "where": "insulin > 0",
+        "val_col": "insulin",
+    },
+}
+
+
+def query_diurnal_24h_treatment(conn, metric, agg, params, day_count, dow_clause_ts):
+    """
+    Computes 24-hour diurnal modal aggregation for discrete treatment events / deliveries.
+    Aggregates by hour (0..23) across the date range:
+    - avg: true 24-hour modal rate (total sum across period / day_count monitored days)
+    - sum: total count / units across period
+    - max: max count / units on any single day at that hour
+    - min: min count / units on any single day at that hour (0 if count of active days < day_count)
+    """
+    m_id = metric["id"]
+    cfg = TREATMENT_METRIC_CONFIG.get(m_id)
+    if not cfg:
+        return {}
+
+    agg_name = (agg or metric.get("default_aggregation", "avg")).lower().strip()
+    is_count = cfg["is_count"]
+    from_table = cfg["from_table"]
+    where_cond = cfg["where"]
+    val_col = cfg["val_col"]
+
+    event_agg = "COUNT(*)::numeric" if is_count else f"COALESCE(SUM({val_col}), 0)::numeric"
+
+    if agg_name == "sum":
+        outer_expr = "COALESCE(SUM(val), 0)"
+    elif agg_name == "avg":
+        outer_expr = f"ROUND(COALESCE(SUM(val), 0)::numeric / {day_count}, 3)"
+    elif agg_name == "max":
+        outer_expr = "COALESCE(MAX(val), 0)"
+    elif agg_name == "min":
+        outer_expr = f"CASE WHEN COUNT(DISTINCT day) < {day_count} THEN 0 ELSE COALESCE(MIN(val), 0) END"
+    else:
+        outer_expr = f"ROUND(COALESCE(SUM(val), 0)::numeric / {day_count}, 3)"
+
+    sql = f"""
+        WITH daily_hour_events AS (
+            SELECT (ts AT TIME ZONE %(tz)s)::date AS day,
+                   EXTRACT(HOUR FROM (ts AT TIME ZONE %(tz)s))::int AS cycle_bin,
+                   {event_agg} AS val
+            FROM {from_table}
+            WHERE {where_cond}
+              AND ts >= ((%(start)s || ' 00:00:00')::timestamp AT TIME ZONE %(tz)s)
+              AND ts < (((%(end)s::date + 1) || ' 00:00:00')::timestamp AT TIME ZONE %(tz)s)
+              {dow_clause_ts}
+            GROUP BY 1, 2
+        )
+        SELECT cycle_bin,
+               {outer_expr} AS metric_val
+        FROM daily_hour_events
+        GROUP BY cycle_bin
+        ORDER BY cycle_bin ASC;
+    """
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("SET LOCAL statement_timeout = '6000ms';")
+        cur.execute(sql, params)
+        res = cur.fetchall()
+        return {int(r["cycle_bin"]): float(r["metric_val"]) if r["metric_val"] is not None else 0.0 for r in res}
+
+
+def get_treatment_hourly_subquery(metric, agg, alias):
+    cfg = TREATMENT_METRIC_CONFIG[metric["id"]]
+    is_count = cfg["is_count"]
+    from_table = cfg["from_table"]
+    where_cond = cfg["where"]
+    val_col = cfg["val_col"]
+    agg_name = (agg or metric.get("default_aggregation", "sum")).lower().strip()
+
+    if is_count:
+        val_expr = "COUNT(*)"
+    else:
+        if agg_name == "avg":
+            val_expr = f"COALESCE(AVG({val_col}), 0)"
+        elif agg_name == "max":
+            val_expr = f"COALESCE(MAX({val_col}), 0)"
+        elif agg_name == "min":
+            val_expr = f"COALESCE(MIN({val_col}), 0)"
+        else:
+            val_expr = f"COALESCE(SUM({val_col}), 0)"
+
+    subquery = f"""
+        LEFT JOIN (
+            SELECT (date_trunc('hour', ts AT TIME ZONE %(tz)s))::timestamp AT TIME ZONE %(tz)s AS hr,
+                   {val_expr} AS val
+            FROM {from_table}
+            WHERE {where_cond}
+              AND ts >= ((%(start)s || ' 00:00:00')::timestamp AT TIME ZONE %(tz)s)
+              AND ts < (((%(end)s::date + 1) || ' 00:00:00')::timestamp AT TIME ZONE %(tz)s)
+            GROUP BY 1
+        ) {alias} ON s.hr = {alias}.hr
+    """
+    col_expr = f"COALESCE({alias}.val, 0)"
+    return subquery, col_expr
+
+
+def get_treatment_5min_subquery(metric, agg, alias):
+    cfg = TREATMENT_METRIC_CONFIG[metric["id"]]
+    is_count = cfg["is_count"]
+    from_table = cfg["from_table"]
+    where_cond = cfg["where"]
+    val_col = cfg["val_col"]
+    agg_name = (agg or metric.get("default_aggregation", "sum")).lower().strip()
+
+    if is_count:
+        val_expr = "COUNT(*)"
+    else:
+        if agg_name == "avg":
+            val_expr = f"COALESCE(AVG({val_col}), 0)"
+        elif agg_name == "max":
+            val_expr = f"COALESCE(MAX({val_col}), 0)"
+        elif agg_name == "min":
+            val_expr = f"COALESCE(MIN({val_col}), 0)"
+        else:
+            val_expr = f"COALESCE(SUM({val_col}), 0)"
+
+    subquery = f"""
+        LEFT JOIN (
+            SELECT (date_trunc('hour', ts) + (floor(extract(minute from ts) / 5) * 5 || ' minutes')::interval) AS b_ts,
+                   {val_expr} AS val
+            FROM {from_table}
+            WHERE {where_cond}
+              AND ts >= ((%(start)s || ' 00:00:00')::timestamp AT TIME ZONE %(tz)s)
+              AND ts < (((%(end)s::date + 1) || ' 00:00:00')::timestamp AT TIME ZONE %(tz)s)
+            GROUP BY 1
+        ) {alias} ON layer2_five_minute_aggregate.ts = {alias}.b_ts
+    """
+    col_expr = f"COALESCE({alias}.val, 0)"
+    return subquery, col_expr
+
+
 def get_source_clause(m, alias):
     """Produces the source subquery/column for daily/temporal metrics."""
     mid = m["id"]
     tbl = m["source_table"]
     col = m["column_expr"]
-    if mid == "meal_count":
+    if mid == "smb_count":
         return (
-            f"(SELECT (ts AT TIME ZONE %(tz)s)::date AS date, COUNT(*)::int AS val FROM treatments WHERE carbs > 0 GROUP BY 1) {alias}",
+            f"(SELECT b.date, COALESCE(e.cnt, 0)::int AS val "
+            f"FROM layer2_daily_band_stats b "
+            f"LEFT JOIN (SELECT (ts AT TIME ZONE %(tz)s)::date AS date, COUNT(*)::int AS cnt "
+            f"           FROM treatments "
+            f"           WHERE (smb_flag = true OR event_type = 'SMB' OR notes ILIKE '%%SMB%%') "
+            f"             AND ts >= (%(start)s::date - interval '1 day') AND ts < (%(end)s::date + interval '2 days') "
+            f"           GROUP BY 1) e ON b.date = e.date) {alias}",
+            f"{alias}.val"
+        )
+    elif mid == "meal_bolus_count":
+        return (
+            f"(SELECT b.date, COALESCE(e.cnt, 0)::int AS val "
+            f"FROM layer2_daily_band_stats b "
+            f"LEFT JOIN (SELECT (ts AT TIME ZONE %(tz)s)::date AS date, COUNT(*)::int AS cnt "
+            f"           FROM treatments "
+            f"           WHERE (smb_flag IS NOT TRUE AND (notes NOT ILIKE '%%SMB%%' OR notes IS NULL)) "
+            f"             AND (event_type NOT ILIKE '%%Correction%%' OR event_type IS NULL) "
+            f"             AND insulin > 0 "
+            f"             AND ts >= (%(start)s::date - interval '1 day') AND ts < (%(end)s::date + interval '2 days') "
+            f"           GROUP BY 1) e ON b.date = e.date) {alias}",
+            f"{alias}.val"
+        )
+    elif mid == "total_bolus_count":
+        return (
+            f"(SELECT b.date, COALESCE(e.cnt, 0)::int AS val "
+            f"FROM layer2_daily_band_stats b "
+            f"LEFT JOIN (SELECT (ts AT TIME ZONE %(tz)s)::date AS date, COUNT(*)::int AS cnt "
+            f"           FROM treatments "
+            f"           WHERE insulin > 0 "
+            f"             AND ts >= (%(start)s::date - interval '1 day') AND ts < (%(end)s::date + interval '2 days') "
+            f"           GROUP BY 1) e ON b.date = e.date) {alias}",
+            f"{alias}.val"
+        )
+    elif mid == "temp_basal_count":
+        return (
+            f"(SELECT b.date, COALESCE(e.cnt, 0)::int AS val "
+            f"FROM layer2_daily_band_stats b "
+            f"LEFT JOIN (SELECT (ts AT TIME ZONE %(tz)s)::date AS date, COUNT(*)::int AS cnt "
+            f"           FROM (SELECT ts, "
+            f"                        COALESCE(absolute, rate) AS rate, "
+            f"                        LAG(COALESCE(absolute, rate)) OVER (ORDER BY ts ASC) AS prev_rate, "
+            f"                        LAG(ts) OVER (ORDER BY ts ASC) AS prev_ts, "
+            f"                        LAG(duration) OVER (ORDER BY ts ASC) AS prev_dur "
+            f"                 FROM treatments "
+            f"                 WHERE event_type = 'Temp Basal' "
+            f"                   AND ts >= (%(start)s::date - interval '1 day') AND ts < (%(end)s::date + interval '2 days') "
+            f"                ) tb "
+            f"           WHERE prev_rate IS NULL "
+            f"              OR rate != prev_rate "
+            f"              OR ts > (prev_ts + (COALESCE(prev_dur, 30) || ' minutes')::interval) "
+            f"           GROUP BY 1) e ON b.date = e.date) {alias}",
+            f"{alias}.val"
+        )
+    elif mid == "meal_count":
+        return (
+            f"(SELECT b.date, COALESCE(e.cnt, 0)::int AS val "
+            f"FROM layer2_daily_band_stats b "
+            f"LEFT JOIN (SELECT (ts AT TIME ZONE %(tz)s)::date AS date, COUNT(*)::int AS cnt "
+            f"           FROM treatments "
+            f"           WHERE carbs > 0 "
+            f"             AND ts >= (%(start)s::date - interval '1 day') AND ts < (%(end)s::date + interval '2 days') "
+            f"           GROUP BY 1) e ON b.date = e.date) {alias}",
+            f"{alias}.val"
+        )
+    elif mid in ("episode_count", "hypo_count"):
+        return (
+            f"(SELECT date, episode_count AS val FROM layer2_daily_risk_stats WHERE episode_count IS NOT NULL) {alias}",
             f"{alias}.val"
         )
     elif mid == "tdd_per_kg":
         return (
             f"(SELECT date, tdd AS val FROM layer2_daily_band_stats) {alias}",
+            f"{alias}.val"
+        )
+    elif mid == "basal_delta":
+        return (
+            f"(SELECT day AS date, AVG(basal_rate - COALESCE(scheduled_basal, 0)) AS val "
+            f"FROM layer2_five_minute_aggregate "
+            f"WHERE day >= %(start)s AND day <= %(end)s "
+            f"GROUP BY day) {alias}",
+            f"{alias}.val"
+        )
+    elif mid == "zero_temp_ratio":
+        return (
+            f"(SELECT day AS date, "
+            f"        ROUND(100.0 * COUNT(CASE WHEN COALESCE(basal_rate, 0) <= 0.001 THEN 1 END) / NULLIF(COUNT(*), 0), 1) AS val "
+            f"FROM layer2_five_minute_aggregate "
+            f"WHERE day >= %(start)s AND day <= %(end)s "
+            f"GROUP BY day) {alias}",
             f"{alias}.val"
         )
     elif tbl == "clinical_notes":
@@ -1012,6 +1380,11 @@ def get_source_clause(m, alias):
     elif tbl == "pod_sessions_capped":
         return (
             f"(SELECT (start_ts AT TIME ZONE %(tz)s)::date AS date, AVG({col}) AS val FROM pod_sessions_capped WHERE status != 'active' GROUP BY (start_ts AT TIME ZONE %(tz)s)::date) {alias}",
+            f"{alias}.val"
+        )
+    elif tbl == "layer2_five_minute_aggregate":
+        return (
+            f"(SELECT day AS date, {col} AS val FROM layer2_five_minute_aggregate) {alias}",
             f"{alias}.val"
         )
     else:
@@ -1058,50 +1431,128 @@ def _compile_and_execute_query(
     # Cycle Modes (Periodicity Fold)
     # -----------------------------------------------------------------------
     if cycle_mode == "diurnal_24h":
-        base_x = FIVE_MIN_EXPR_MAP.get(x_metric["id"], "NULL")
-        base_y = FIVE_MIN_EXPR_MAP.get(y_metric["id"], "NULL")
+        y_is_treat = y_metric["id"] in TREATMENT_METRIC_CONFIG
+        y2_is_treat = bool(y2_metric and y2_metric["id"] in TREATMENT_METRIC_CONFIG)
 
-        col_x = "LPAD(EXTRACT(HOUR FROM (ts AT TIME ZONE %(tz)s))::text, 2, '0') || ':00'" if x_is_date else build_sql_aggregation(base_x, x_agg or x_metric.get("default_aggregation", "avg"), order_col="ts")
-        col_y = build_sql_aggregation(base_y, y_agg or y_metric.get("default_aggregation", "avg"), order_col="ts")
+        if not y_is_treat and not y2_is_treat:
+            base_x = FIVE_MIN_EXPR_MAP.get(x_metric["id"], "NULL")
+            base_y = FIVE_MIN_EXPR_MAP.get(y_metric["id"], "NULL")
 
-        col_y2_select = ""
-        if y2_metric:
-            base_y2 = FIVE_MIN_EXPR_MAP.get(y2_metric["id"], "NULL")
-            agg_y2 = build_sql_aggregation(base_y2, y2_agg or y2_metric.get("default_aggregation", "avg"), order_col="ts")
-            col_y2_select = f", {agg_y2} AS y2_val"
+            col_x = "LPAD(EXTRACT(HOUR FROM (ts AT TIME ZONE %(tz)s))::text, 2, '0') || ':00'" if x_is_date else build_sql_aggregation(base_x, x_agg or x_metric.get("default_aggregation", "avg"), order_col="ts")
+            col_y = build_sql_aggregation(base_y, y_agg or y_metric.get("default_aggregation", "avg"), order_col="ts")
 
-        sql = f"""
-            SELECT EXTRACT(HOUR FROM (ts AT TIME ZONE %(tz)s))::int AS cycle_bin,
-                   LPAD(EXTRACT(HOUR FROM (ts AT TIME ZONE %(tz)s))::text, 2, '0') || ':00' AS obs_date,
-                   {col_x} AS x_val,
-                   {col_y} AS y_val{col_y2_select}
-            FROM layer2_five_minute_aggregate
-            WHERE day >= %(start)s AND day <= %(end)s{dow_clause_ts}
-            GROUP BY 1, 2
-            ORDER BY 1 ASC;
-        """
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SET LOCAL statement_timeout = '6000ms';")
-            cur.execute(sql, params)
-            sql_rows = cur.fetchall()
+            col_y2_select = ""
+            if y2_metric:
+                base_y2 = FIVE_MIN_EXPR_MAP.get(y2_metric["id"], "NULL")
+                agg_y2 = build_sql_aggregation(base_y2, y2_agg or y2_metric.get("default_aggregation", "avg"), order_col="ts")
+                col_y2_select = f", {agg_y2} AS y2_val"
 
-        # Build full 24-hour canonical grid (00:00 - 23:00)
-        row_map = {int(r["cycle_bin"]): r for r in sql_rows if r.get("cycle_bin") is not None}
-        rows = []
-        for h in range(24):
-            lbl = f"{h:02d}:00"
-            if h in row_map:
-                rows.append(row_map[h])
-            else:
+            sql = f"""
+                SELECT EXTRACT(HOUR FROM (ts AT TIME ZONE %(tz)s))::int AS cycle_bin,
+                       LPAD(EXTRACT(HOUR FROM (ts AT TIME ZONE %(tz)s))::text, 2, '0') || ':00' AS obs_date,
+                       {col_x} AS x_val,
+                       {col_y} AS y_val{col_y2_select}
+                FROM layer2_five_minute_aggregate
+                WHERE day >= %(start)s AND day <= %(end)s{dow_clause_ts}
+                GROUP BY 1, 2
+                ORDER BY 1 ASC;
+            """
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("SET LOCAL statement_timeout = '6000ms';")
+                cur.execute(sql, params)
+                sql_rows = cur.fetchall()
+
+            # Build full 24-hour canonical grid (00:00 - 23:00)
+            row_map = {int(r["cycle_bin"]): r for r in sql_rows if r.get("cycle_bin") is not None}
+            rows = []
+            for h in range(24):
+                lbl = f"{h:02d}:00"
+                if h in row_map:
+                    rows.append(row_map[h])
+                else:
+                    rows.append({
+                        "cycle_bin": h,
+                        "obs_date": lbl,
+                        "x_val": lbl if x_is_date else None,
+                        "y_val": None,
+                        "y2_val": None if y2_metric else None
+                    })
+            ms = int((datetime.now() - t0).total_seconds() * 1000)
+            return rows, ms
+        else:
+            # At least one metric is treatment-based
+            # 1. Determine day_count denominator (monitored days in the selected range)
+            with conn.cursor() as cur:
+                cur.execute(f"""
+                    SELECT GREATEST(COUNT(DISTINCT date), 1)
+                    FROM layer2_daily_band_stats
+                    WHERE date >= %(start)s AND date <= %(end)s {dow_clause_date};
+                """, params)
+                cnt_row = cur.fetchone()
+                day_count = cnt_row[0] if (cnt_row and cnt_row[0]) else 1
+
+            # 2. Query treatment metric(s)
+            y_treat_map = {}
+            if y_is_treat:
+                y_treat_map = query_diurnal_24h_treatment(conn, y_metric, y_agg, params, day_count, dow_clause_ts)
+
+            y2_treat_map = {}
+            if y2_is_treat and y2_metric:
+                y2_treat_map = query_diurnal_24h_treatment(conn, y2_metric, y2_agg, params, day_count, dow_clause_ts)
+
+            # 3. Query 5m metrics if y or y2 is from 5m table
+            five_min_map = {}
+            if not y_is_treat or (y2_metric and not y2_is_treat):
+                col_y_5m = "NULL AS y_val"
+                if not y_is_treat:
+                    base_y = FIVE_MIN_EXPR_MAP.get(y_metric["id"], "NULL")
+                    col_y_5m = f"{build_sql_aggregation(base_y, y_agg or y_metric.get('default_aggregation', 'avg'), order_col='ts')} AS y_val"
+
+                col_y2_5m = ""
+                if y2_metric and not y2_is_treat:
+                    base_y2 = FIVE_MIN_EXPR_MAP.get(y2_metric["id"], "NULL")
+                    col_y2_5m = f", {build_sql_aggregation(base_y2, y2_agg or y2_metric.get('default_aggregation', 'avg'), order_col='ts')} AS y2_val"
+
+                sql_5m = f"""
+                    SELECT EXTRACT(HOUR FROM (ts AT TIME ZONE %(tz)s))::int AS cycle_bin,
+                           {col_y_5m}{col_y2_5m}
+                    FROM layer2_five_minute_aggregate
+                    WHERE day >= %(start)s AND day <= %(end)s{dow_clause_ts}
+                    GROUP BY 1
+                    ORDER BY 1 ASC;
+                """
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute("SET LOCAL statement_timeout = '6000ms';")
+                    cur.execute(sql_5m, params)
+                    five_min_rows = cur.fetchall()
+                    five_min_map = {int(r["cycle_bin"]): r for r in five_min_rows if r.get("cycle_bin") is not None}
+
+            # 4. Construct canonical 24-hour grid (00:00 to 23:00)
+            rows = []
+            for h in range(24):
+                lbl = f"{h:02d}:00"
+                if y_is_treat:
+                    y_val = y_treat_map.get(h, 0.0)
+                else:
+                    y_val = five_min_map.get(h, {}).get("y_val")
+
+                y2_val = None
+                if y2_metric:
+                    if y2_is_treat:
+                        y2_val = y2_treat_map.get(h, 0.0)
+                    else:
+                        y2_val = five_min_map.get(h, {}).get("y2_val")
+
                 rows.append({
                     "cycle_bin": h,
                     "obs_date": lbl,
                     "x_val": lbl if x_is_date else None,
-                    "y_val": None,
-                    "y2_val": None if y2_metric else None
+                    "y_val": y_val,
+                    "y2_val": y2_val
                 })
-        ms = int((datetime.now() - t0).total_seconds() * 1000)
-        return rows, ms
+
+            ms = int((datetime.now() - t0).total_seconds() * 1000)
+            return rows, ms
 
     elif cycle_mode in ("weekly_7d", "annual_12m", "custom_x"):
         if cycle_mode == "weekly_7d":
@@ -1188,55 +1639,163 @@ def _compile_and_execute_query(
     # Chronological Temporal Grains
     # -----------------------------------------------------------------------
     if grain == "5min":
-        col_x = "to_char(ts AT TIME ZONE %(tz)s, 'YYYY-MM-DD HH24:MI')" if x_is_date else FIVE_MIN_EXPR_MAP.get(x_metric["id"], "NULL")
-        col_y = FIVE_MIN_EXPR_MAP.get(y_metric["id"], "NULL")
-        col_y2_select = f", {FIVE_MIN_EXPR_MAP.get(y2_metric['id'], 'NULL')} AS y2_val" if y2_metric else ""
-        sql = f"""
-            SELECT to_char(ts AT TIME ZONE %(tz)s, 'YYYY-MM-DD HH24:MI') AS obs_date,
-                   {col_x} AS x_val,
-                   {col_y} AS y_val{col_y2_select}
-            FROM layer2_five_minute_aggregate
-            WHERE day >= %(start)s AND day <= %(end)s{dow_clause_ts}
-            ORDER BY ts ASC;
-        """
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SET LOCAL statement_timeout = '6000ms';")
-            cur.execute(sql, params)
-            rows = cur.fetchall()
-        ms = int((datetime.now() - t0).total_seconds() * 1000)
-        return rows, ms
+        y_is_treat = y_metric["id"] in TREATMENT_METRIC_CONFIG
+        y2_is_treat = bool(y2_metric and y2_metric["id"] in TREATMENT_METRIC_CONFIG)
+
+        if not y_is_treat and not y2_is_treat:
+            col_x = "to_char(ts AT TIME ZONE %(tz)s, 'YYYY-MM-DD HH24:MI')" if x_is_date else FIVE_MIN_EXPR_MAP.get(x_metric["id"], "NULL")
+            col_y = FIVE_MIN_EXPR_MAP.get(y_metric["id"], "NULL")
+            col_y2_select = f", {FIVE_MIN_EXPR_MAP.get(y2_metric['id'], 'NULL')} AS y2_val" if y2_metric else ""
+            sql = f"""
+                SELECT to_char(ts AT TIME ZONE %(tz)s, 'YYYY-MM-DD HH24:MI') AS obs_date,
+                       {col_x} AS x_val,
+                       {col_y} AS y_val{col_y2_select}
+                FROM layer2_five_minute_aggregate
+                WHERE day >= %(start)s AND day <= %(end)s{dow_clause_ts}
+                ORDER BY ts ASC;
+            """
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("SET LOCAL statement_timeout = '6000ms';")
+                cur.execute(sql, params)
+                rows = cur.fetchall()
+            ms = int((datetime.now() - t0).total_seconds() * 1000)
+            return rows, ms
+        else:
+            col_x = "to_char(layer2_five_minute_aggregate.ts AT TIME ZONE %(tz)s, 'YYYY-MM-DD HH24:MI')" if x_is_date else FIVE_MIN_EXPR_MAP.get(x_metric["id"], "NULL")
+
+            joins = []
+            if y_is_treat:
+                sub_y, col_y = get_treatment_5min_subquery(y_metric, y_agg, "t5_y")
+                joins.append(sub_y)
+            else:
+                col_y = FIVE_MIN_EXPR_MAP.get(y_metric["id"], "NULL")
+
+            col_y2_select = ""
+            if y2_metric:
+                if y2_is_treat:
+                    sub_y2, col_y2 = get_treatment_5min_subquery(y2_metric, y2_agg, "t5_y2")
+                    joins.append(sub_y2)
+                else:
+                    col_y2 = FIVE_MIN_EXPR_MAP.get(y2_metric["id"], "NULL")
+                col_y2_select = f", {col_y2} AS y2_val"
+
+            join_sql = "\n".join(joins)
+            sql = f"""
+                SELECT to_char(layer2_five_minute_aggregate.ts AT TIME ZONE %(tz)s, 'YYYY-MM-DD HH24:MI') AS obs_date,
+                       {col_x} AS x_val,
+                       {col_y} AS y_val{col_y2_select}
+                FROM layer2_five_minute_aggregate
+                {join_sql}
+                WHERE day >= %(start)s AND day <= %(end)s{dow_clause_ts}
+                ORDER BY layer2_five_minute_aggregate.ts ASC;
+            """
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("SET LOCAL statement_timeout = '6000ms';")
+                cur.execute(sql, params)
+                rows = cur.fetchall()
+            ms = int((datetime.now() - t0).total_seconds() * 1000)
+            return rows, ms
 
     elif grain == "hourly":
-        if x_is_date:
-            col_x = "to_char(date_trunc('hour', ts AT TIME ZONE %(tz)s), 'YYYY-MM-DD HH24:00')"
+        y_is_treat = y_metric["id"] in TREATMENT_METRIC_CONFIG
+        y2_is_treat = bool(y2_metric and y2_metric["id"] in TREATMENT_METRIC_CONFIG)
+
+        if not y_is_treat and not y2_is_treat:
+            if x_is_date:
+                col_x = "to_char(date_trunc('hour', ts AT TIME ZONE %(tz)s), 'YYYY-MM-DD HH24:00')"
+            else:
+                base_col_x = FIVE_MIN_EXPR_MAP.get(x_metric["id"], "NULL")
+                col_x = build_sql_aggregation(base_col_x, x_agg or x_metric.get("default_aggregation", "avg"), order_col="ts")
+
+            base_col_y = FIVE_MIN_EXPR_MAP.get(y_metric["id"], "NULL")
+            col_y = build_sql_aggregation(base_col_y, y_agg or y_metric.get("default_aggregation", "avg"), order_col="ts")
+
+            col_y2_select = ""
+            if y2_metric:
+                base_col_y2 = FIVE_MIN_EXPR_MAP.get(y2_metric["id"], "NULL")
+                agg_y2 = build_sql_aggregation(base_col_y2, y2_agg or y2_metric.get("default_aggregation", "avg"), order_col="ts")
+                col_y2_select = f", {agg_y2} AS y2_val"
+
+            sql = f"""
+                SELECT to_char(date_trunc('hour', ts AT TIME ZONE %(tz)s), 'YYYY-MM-DD HH24:00') AS obs_date,
+                       {col_x} AS x_val,
+                       {col_y} AS y_val{col_y2_select}
+                FROM layer2_five_minute_aggregate
+                WHERE day >= %(start)s AND day <= %(end)s{dow_clause_ts}
+                GROUP BY date_trunc('hour', ts AT TIME ZONE %(tz)s)
+                ORDER BY 1 ASC;
+            """
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("SET LOCAL statement_timeout = '6000ms';")
+                cur.execute(sql, params)
+                rows = cur.fetchall()
+            ms = int((datetime.now() - t0).total_seconds() * 1000)
+            return rows, ms
         else:
-            base_col_x = FIVE_MIN_EXPR_MAP.get(x_metric["id"], "NULL")
-            col_x = build_sql_aggregation(base_col_x, x_agg or x_metric.get("default_aggregation", "avg"), order_col="ts")
+            # Hourly grain with treatment metric(s)
+            dow_spine = " AND EXTRACT(ISODOW FROM (s.hr AT TIME ZONE %(tz)s)) = ANY(%(dow_filter)s)" if (dow_filter and len(dow_filter) < 7) else ""
 
-        base_col_y = FIVE_MIN_EXPR_MAP.get(y_metric["id"], "NULL")
-        col_y = build_sql_aggregation(base_col_y, y_agg or y_metric.get("default_aggregation", "avg"), order_col="ts")
+            joins = []
+            if y_is_treat:
+                sub_y, col_y = get_treatment_hourly_subquery(y_metric, y_agg, "th_y")
+                joins.append(sub_y)
+            else:
+                base_col_y = FIVE_MIN_EXPR_MAP.get(y_metric["id"], "NULL")
+                agg_y = build_sql_aggregation(base_col_y, y_agg or y_metric.get("default_aggregation", "avg"), order_col="ts")
+                joins.append(f"""
+                    LEFT JOIN (
+                        SELECT (date_trunc('hour', ts AT TIME ZONE %(tz)s))::timestamp AT TIME ZONE %(tz)s AS hr,
+                               {agg_y} AS val
+                        FROM layer2_five_minute_aggregate
+                        WHERE day >= %(start)s AND day <= %(end)s
+                        GROUP BY 1
+                    ) f_y ON s.hr = f_y.hr
+                """)
+                col_y = "f_y.val"
 
-        col_y2_select = ""
-        if y2_metric:
-            base_col_y2 = FIVE_MIN_EXPR_MAP.get(y2_metric["id"], "NULL")
-            agg_y2 = build_sql_aggregation(base_col_y2, y2_agg or y2_metric.get("default_aggregation", "avg"), order_col="ts")
-            col_y2_select = f", {agg_y2} AS y2_val"
+            col_y2_select = ""
+            if y2_metric:
+                if y2_is_treat:
+                    sub_y2, col_y2 = get_treatment_hourly_subquery(y2_metric, y2_agg, "th_y2")
+                    joins.append(sub_y2)
+                else:
+                    base_col_y2 = FIVE_MIN_EXPR_MAP.get(y2_metric["id"], "NULL")
+                    agg_y2 = build_sql_aggregation(base_col_y2, y2_agg or y2_metric.get("default_aggregation", "avg"), order_col="ts")
+                    joins.append(f"""
+                        LEFT JOIN (
+                            SELECT (date_trunc('hour', ts AT TIME ZONE %(tz)s))::timestamp AT TIME ZONE %(tz)s AS hr,
+                                   {agg_y2} AS val
+                            FROM layer2_five_minute_aggregate
+                            WHERE day >= %(start)s AND day <= %(end)s
+                            GROUP BY 1
+                        ) f_y2 ON s.hr = f_y2.hr
+                    """)
+                    col_y2 = "f_y2.val"
+                col_y2_select = f", {col_y2} AS y2_val"
 
-        sql = f"""
-            SELECT to_char(date_trunc('hour', ts AT TIME ZONE %(tz)s), 'YYYY-MM-DD HH24:00') AS obs_date,
-                   {col_x} AS x_val,
-                   {col_y} AS y_val{col_y2_select}
-            FROM layer2_five_minute_aggregate
-            WHERE day >= %(start)s AND day <= %(end)s{dow_clause_ts}
-            GROUP BY date_trunc('hour', ts AT TIME ZONE %(tz)s)
-            ORDER BY 1 ASC;
-        """
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SET LOCAL statement_timeout = '6000ms';")
-            cur.execute(sql, params)
-            rows = cur.fetchall()
-        ms = int((datetime.now() - t0).total_seconds() * 1000)
-        return rows, ms
+            join_sql = "\n".join(joins)
+            sql = f"""
+                WITH spine AS (
+                    SELECT generate_series(
+                        (%(start)s || ' 00:00:00')::timestamp AT TIME ZONE %(tz)s,
+                        ((%(end)s::date + 1) || ' 00:00:00')::timestamp AT TIME ZONE %(tz)s - interval '1 hour',
+                        interval '1 hour'
+                    ) AS hr
+                )
+                SELECT to_char(s.hr AT TIME ZONE %(tz)s, 'YYYY-MM-DD HH24:00') AS obs_date,
+                       to_char(s.hr AT TIME ZONE %(tz)s, 'YYYY-MM-DD HH24:00') AS x_val,
+                       {col_y} AS y_val{col_y2_select}
+                FROM spine s
+                {join_sql}
+                WHERE 1=1{dow_spine}
+                ORDER BY s.hr ASC;
+            """
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("SET LOCAL statement_timeout = '6000ms';")
+                cur.execute(sql, params)
+                rows = cur.fetchall()
+            ms = int((datetime.now() - t0).total_seconds() * 1000)
+            return rows, ms
 
     elif grain in ("daily", "weekly", "monthly"):
         needs_weight_interpolation = (
@@ -1248,6 +1807,9 @@ def _compile_and_execute_query(
         dow_clause_simple = " AND EXTRACT(ISODOW FROM date) = ANY(%(dow_filter)s)" if (dow_filter and len(dow_filter) < 7) else ""
         dow_clause_tbl_y = " AND EXTRACT(ISODOW FROM tbl_y.date) = ANY(%(dow_filter)s)" if (dow_filter and len(dow_filter) < 7) else ""
         dow_clause_tbl_x = " AND EXTRACT(ISODOW FROM tbl_x.date) = ANY(%(dow_filter)s)" if (dow_filter and len(dow_filter) < 7) else ""
+
+        NON_DIRECT_DAILY_TABLES = ("clinical_notes", "pod_sessions_capped", "layer2_five_minute_aggregate", "treatments")
+        NON_DIRECT_DAILY_METRIC_IDS = ("meal_count", "smb_count", "meal_bolus_count", "total_bolus_count", "temp_basal_count", "tdd_per_kg", "basal_delta", "zero_temp_ratio")
 
         if grain == "daily":
             if not y2_metric:
@@ -1261,38 +1823,16 @@ def _compile_and_execute_query(
                         WHERE tbl_y.date >= %(start)s AND tbl_y.date <= %(end)s{dow_clause_tbl_y}
                         ORDER BY tbl_y.date ASC;
                     """
-                elif x_metric["source_table"] == y_metric["source_table"] and x_metric["id"] not in ("meal_count", "tdd_per_kg") and y_metric["id"] not in ("meal_count", "tdd_per_kg"):
+                elif x_metric["source_table"] == y_metric["source_table"] and x_metric["id"] not in NON_DIRECT_DAILY_METRIC_IDS and y_metric["id"] not in NON_DIRECT_DAILY_METRIC_IDS and x_metric["source_table"] not in NON_DIRECT_DAILY_TABLES:
                     t_x = x_metric["source_table"]
-                    if t_x == "clinical_notes":
-                        sql = f"""
-                            SELECT date::text AS obs_date,
-                                   {x_metric['column_expr']} AS x_val,
-                                   {y_metric['column_expr']} AS y_val
-                            FROM clinical_notes
-                            WHERE date >= %(start)s AND date <= %(end)s{dow_clause_simple}
-                            ORDER BY date ASC;
-                        """
-                    elif t_x == "pod_sessions_capped":
-                        sql = f"""
-                            SELECT (start_ts AT TIME ZONE %(tz)s)::date::text AS obs_date,
-                                   {x_metric['column_expr']} AS x_val,
-                                   {y_metric['column_expr']} AS y_val
-                            FROM pod_sessions_capped
-                            WHERE status != 'active'
-                              AND (start_ts AT TIME ZONE %(tz)s)::date >= %(start)s
-                              AND (start_ts AT TIME ZONE %(tz)s)::date <= %(end)s
-                              {dow_clause_simple.replace('date', '(start_ts AT TIME ZONE %(tz)s)::date')}
-                            ORDER BY obs_date ASC;
-                        """
-                    else:
-                        sql = f"""
-                            SELECT date::text AS obs_date,
-                                   {x_metric['column_expr']} AS x_val,
-                                   {y_metric['column_expr']} AS y_val
-                            FROM {t_x}
-                            WHERE date >= %(start)s AND date <= %(end)s{dow_clause_simple}
-                            ORDER BY date ASC;
-                        """
+                    sql = f"""
+                        SELECT date::text AS obs_date,
+                               {x_metric['column_expr']} AS x_val,
+                               {y_metric['column_expr']} AS y_val
+                        FROM {t_x}
+                        WHERE date >= %(start)s AND date <= %(end)s{dow_clause_simple}
+                        ORDER BY date ASC;
+                    """
                 else:
                     from_x, col_x = get_source_clause(x_metric, "tbl_x")
                     from_y, col_y = get_source_clause(y_metric, "tbl_y")
@@ -1308,7 +1848,7 @@ def _compile_and_execute_query(
             else:
                 # y2_metric is active
                 if x_is_date:
-                    if y_metric["source_table"] == y2_metric["source_table"] and y_metric["id"] not in ("meal_count", "tdd_per_kg") and y2_metric["id"] not in ("meal_count", "tdd_per_kg") and y_metric["source_table"] not in ("clinical_notes", "pod_sessions_capped"):
+                    if y_metric["source_table"] == y2_metric["source_table"] and y_metric["id"] not in NON_DIRECT_DAILY_METRIC_IDS and y2_metric["id"] not in NON_DIRECT_DAILY_METRIC_IDS and y_metric["source_table"] not in NON_DIRECT_DAILY_TABLES:
                         sql = f"""
                             SELECT date::text AS obs_date,
                                    date::text AS x_val,
@@ -1332,7 +1872,7 @@ def _compile_and_execute_query(
                             ORDER BY tbl_y.date ASC;
                         """
                 else:
-                    if x_metric["source_table"] == y_metric["source_table"] == y2_metric["source_table"] and all(m["id"] not in ("meal_count", "tdd_per_kg") for m in (x_metric, y_metric, y2_metric)) and x_metric["source_table"] not in ("clinical_notes", "pod_sessions_capped"):
+                    if x_metric["source_table"] == y_metric["source_table"] == y2_metric["source_table"] and all(m["id"] not in NON_DIRECT_DAILY_METRIC_IDS for m in (x_metric, y_metric, y2_metric)) and x_metric["source_table"] not in NON_DIRECT_DAILY_TABLES:
                         sql = f"""
                             SELECT date::text AS obs_date,
                                    {x_metric['column_expr']} AS x_val,
@@ -1636,7 +2176,7 @@ def api_query_graph_it_all():
         if conn is None:
             return jsonify({"error": "Database temporarily unavailable. Please retry."}), 503
 
-        tz_name = getattr(config, "TIMEZONE", "Australia/Perth")
+        tz_name = getattr(config, "TIMEZONE", "UTC")
 
         with conn:
             rows, exec_ms = _compile_and_execute_query(

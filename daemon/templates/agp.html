@@ -1118,7 +1118,7 @@
                 // confirmed by grep before this rewrite). That's why the
                 // Chart Display Settings "Render Type" dropdown never actually
                 // changed anything on this chart. Fixed 3 Sep 2026 -- see
-                // docs/ideas-for-harry.md for the full audit that found this.
+                // See the in-code data selection rationale for this behavior.
                 const resolvedType = {};
                 const seriesStyles = {};
                 if (window.NSChartCustomizer && registry.length > 0) {
@@ -1148,7 +1148,7 @@
                 const iobType = resolvedType['IOB (U)'] || 'line';
                 const isfType = resolvedType['Dynamic ISF'] || 'line';
                 // New: Median BGI / Median Deviation now get the same Line/Bar
-                // treatment as the other 10 -- this is what Harry actually
+                // treatment as the other 10 -- this is what the project actually
                 // asked about that surfaced the whole disconnected-mechanism
                 // bug in the first place.
                 const bgiType = resolvedType['Median BGI'] || 'line';

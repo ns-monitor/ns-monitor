@@ -32,13 +32,13 @@
 
     // Curve-smoothing tension steps, Trends/Patterns only (visual-only
     // ECharts spline interpolation -- see 'off' == smooth:false). Exposed
-    // as the full 0.1 increments for now while Harry tunes what the
+    // as the full 0.1 increments for now while the project tunes what the
     // shipping Light/Med/Heavy presets should map to; not a decision on the
     // final user-facing control shape.
     var SMOOTH_LEVELS = ['off', 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
 
     // Pages where curve smoothing applies at all. Trace is deliberately
-    // excluded -- Harry: "Smoothing has no place on trace" (4 Sep 2026) --
+    // excluded -- the project: "Smoothing has no place on trace" (4 Sep 2026) --
     // each raw CGM/pump reading is real, not a value MAVG or a backend
     // *_smooth column has already reduced, so curving it visually would
     // misrepresent single readings the same way unclamped overshoot does.

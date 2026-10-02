@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autotune — nightscout-monitor</title>
+    <!-- Shared Stylesheets -->
+    <link rel="stylesheet" href="/static/css/ns-shared.css">
+    <link rel="stylesheet" href="/static/css/autotune.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- ECharts 5.5.0 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+</head>
+<body>
+    {% include "sidebar.html" %}
+
+    <div class="container autotune-container">
+        <!-- Canonical Page Header with Uncoupled Date Selector Popover -->
+        <header class="page-header">
+            <div>
+                <div class="autotune-header-row">
+                    <h1 class="panel-h1" style="margin-bottom: 0;">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Autotune Parameter Recommendations
+                    </h1>
+                    <!-- Strategic Help (i) Popover: Page / Workbench Overview -->
+                    <div class="at-popover-wrapper">
+                        <button type="button" class="at-popover-trigger" aria-label="Autotune Overview Guide" title="Autotune Overview Guide">
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                            </svg>
+                        </button>
+                        <div class="at-guide-popover" onclick="event.stopPropagation()">
+                            <h4><i class="fa-solid fa-wand-magic-sparkles"></i> Autotune Overview</h4>
+                            <h5>What is Autotune?</h5>
+                            <p>Autotune is an automated physiological parameter tuning algorithm derived from AndroidAPS and oref0. It evaluates observational closed-loop data to tune <strong>24 hourly basal rates</strong>, one scalar <strong>Insulin Sensitivity Factor (ISF)</strong>, and one scalar <strong>Carb Ratio (IC)</strong>.</p>
+                            <h5>Clinical Safety Boundary:</h5>
+                            <p><strong>This is an analysis and reporting tool only.</strong> It never automatically overwrites pump profiles or modifies active insulin delivery. All recommendations must be reviewed against baseline settings and clinical context before enacting changes.</p>
+                            <h5>Sequential 04:00 Windowing:</h5>
+                            <p>Autotune does not pool data into an arbitrary multi-day average. It evaluates days sequentially from <strong>04:00 to 04:00 local time</strong>, carrying forward tuned results into each subsequent day while strictly enforcing safety caps against your immutable baseline pump profile.</p>
+                        </div>
+                    </div>
+                </div>
+                <p class="autotune-page-subtitle">
+                    Sequential parameter tuning (Basal, ISF, CR) derived from AndroidAPS / oref0 logic. Evaluates chronological 04:00-to-04:00 windows with immutable baseline profile bounds.
+                </p>
+            </div>
+
+            <!-- Canonical Date Selector (uncoupled namespace 'autotune') -->
+            {% set date_state_namespace = 'autotune' %}
+            {% set has_compare = false %}
+            {% include "_header_date_selector.html" %}
+        </header>
+
+        <!-- CARD 1: Granular Day Selection & Parameters Toolbar -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    <span>Input Day Selection (04:00 to 04:00 Windows)</span>
+                    <span class="badge badge-safe" id="selected-count-badge">5 Days Selected</span>
+                    <!-- Strategic Help (i) Popover: Day Selection & Windowing -->
+                    <div class="at-popover-wrapper">
+                        <button type="button" class="at-popover-trigger" aria-label="Day Selection Guide" title="Day Selection Guide">
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                            </svg>
+                        </button>
+                        <div class="at-guide-popover" onclick="event.stopPropagation()">
+                            <h4><i class="fa-solid fa-calendar-check"></i> Input Day Selection</h4>
+                            <h5>Why 04:00 to 04:00?</h5>
+                            <p>Midnight-to-midnight windows split nocturnal fasting periods in half. Autotune anchors each tuning day at 04:00 local time, capturing overnight sleep and basal equilibrium intact.</p>
+                            <h5>Excluding Days:</h5>
+                            <p>You can toggle individual days ON or OFF within the selected evaluation period. Consider deselecting days characterized by:</p>
+                            <ul>
+                                <li>Acute illness, fever, or infection</li>
+                                <li>Infusion site failures or occlusions</li>
+                                <li>Unannounced meals or missing carb entries</li>
+                                <li>Severe sensor dropouts or compression lows</li>
+                            </ul>
+                            <h5>Presets:</h5>
+                            <p><strong>Clean Data Only:</strong> Automatically deselects days with material CGM gaps (&gt;15 min) or &lt;80% sensor coverage.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="toolbar-header-actions">
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="atPresetDays('default')">Last 5 Days (Default)</button>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="atPresetDays('all')">Select All</button>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="atPresetDays('weekdays')">Weekdays Only</button>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="atPresetDays('weekends')">Weekends Only</button>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="atPresetDays('clean')">Clean Data Only</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+                    Autotune runs chronologically from oldest to newest day. Uncheck anomalous days to exclude them from parameter tuning:
+                </p>
+
+                <!-- Dynamic Day Selection Grid -->
+                <div class="day-grid-container" id="day-grid">
+                    <div style="grid-column: 1/-1; padding: 20px; color: var(--text-secondary); text-align: center;">
+                        <i class="fa-solid fa-spinner fa-spin"></i> Loading 04:00-to-04:00 day windows...
+                    </div>
+                </div>
+
+                <!-- Parameters Bar (Refined 2-Row Layout to Prevent Squeezing) -->
+                <div class="config-bar">
+                    <!-- Top Row: Base Profile Dropdown & Run Button -->
+                    <div class="config-row-top">
+                        <div class="config-field profile-field">
+                            <label for="at-profile-select">
+                                <i class="fa-solid fa-id-badge"></i> Base Pump Profile Snapshot
+                                <span class="at-popover-wrapper">
+                                    <button type="button" class="at-popover-trigger" aria-label="Base Profile Guide" title="Base Profile Guide">
+                                        <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/></svg>
+                                    </button>
+                                    <div class="at-guide-popover" onclick="event.stopPropagation()">
+                                        <h4>Base Pump Profile</h4>
+                                        <p>Selects the immutable baseline snapshot from profile history. All hourly basal rates, ISF, and Carb Ratio recommendations are capped relative to this original profile, rather than merely relative to yesterday's tuned result.</p>
+                                    </div>
+                                </span>
+                            </label>
+                            <select id="at-profile-select" class="form-select">
+                                <option value="">Loading profiles...</option>
+                            </select>
+                        </div>
+                        <div class="config-action-cell">
+                            <button type="button" class="btn btn-primary btn-run" id="at-run-btn" onclick="atRunAutotune()">
+                                <i class="fa-solid fa-play"></i> Run Autotune
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Row: Parameter Inputs & Safety Caps -->
+                    <div class="config-row-params">
+                        <div class="config-field">
+                            <label for="at-min-factor">
+                                <i class="fa-solid fa-arrow-down"></i> Autosens Min (Cap)
+                                <span class="at-popover-wrapper">
+                                    <button type="button" class="at-popover-trigger" aria-label="Min Cap Guide" title="Min Cap Guide">
+                                        <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/></svg>
+                                    </button>
+                                    <div class="at-guide-popover" onclick="event.stopPropagation()">
+                                        <h4>Autosens Min Factor</h4>
+                                        <p>The maximum downward adjustment allowed relative to the baseline profile. Default <strong>0.70</strong> (cannot drop below 70% of baseline basal rate or carb ratio).</p>
+                                    </div>
+                                </span>
+                            </label>
+                            <input type="number" id="at-min-factor" class="form-input" value="0.70" step="0.05" min="0.5" max="0.9">
+                        </div>
+
+                        <div class="config-field">
+                            <label for="at-max-factor">
+                                <i class="fa-solid fa-arrow-up"></i> Autosens Max (Cap)
+                                <span class="at-popover-wrapper">
+                                    <button type="button" class="at-popover-trigger" aria-label="Max Cap Guide" title="Max Cap Guide">
+                                        <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/></svg>
+                                    </button>
+                                    <div class="at-guide-popover" onclick="event.stopPropagation()">
+                                        <h4>Autosens Max Factor</h4>
+                                        <p>The maximum upward adjustment allowed relative to the baseline profile. Default <strong>1.20</strong> (cannot exceed 120% of baseline basal rate or carb ratio).</p>
+                                    </div>
+                                </span>
+                            </label>
+                            <input type="number" id="at-max-factor" class="form-input" value="1.20" step="0.05" min="1.1" max="1.5">
+                        </div>
+
+                        <div class="config-field">
+                            <label for="at-carb-impact">
+                                <i class="fa-solid fa-bread-slice"></i> Min 5m Carb Impact
+                                <span class="at-popover-wrapper">
+                                    <button type="button" class="at-popover-trigger" aria-label="Carb Impact Guide" title="Carb Impact Guide">
+                                        <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/></svg>
+                                    </button>
+                                    <div class="at-guide-popover popover-right" onclick="event.stopPropagation()">
+                                        <h4>Min 5m Carb Impact</h4>
+                                        <p>The minimum assumed glucose rise per 5-minute bucket during active digestion when deviations are flat. Default <strong>3.0 mg/dL</strong> (~0.17 mmol/L), ensuring active Carbs on Board (COB) decay properly even during sluggish absorption.</p>
+                                    </div>
+                                </span>
+                            </label>
+                            <div class="input-with-unit">
+                                <input type="number" id="at-carb-impact" class="form-input" value="3.0" step="0.5" min="1.0" max="8.0">
+                                <span class="unit-suffix">mg/dL (~0.17 mmol/L)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 2: Comparison Scorecard -->
+        <div class="scorecard-grid">
+            <!-- 1. Daily Basal Total -->
+            <div class="metric-card">
+                <div class="metric-title">
+                    <span>Daily Basal Total</span>
+                    <i class="fa-solid fa-syringe" style="color: var(--accent);"></i>
+                </div>
+                <div class="metric-comparison">
+                    <span class="val-base" id="stat-basal-base">-- U</span>
+                    <span class="val-arrow" id="arrow-basal" style="display: none;">&rarr;</span>
+                    <span class="val-tuned" id="stat-basal-tuned" style="display: none;">--</span>
+                </div>
+                <div class="metric-delta delta-neutral" id="delta-basal-container">
+                    <i class="fa-solid fa-arrow-trend-up"></i>
+                    <span id="delta-basal-text">Baseline Profile &bull; Click Run to calculate</span>
+                </div>
+            </div>
+
+            <!-- 2. ISF in mmol/L/U -->
+            <div class="metric-card">
+                <div class="metric-title">
+                    <span>Sensitivity (ISF)</span>
+                    <i class="fa-solid fa-bolt" style="color: #f39c12;"></i>
+                </div>
+                <div class="metric-comparison">
+                    <span class="val-base" id="stat-isf-base">--</span>
+                    <span class="val-arrow" id="arrow-isf" style="display: none;">&rarr;</span>
+                    <span class="val-tuned" id="stat-isf-tuned" style="display: none;">--</span>
+                    <span style="font-size: 11px; color: var(--text-secondary);">mmol/L/U</span>
+                </div>
+                <div class="metric-delta delta-neutral" id="delta-isf-container">
+                    <i class="fa-solid fa-arrow-trend-down"></i>
+                    <span id="delta-isf-text">Baseline Profile &bull; Awaiting execution</span>
+                </div>
+            </div>
+
+            <!-- 3. Carb Ratio (CR) -->
+            <div class="metric-card">
+                <div class="metric-title">
+                    <span>Carb Ratio (IC)</span>
+                    <i class="fa-solid fa-cookie-bite" style="color: #9b59b6;"></i>
+                </div>
+                <div class="metric-comparison">
+                    <span class="val-base" id="stat-cr-base">--</span>
+                    <span class="val-arrow" id="arrow-cr" style="display: none;">&rarr;</span>
+                    <span class="val-tuned" id="stat-cr-tuned" style="display: none;">--</span>
+                    <span style="font-size: 11px; color: var(--text-secondary);">g/U</span>
+                </div>
+                <div class="metric-delta delta-neutral" id="delta-cr-container">
+                    <i class="fa-solid fa-arrow-trend-down"></i>
+                    <span id="delta-cr-text">Baseline Profile &bull; Awaiting execution</span>
+                </div>
+            </div>
+
+            <!-- 4. Diagnostic CSF in mmol/L/g -->
+            <div class="metric-card">
+                <div class="metric-title">
+                    <span>Sensitivity / Carb (CSF)</span>
+                    <i class="fa-solid fa-scale-balanced" style="color: var(--success);"></i>
+                </div>
+                <div class="metric-comparison">
+                    <span class="val-base" id="stat-csf-base">--</span>
+                    <span class="val-arrow" id="arrow-csf" style="display: none;">&rarr;</span>
+                    <span class="val-tuned" id="stat-csf-tuned" style="display: none;">--</span>
+                    <span style="font-size: 11px; color: var(--text-secondary);">mmol/g</span>
+                </div>
+                <div class="metric-delta delta-neutral" id="delta-csf-container">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span id="delta-csf-text">Diagnostic ratio &bull; Reporting only</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 3: 24-Hour Basal Rate Profile (ECharts) -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fa-solid fa-chart-area"></i>
+                    <span>24-Hour Diurnal Basal Profile &amp; Hourly Deviation Evidence</span>
+                    <!-- Strategic Help (i) Popover: 24h Basal Curve -->
+                    <div class="at-popover-wrapper">
+                        <button type="button" class="at-popover-trigger" aria-label="Basal Profile Chart Guide" title="Basal Profile Chart Guide">
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                            </svg>
+                        </button>
+                        <div class="at-guide-popover" onclick="event.stopPropagation()">
+                            <h4><i class="fa-solid fa-chart-area"></i> Basal Curve &amp; 3-Hour Lookback</h4>
+                            <h5>How Basal Rates Are Tuned:</h5>
+                            <p>Autotune sums glucose deviations in basal periods for each clock hour. Rather than adjusting the current hour, it applies adjustments to the <strong>preceding 3 hours</strong>.</p>
+                            <h5>Why Preceding Hours?</h5>
+                            <p>Subcutaneous insulin has an absorption and peak depot delay. Glucose deviations observed at 06:00 are caused by basal insulin infused between 03:00 and 05:00.</p>
+                            <h5>Chart Series:</h5>
+                            <ul>
+                                <li><strong>Solid Blue Line:</strong> Baseline Pump Basal</li>
+                                <li><strong>Dashed Green Line:</strong> Recommended Tuned Basal</li>
+                                <li><strong>Shaded Corridor:</strong> Permitted safety range [Min Cap, Max Cap]</li>
+                                <li><strong>Bottom Bars:</strong> Hourly BG deviations in mmol/L</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div style="font-size: 12px; color: var(--text-secondary);">
+                    <span style="display: inline-block; width: 10px; height: 10px; background: #2f81f7; border-radius: 2px; margin-right: 4px;"></span> Baseline Pump Profile
+                    <span style="display: inline-block; width: 10px; height: 10px; background: #2ecc71; border-radius: 2px; margin-left: 12px; margin-right: 4px;"></span> Recommended Tuned
+                    <span style="display: inline-block; width: 10px; height: 10px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-left: 12px; margin-right: 4px;"></span> Permitted Safety Corridor
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="basal-chart" class="chart-box">
+                    <div style="display: flex; height: 100%; align-items: center; justify-content: center; color: var(--text-secondary);">
+                        Select days and click "Run Autotune" to plot the 24-hour basal curves.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 4: Daily Sequential Progression Table -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fa-solid fa-list-ol"></i>
+                    <span>Daily Sequential Tuning Progression &amp; Classification Breakdown</span>
+                    <!-- Strategic Help (i) Popover: Evidence Breakdown -->
+                    <div class="at-popover-wrapper">
+                        <button type="button" class="at-popover-trigger" aria-label="Evidence Classification Guide" title="Evidence Classification Guide">
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/>
+                            </svg>
+                        </button>
+                        <div class="at-guide-popover popover-right" onclick="event.stopPropagation()">
+                            <h4><i class="fa-solid fa-list-ol"></i> Evidence Classifications</h4>
+                            <h5>Four Classification Categories:</h5>
+                            <ul>
+                                <li><strong>Meal / CSF:</strong> Active Carbs on Board (COB) or positive post-meal deviation tail. Used for Carb Ratio tuning.</li>
+                                <li><strong>UAM:</strong> Unannounced Meals / large excursions. Separated from clean fasting basal data.</li>
+                                <li><strong>Basal:</strong> Clean background periods without active meals or UAM where glucose change is attributable to basal rate.</li>
+                                <li><strong>ISF:</strong> Stable non-meal periods with active bolus or correction IOB. Used to evaluate insulin sensitivity.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Step / Date Window (04:00 - 04:00)</th>
+                            <th>CGM Points</th>
+                            <th>Meal / CSF</th>
+                            <th>UAM Points</th>
+                            <th>Basal Points</th>
+                            <th>ISF Points</th>
+                            <th>Tuned Basal Total</th>
+                            <th>Tuned ISF (mmol/L/U)</th>
+                            <th>Tuned CR (g/U)</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="progression-table-body">
+                        <tr>
+                            <td colspan="10" style="text-align: center; color: var(--text-secondary); padding: 24px;">
+                                Awaiting execution. Daily sequential steps will populate here after clicking "Run Autotune".
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- CARD 5: Clinical Audit & Raw Diff (Tabbed Panel) -->
+        <div class="card">
+            <div class="card-header" style="padding-bottom: 0; border-bottom: none;">
+                <div class="card-title">
+                    <i class="fa-solid fa-code-compare"></i>
+                    <span>Clinical Audit &amp; Raw Profile Diff</span>
+                </div>
+            </div>
+            <div class="tabs-header">
+                <button type="button" class="tab-btn active" onclick="atSwitchTab('hourly')">Hourly Basal Schedule</button>
+                <button type="button" class="tab-btn" onclick="atSwitchTab('json')">Profile JSON Diff</button>
+                <button type="button" class="tab-btn" onclick="atSwitchTab('markdown')">Clinical Markdown Report</button>
+                <button type="button" class="tab-btn" onclick="atSwitchTab('bounds')">Query Bounds Archive</button>
+            </div>
+            <div class="card-body">
+                <!-- Tab 1: Hourly Basal Table -->
+                <div id="tab-content-hourly" class="tab-pane">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Hour of Day</th>
+                                    <th>Baseline Pump Rate</th>
+                                    <th>Recommended Tuned Rate</th>
+                                    <th>Delta (U/h)</th>
+                                    <th>% Change</th>
+                                    <th>Permitted Range [Min, Max]</th>
+                                    <th>Cap Status</th>
+                                    <th>Net Deviation (mmol/L)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="hourly-table-body">
+                                <tr>
+                                    <td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 24px;">
+                                        Hourly basal breakdown will populate after running Autotune.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Profile JSON Diff -->
+                <div id="tab-content-json" class="tab-pane" style="display: none;">
+                    <pre class="code-pre" id="at-diff-json">// Run Autotune to generate side-by-side JSON profile diff</pre>
+                </div>
+
+                <!-- Tab 3: Markdown Report -->
+                <div id="tab-content-markdown" class="tab-pane" style="display: none;">
+                    <pre class="code-pre" id="at-diff-markdown">// Run Autotune to generate formatted clinical markdown report</pre>
+                </div>
+
+                <!-- Tab 4: Query Bounds Archive -->
+                <div id="tab-content-bounds" class="tab-pane" style="display: none;">
+                    <pre class="code-pre" id="at-diff-bounds">// Query bounds and execution diagnostics for reproducible clinical audit</pre>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/ns-date-selector.js"></script>
+    <script src="/static/js/autotune.js"></script>
+</body>
+</html>
