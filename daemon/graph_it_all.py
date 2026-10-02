@@ -651,7 +651,7 @@ DATE_METRIC = {
 
 
 def _get_tz():
-    tz_name = getattr(config, "TIMEZONE", "UTC")
+    tz_name = getattr(config, "TIMEZONE", "Australia/Perth")
     try:
         return ZoneInfo(tz_name)
     except Exception:
@@ -2176,7 +2176,7 @@ def api_query_graph_it_all():
         if conn is None:
             return jsonify({"error": "Database temporarily unavailable. Please retry."}), 503
 
-        tz_name = getattr(config, "TIMEZONE", "UTC")
+        tz_name = getattr(config, "TIMEZONE", "Australia/Perth")
 
         with conn:
             rows, exec_ms = _compile_and_execute_query(

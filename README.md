@@ -1,9 +1,13 @@
 # Nightscout Monitor
 
-A self-hosted analytics and visualisation suite for **Nightscout** and **AndroidAPS** (oref1 / openaps), with dashboards, clinical reports, trend exploration, and diary logging. Compatibility with other data sources may vary.
+A high-performance, analytics and visualisation suite for people using **Nightscout** and **AndroidAPS** (oref1 / openaps).  The app was built for my own personal use, so is heavily slanted towards AndroidAPS, Nightscout and Omnipod use. Other combinations are untested.
 
 **NS Monitor** provides deep clinical insights, responsive trend exploration, AGP/Patterns analysis, continuous HbA1c estimation, and diary event tracking. It is designed to show graphs with sub-second query latency over multi-year datasets.
 
+
+---
+
+And full disclosure, the app was entirely Vibe Coded by AI.
 
 ---
 
@@ -117,7 +121,7 @@ NIGHTSCOUT_URL=https://your-nightscout.example.com/api/v1
 API_SECRET=your_nightscout_api_secret
 
 # Your local timezone
-TIMEZONE=UTC
+TIMEZONE=Australia/Perth
 ```
 
 ### 3. Launch Services

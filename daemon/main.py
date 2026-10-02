@@ -54,7 +54,7 @@ def add_no_cache_headers(response):
 
 # CENTRAL LOGGING SETUP (Rotates daily at local midnight, retains 7 days, in-memory SSE ring buffer)
 def _sync_process_tz():
-    tz_name = getattr(config, "TIMEZONE", "UTC")
+    tz_name = getattr(config, "TIMEZONE", "Australia/Perth")
     tz_name = os.environ.get("TIMEZONE", tz_name)
     if hasattr(time, "tzset"):
         os.environ["TZ"] = tz_name
@@ -1057,7 +1057,7 @@ def api_carpet_plot():
     conn = database.get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT COALESCE((SELECT value FROM system_config WHERE key = 'TIMEZONE' LIMIT 1), 'UTC')")
+        cur.execute("SELECT COALESCE((SELECT value FROM system_config WHERE key = 'TIMEZONE' LIMIT 1), 'Australia/Perth')")
         tz_name = cur.fetchone()[0]
 
         cur.execute("""
@@ -2493,7 +2493,7 @@ def update_settings():
         try:
             ZoneInfo(timezone_name)
         except Exception:
-            return jsonify({"status": "error", "message": "Timezone must be a valid IANA name, such as Etc/UTC."}), 400
+            return jsonify({"status": "error", "message": "Timezone must be a valid IANA name, such as Australia/Perth."}), 400
         data['TIMEZONE'] = timezone_name
     try:
         conn = database.get_conn()

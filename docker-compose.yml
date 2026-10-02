@@ -40,7 +40,7 @@ services:
       - .env
     environment:
       PYTHONUNBUFFERED: 1
-      TZ: ${TIMEZONE:-UTC}
+      TZ: ${TIMEZONE:-Australia/Perth}
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-8080}:8080"
